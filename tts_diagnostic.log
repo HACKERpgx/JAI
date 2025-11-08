@@ -1,0 +1,134 @@
+2025-10-08 22:00:08,590 - INFO - Starting TTS Diagnostic Test...
+2025-10-08 22:00:08,591 - INFO - Initializing TTS engine...
+2025-10-08 22:00:08,790 - INFO - Imported existing <module 'comtypes.gen' from 'C:\\Python313\\Lib\\site-packages\\comtypes\\gen\\__init__.py'>
+2025-10-08 22:00:08,791 - INFO - Using writeable comtypes cache directory: 'C:\Python313\Lib\site-packages\comtypes\gen'
+2025-10-08 22:00:09,083 - INFO - 
+=== Available Voices ===
+2025-10-08 22:00:09,083 - INFO - 1. ID: HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Speech\Voices\Tokens\TTS_MS_EN-US_DAVID_11.0
+2025-10-08 22:00:09,083 - INFO -    Name: Microsoft David Desktop - English (United States)
+2025-10-08 22:00:09,084 - INFO -    Languages: []
+2025-10-08 22:00:09,085 - INFO -    Gender: None
+2025-10-08 22:00:09,085 - INFO - ----------------------------------------
+2025-10-08 22:00:09,085 - INFO - 2. ID: HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Speech\Voices\Tokens\TTS_MS_EN-US_ZIRA_11.0
+2025-10-08 22:00:09,085 - INFO -    Name: Microsoft Zira Desktop - English (United States)
+2025-10-08 22:00:09,086 - INFO -    Languages: []
+2025-10-08 22:00:09,086 - INFO -    Gender: None
+2025-10-08 22:00:09,086 - INFO - ----------------------------------------
+2025-10-08 22:00:09,087 - INFO - 
+=== Testing Default Voice ===
+2025-10-08 22:00:09,087 - INFO - Testing with text: This is a test of the text-to-speech system. Hello, world!
+2025-10-08 22:00:09,087 - INFO - Speaking... (you should hear the test message)
+2025-10-08 22:00:13,736 - INFO - 
+=== Testing All Available Voices ===
+2025-10-08 22:00:13,737 - INFO - Testing voice 1: Microsoft David Desktop - English (United States)
+2025-10-08 22:00:19,098 - INFO - Testing voice 2: Microsoft Zira Desktop - English (United States)
+2025-10-08 22:00:24,931 - INFO - 
+=== TTS Test Complete ===
+2025-10-08 22:00:24,936 - INFO - TTS test completed successfully! Check the output above for available voices.
+2025-10-08 22:13:47,885 - INFO - Starting TTS Diagnostic Test...
+2025-10-08 22:13:47,918 - INFO - Initializing TTS engine...
+2025-10-08 22:13:48,429 - INFO - Imported existing <module 'comtypes.gen' from 'C:\\Python313\\Lib\\site-packages\\comtypes\\gen\\__init__.py'>
+2025-10-08 22:13:48,430 - INFO - Using writeable comtypes cache directory: 'C:\Python313\Lib\site-packages\comtypes\gen'
+2025-10-08 22:13:48,887 - INFO - 
+=== Available Voices ===
+2025-10-08 22:13:48,887 - INFO - 1. ID: HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Speech\Voices\Tokens\TTS_MS_EN-US_DAVID_11.0
+2025-10-08 22:13:48,889 - INFO -    Name: Microsoft David Desktop - English (United States)
+2025-10-08 22:13:48,890 - INFO -    Languages: []
+2025-10-08 22:13:48,890 - INFO -    Gender: None
+2025-10-08 22:13:48,891 - INFO - ----------------------------------------
+2025-10-08 22:13:48,891 - INFO - 2. ID: HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Speech\Voices\Tokens\TTS_MS_EN-US_ZIRA_11.0
+2025-10-08 22:13:48,892 - INFO -    Name: Microsoft Zira Desktop - English (United States)
+2025-10-08 22:13:48,892 - INFO -    Languages: []
+2025-10-08 22:13:48,893 - INFO -    Gender: None
+2025-10-08 22:13:48,895 - INFO - ----------------------------------------
+2025-10-08 22:13:48,898 - INFO - 
+=== Testing Default Voice ===
+2025-10-08 22:13:48,901 - INFO - Testing with text: This is a test of the text-to-speech system. Hello, world!
+2025-10-08 22:13:48,903 - INFO - Speaking... (you should hear the test message)
+2025-10-08 22:13:53,278 - INFO - 
+=== Testing All Available Voices ===
+2025-10-08 22:13:53,280 - INFO - Testing voice 1: Microsoft David Desktop - English (United States)
+2025-10-08 22:13:58,362 - INFO - Testing voice 2: Microsoft Zira Desktop - English (United States)
+2025-10-08 22:14:03,533 - INFO - 
+=== TTS Test Complete ===
+2025-10-08 22:14:03,541 - INFO - TTS test completed successfully! Check the output above for available voices.
+2025-10-08 22:14:39,481 - INFO - Starting TTS Diagnostic Test...
+2025-10-08 22:14:39,483 - INFO - Initializing TTS engine...
+2025-10-08 22:14:39,814 - INFO - Imported existing <module 'comtypes.gen' from 'C:\\Python313\\Lib\\site-packages\\comtypes\\gen\\__init__.py'>
+2025-10-08 22:14:39,815 - INFO - Using writeable comtypes cache directory: 'C:\Python313\Lib\site-packages\comtypes\gen'
+2025-10-08 22:14:40,548 - INFO - 
+=== Audio Settings ===
+2025-10-08 22:14:40,550 - INFO - Volume: 1.0 (0.0 to 1.0)
+2025-10-08 22:14:40,551 - INFO - Rate: 200 (words per minute)
+2025-10-08 22:14:40,555 - INFO - 
+=== Available Voices ===
+2025-10-08 22:14:40,556 - INFO - 1. ID: HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Speech\Voices\Tokens\TTS_MS_EN-US_DAVID_11.0
+2025-10-08 22:14:40,558 - INFO -    Name: Microsoft David Desktop - English (United States)
+2025-10-08 22:14:40,559 - INFO -    Languages: []
+2025-10-08 22:14:40,559 - INFO -    Gender: None
+2025-10-08 22:14:40,560 - INFO - ----------------------------------------
+2025-10-08 22:14:40,562 - INFO - 2. ID: HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Speech\Voices\Tokens\TTS_MS_EN-US_ZIRA_11.0
+2025-10-08 22:14:40,563 - INFO -    Name: Microsoft Zira Desktop - English (United States)
+2025-10-08 22:14:40,564 - INFO -    Languages: []
+2025-10-08 22:14:40,564 - INFO -    Gender: None
+2025-10-08 22:14:40,565 - INFO - ----------------------------------------
+2025-10-08 22:14:40,565 - INFO - 
+=== Testing Default Voice ===
+2025-10-08 22:14:40,567 - INFO - Testing with text: This is a test of the text-to-speech system. Hello, world!
+2025-10-08 22:14:40,571 - INFO - 
+Testing voice 1: Microsoft David Desktop - English (United States)
+2025-10-08 22:14:46,104 - INFO - Did you hear the voice? (y/n)
+2025-10-08 22:15:21,463 - INFO - Great! Voice 1 is working.
+2025-10-08 22:15:21,464 - INFO - 
+Testing voice 2: Microsoft Zira Desktop - English (United States)
+2025-10-08 22:15:21,465 - ERROR - Error testing voice 2: run loop already started
+2025-10-08 22:15:21,466 - INFO - 
+=== Testing All Available Voices ===
+2025-10-08 22:15:21,466 - INFO - Testing voice 1: Microsoft David Desktop - English (United States)
+2025-10-08 22:15:21,467 - ERROR - Error with voice 1: run loop already started
+2025-10-08 22:15:21,468 - INFO - Testing voice 2: Microsoft Zira Desktop - English (United States)
+2025-10-08 22:15:21,469 - ERROR - Error with voice 2: run loop already started
+2025-10-08 22:15:21,470 - INFO - 
+=== TTS Test Complete ===
+2025-10-08 22:15:21,470 - INFO - TTS test completed successfully! Check the output above for available voices.
+2025-10-08 22:30:45,228 - INFO - Starting TTS Diagnostic Test...
+2025-10-08 22:30:45,230 - INFO - Initializing TTS engine...
+2025-10-08 22:30:45,369 - INFO - Imported existing <module 'comtypes.gen' from 'C:\\Python313\\Lib\\site-packages\\comtypes\\gen\\__init__.py'>
+2025-10-08 22:30:45,375 - INFO - Using writeable comtypes cache directory: 'C:\Python313\Lib\site-packages\comtypes\gen'
+2025-10-08 22:30:45,844 - ERROR - Error getting audio devices: 'POINTER(IMMDevice)' object has no attribute 'GetDisplayName'
+2025-10-08 22:30:45,846 - INFO - 
+=== Audio Settings ===
+2025-10-08 22:30:45,847 - INFO - Volume: 1.0 (0.0 to 1.0)
+2025-10-08 22:30:45,849 - INFO - Rate: 200 (words per minute)
+2025-10-08 22:30:45,857 - INFO - 
+=== Available Voices ===
+2025-10-08 22:30:45,863 - INFO - 1. ID: HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Speech\Voices\Tokens\TTS_MS_EN-US_DAVID_11.0
+2025-10-08 22:30:45,865 - INFO -    Name: Microsoft David Desktop - English (United States)
+2025-10-08 22:30:45,866 - INFO -    Languages: []
+2025-10-08 22:30:45,868 - INFO -    Gender: None
+2025-10-08 22:30:45,869 - INFO - ----------------------------------------
+2025-10-08 22:30:45,870 - INFO - 2. ID: HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Speech\Voices\Tokens\TTS_MS_EN-US_ZIRA_11.0
+2025-10-08 22:30:45,872 - INFO -    Name: Microsoft Zira Desktop - English (United States)
+2025-10-08 22:30:45,874 - INFO -    Languages: []
+2025-10-08 22:30:45,875 - INFO -    Gender: None
+2025-10-08 22:30:45,877 - INFO - ----------------------------------------
+2025-10-08 22:30:45,878 - INFO - 
+=== Testing Default Voice ===
+2025-10-08 22:30:45,880 - INFO - Testing with text: This is a test of the text-to-speech system. Hello, world!
+2025-10-08 22:30:45,886 - ERROR - Error getting audio devices: 'POINTER(IMMDevice)' object has no attribute 'GetDisplayName'
+2025-10-08 22:30:45,888 - INFO - 
+Testing voice 1: Microsoft David Desktop - English (United States)
+2025-10-08 22:30:51,547 - INFO - Did you hear the voice? (y/n)
+2025-10-08 22:31:00,532 - INFO - Great! Voice 1 is working.
+2025-10-08 22:31:00,532 - INFO - 
+Testing voice 2: Microsoft Zira Desktop - English (United States)
+2025-10-08 22:31:00,533 - ERROR - Error testing voice 2: run loop already started
+2025-10-08 22:31:00,534 - INFO - 
+=== Testing All Available Voices ===
+2025-10-08 22:31:00,534 - INFO - Testing voice 1: Microsoft David Desktop - English (United States)
+2025-10-08 22:31:00,535 - ERROR - Error with voice 1: run loop already started
+2025-10-08 22:31:00,538 - INFO - Testing voice 2: Microsoft Zira Desktop - English (United States)
+2025-10-08 22:31:00,541 - ERROR - Error with voice 2: run loop already started
+2025-10-08 22:31:00,542 - INFO - 
+=== TTS Test Complete ===
+2025-10-08 22:31:00,542 - INFO - TTS test completed successfully! Check the output above for available voices.

@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0c0c0d" />
+  <link rel="manifest" href="/manifest.json" />
+  <title>JAI Assistant</title>
+  <style>
+    :root { --bg:#0c0c0d; --fg:#e9e9ea; --muted:#9aa0a6; --accent:#6ee7b7; --card:#1a1b1e; }
+    html, body { background: var(--bg); color: var(--fg); font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; margin:0; padding:0; }
+    .shell { max-width: 720px; margin: 0 auto; padding: 16px; }
+    header { display:flex; align-items:center; gap:10px; margin: 4px 0 12px; }
+    .brand { font-weight: 700; letter-spacing: 0.2px; }
+    .card { background: var(--card); border-radius: 12px; padding: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.25); }
+    #log { height: 48vh; overflow:auto; display:flex; flex-direction:column; gap:8px; scroll-behavior: smooth; }
+    .msg { padding:10px 12px; border-radius: 10px; white-space: pre-wrap; line-height: 1.35; }
+    .me  { background:#233; align-self:flex-end; }
+    .bot { background:#222; border: 1px solid #2b2f36; }
+    .row { display:flex; gap:8px; align-items:center; margin-top:10px; }
+    input[type="text"], textarea { flex:1; padding:10px 12px; border-radius:10px; border:1px solid #2b2f36; background:#121315; color:var(--fg); outline:none; }
+    button { background: var(--accent); color:#0c0c0d; border: none; border-radius: 10px; padding: 10px 14px; font-weight: 600; }
+    select, input[type="file"] { color: var(--fg); }
+    small { color: var(--muted); }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <header>
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9L12 3z" stroke="#6ee7b7" stroke-width="1.5"/></svg>
+      <div class="brand">JAI Assistant</div>
+    </header>
+
+    <div class="card" id="chat">
+      <div id="log"></div>
+      <div class="row">
+        <input id="txt" type="text" placeholder="Type a command..." />
+        <button id="send">Send</button>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:12px">
+      <div class="row">
+        <input id="audio" type="file" accept=".wav,.flac,audio/wav,audio/flac,audio/*" />
+        <select id="lang">
+          <option value="en-US" selected>English (US)</option>
+          <option value="ur-PK">Urdu (PK)</option>
+          <option value="hi-IN">Hindi (IN)</option>
+          <option value="ar-SA">Arabic (SA)</option>
+        </select>
+        <button id="upload">Transcribe</button>
+      </div>
+      <small>Tip: For best results, upload WAV or FLAC. Direct mic recording in mobile browsers may produce formats not yet supported.</small>
+    </div>
+
+    <div style="margin-top:12px">
+      <small>Installable: Add to Home Screen for app-like experience.</small>
+    </div>
+  </div>
+
+<script>
+  function rid(){ return ([1e7]+-1e3+-4e3+-8e3+-1e11).replace(/[018]/g,c=>(c^crypto.getRandomValues(new Uint8Array(1))[0]&15>>c/4).toString(16)); }
+  const log = document.getElementById('log');
+  function push(role, text){
+    const div = document.createElement('div');
+    div.className = 'msg ' + (role === 'me' ? 'me' : 'bot');
+    div.textContent = text;
+    log.appendChild(div);
+    log.scrollTop = log.scrollHeight;
+  }
+  async function sendText(){
+    const input = document.getElementById('txt');
+    const text = input.value.trim();
+    if(!text) return;
+    push('me', text);
+    input.value = '';
+    try {
+      const res = await fetch('/api/text', {
+        method:'POST',
+        headers: { 'Content-Type':'application/json', 'X-Request-Id': rid() },
+        body: JSON.stringify({ text })
+      });
+      const data = await res.json();
+      push('bot', data.response || JSON.stringify(data));
+    } catch(e){
+      push('bot', 'Network error');
+    }
+  }
+  async function sendVoice(){
+    const f = document.getElementById('audio').files[0];
+    const lang = document.getElementById('lang').value;
+    if(!f){ push('bot','Please choose an audio file (WAV/FLAC).'); return; }
+    const fd = new FormData();
+    fd.append('file', f);
+    fd.append('lang', lang);
+    try{
+      const res = await fetch('/api/voice', { method:'POST', headers: { 'X-Request-Id': rid() }, body: fd });
+      const data = await res.json();
+      if(data.transcript) push('me', data.transcript);
+      push('bot', data.response || data.error || 'No response');
+    } catch(e){
+      push('bot','Upload failed');
+    }
+  }
+  document.getElementById('send').addEventListener('click', sendText);
+  document.getElementById('txt').addEventListener('keydown', e=>{ if(e.key==='Enter') sendText(); });
+  document.getElementById('upload').addEventListener('click', sendVoice);
+
+  if('serviceWorker' in navigator){
+    window.addEventListener('load', ()=>{
+      navigator.serviceWorker.register('/service-worker.js').catch(()=>{});
+    });
+  }
+</script>
+</body>
+</html>

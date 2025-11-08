@@ -1,0 +1,15 @@
+2025-09-22 16:20:54,826 - INFO - Imported existing <module 'comtypes.gen' from 'C:\\Python313\\Lib\\site-packages\\comtypes\\gen\\__init__.py'>
+2025-09-22 16:20:54,827 - INFO - Using writeable comtypes cache directory: 'C:\Python313\Lib\site-packages\comtypes\gen'
+2025-09-22 16:20:55,204 - INFO - Male voice selected: HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Speech\Voices\Tokens\TTS_MS_EN-US_DAVID_11.0
+2025-09-22 16:21:05,205 - ERROR - TTS timed out after 10 seconds
+2025-09-22 16:21:05,205 - INFO - Attempted to speak: Weather in Toronto
+2025-10-08 21:43:29,248 - INFO - Imported existing <module 'comtypes.gen' from 'C:\\Python313\\Lib\\site-packages\\comtypes\\gen\\__init__.py'>
+2025-10-08 21:43:29,249 - INFO - Using writeable comtypes cache directory: 'C:\Python313\Lib\site-packages\comtypes\gen'
+2025-10-08 21:43:30,197 - INFO - Male voice selected: HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Speech\Voices\Tokens\TTS_MS_EN-US_DAVID_11.0
+2025-10-08 21:43:40,201 - ERROR - TTS timed out after 10 seconds
+2025-10-08 21:43:40,201 - INFO - TTS success: False
+2025-10-08 21:52:10,654 - INFO - Imported existing <module 'comtypes.gen' from 'C:\\Python313\\Lib\\site-packages\\comtypes\\gen\\__init__.py'>
+2025-10-08 21:52:10,655 - INFO - Using writeable comtypes cache directory: 'C:\Python313\Lib\site-packages\comtypes\gen'
+2025-10-08 21:52:11,198 - INFO - Male voice selected: HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Speech\Voices\Tokens\TTS_MS_EN-US_DAVID_11.0
+2025-10-08 21:52:21,215 - ERROR - TTS timed out after 10 seconds
+2025-10-08 21:52:21,215 - INFO - TTS success: False

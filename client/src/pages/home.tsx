@@ -21,7 +21,7 @@ import androidMockup from "@assets/generated_images/Android_phone_mockup_with_JA
 
 export default function Home() {
   return (
-    <div className="min-h-screen bg-[#0f0f0f] text-foreground overflow-hidden">
+    <div className="min-h-screen bg-[#0f0f0f] text-foreground overflow-x-hidden pb-32">
       {/* Animated gradient background */}
       <div className="fixed inset-0 z-0 overflow-hidden">
         <div className="absolute inset-0 bg-[#0f0f0f]" />
@@ -303,10 +303,10 @@ interface FeatureCardProps {
 function FeatureCard({ icon, title, description, testId }: FeatureCardProps) {
   return (
     <Card 
-      className="group p-8 bg-card/40 backdrop-blur-sm border-border/40 hover:border-border/60 hover:bg-card/60 transition-all duration-300 hover:scale-[1.02]"
+      className="group p-8 bg-card/40 hover:bg-card/50 backdrop-blur-sm border-border/40 hover:border-border/60 transition-all duration-300"
       data-testid={testId}
     >
-      <div className="mb-4 text-primary group-hover:scale-110 transition-transform duration-300 inline-block">
+      <div className="mb-4 text-primary inline-block">
         {icon}
       </div>
       <h3 className="text-xl font-semibold mb-3 text-foreground">

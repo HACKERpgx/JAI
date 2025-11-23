@@ -25,6 +25,7 @@ import json
 import uuid
 import contextvars
 import time
+from contextlib import asynccontextmanager
 
 try:
     import pyttsx3
@@ -1341,18 +1342,31 @@ def execute_command(command: str, session: UserSession, suppress_tts: bool = Fal
                 "Good to see you, sir.",
                 "Ready and waiting, sir."
             ]
-        return random.choice(greetings)
+        resp_greet = random.choice(greetings)
+        try:
+            if getattr(session, "tts_enabled", False):
+                speak_async_text(resp_greet, logging_extra, speak_lang)
+        except Exception:
+            pass
+        return resp_greet
 
     if intent == "activate aj":
-        return "AJ is active. Say 'activate text mode' to text me or 'activate voice mode' to use voice control."
+        session.tts_enabled = True
+        response = "AJ is active"
+        speak_async_text(response, logging_extra, speak_lang)
+        return response
 
     if intent == "activate text mode":
         session.tts_enabled = True
-        return "Text mode activated. I will respond in both text and voice."
+        response = "Text mode activated. I will respond in both text and voice."
+        speak_async_text(response, logging_extra, speak_lang)
+        return response
 
     if intent == "activate voice mode":
         session.tts_enabled = True
-        return "Voice mode activated. I will respond in both text and voice."
+        response = "Voice mode activated. I will respond in both text and voice."
+        speak_async_text(response, logging_extra, speak_lang)
+        return response
     
     try:
         digits_in_cmd = re.sub(r"\D", "", command)
@@ -1747,7 +1761,62 @@ def execute_command(command: str, session: UserSession, suppress_tts: bool = Fal
 # -----------------------------
 # FastAPI App
 # -----------------------------
-app = FastAPI(title="JAI Networked Assistant")
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    global screen_watcher_thread, voice_listener_thread
+    try:
+        if win32gui is not None:
+            screen_watcher_thread = ScreenWatcher(interval=SCREEN_WATCH_INTERVAL)
+            screen_watcher_thread.start()
+        else:
+            logging.warning("Screen watcher unavailable", extra={"user": "system"})
+    except Exception:
+        logging.warning("Screen watcher failed to start", extra={"user": "system"})
+    try:
+        if ENABLE_VOICE_LISTENER and sr is not None:
+            voice_listener_thread = VoiceCommandListener(hotword=VOICE_HOTWORD)
+            voice_listener_thread.start()
+        else:
+            logging.warning("Voice listener unavailable", extra={"user": "system"})
+    except Exception:
+        logging.warning("Voice listener failed to start", extra={"user": "system"})
+
+    yield
+
+    try:
+        if tts_module is not None and hasattr(tts_module, "shutdown"):
+            try:
+                tts_module.shutdown()
+            except Exception:
+                pass
+    except Exception:
+        pass
+    try:
+        if 'calendar_manager' in globals() and calendar_manager is not None:
+            try:
+                if getattr(calendar_manager, 'scheduler', None) is not None:
+                    calendar_manager.scheduler.shutdown(wait=False)
+            except Exception:
+                pass
+            try:
+                if getattr(calendar_manager, 'conn', None) is not None:
+                    calendar_manager.conn.close()
+            except Exception:
+                pass
+    except Exception:
+        pass
+    try:
+        if screen_watcher_thread is not None:
+            screen_watcher_thread.stop()
+    except Exception:
+        pass
+    try:
+        if voice_listener_thread is not None:
+            voice_listener_thread.stop()
+    except Exception:
+        pass
+
+app = FastAPI(title="JAI Networked Assistant", lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -1830,6 +1899,7 @@ def handle_command(cmd: CommandRequest, request: Request):
     finally:
         duration_ms = int((datetime.now() - start_time).total_seconds() * 1000)
         logging.info("Command processed in %d ms", duration_ms, extra=logging_extra)
+    
     return {"response": response_text, "request_id": request_id_ctx_var.get()}
 
 class TaskerCommandRequest(BaseModel):
@@ -1887,39 +1957,7 @@ def nasa_apod(date: Optional[str] = None, hd: bool = False, request: Request = N
         logging.error("NASA APOD error: %s", e, extra=logging_extra, exc_info=True)
         return JSONResponse(status_code=500, content={"detail": "Internal server error", "request_id": request_id_ctx_var.get()})
 
-@app.on_event("startup")
-async def _startup_bg():
-    global screen_watcher_thread, voice_listener_thread
-    try:
-        if win32gui is not None:
-            screen_watcher_thread = ScreenWatcher(interval=SCREEN_WATCH_INTERVAL)
-            screen_watcher_thread.start()
-        else:
-            logging.warning("Screen watcher unavailable", extra={"user": "system"})
-    except Exception:
-        logging.warning("Screen watcher failed to start", extra={"user": "system"})
-    try:
-        if ENABLE_VOICE_LISTENER and sr is not None:
-            voice_listener_thread = VoiceCommandListener(hotword=VOICE_HOTWORD)
-            voice_listener_thread.start()
-        else:
-            logging.warning("Voice listener unavailable", extra={"user": "system"})
-    except Exception:
-        logging.warning("Voice listener failed to start", extra={"user": "system"})
-
-@app.on_event("shutdown")
-async def _shutdown_bg():
-    global screen_watcher_thread, voice_listener_thread
-    try:
-        if screen_watcher_thread is not None:
-            screen_watcher_thread.stop()
-    except Exception:
-        pass
-    try:
-        if voice_listener_thread is not None:
-            voice_listener_thread.stop()
-    except Exception:
-        pass
+ 
 
 if __name__ == "__main__":
     import uvicorn

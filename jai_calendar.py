@@ -325,10 +325,20 @@ class CalendarManager:
     
     def __del__(self):
         """Cleanup."""
-        if hasattr(self, 'scheduler') and self.scheduler:
-            self.scheduler.shutdown()
-        if hasattr(self, 'conn'):
-            self.conn.close()
+        try:
+            if hasattr(self, 'scheduler') and getattr(self, 'scheduler', None):
+                try:
+                    self.scheduler.shutdown(wait=False)
+                except Exception:
+                    pass
+            if hasattr(self, 'conn') and getattr(self, 'conn', None):
+                try:
+                    self.conn.close()
+                except Exception:
+                    pass
+        except Exception:
+            # Ignore cleanup errors at interpreter shutdown
+            pass
 
 
 def handle_calendar_command(command: str, calendar: CalendarManager) -> Optional[str]:

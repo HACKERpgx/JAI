@@ -10,6 +10,13 @@ import os
 from jai_assistant import execute_command, sessions as ja_sessions, UserSession as JAUserSession, request_id_ctx_var
 import tempfile
 import pathlib
+import shutil
+import subprocess
+from fastapi.middleware.cors import CORSMiddleware
+try:
+    from openai import OpenAI
+except Exception:
+    OpenAI = None
 try:
     import speech_recognition as sr
 except Exception:
@@ -25,6 +32,17 @@ if JAI_MOBILE_TOKEN == "my-super-secret-token-123":
 
 # Store device states (in-memory for simplicity)
 device_states = {}
+
+# CORS (restrict in production by setting JAI_CORS_ORIGINS="https://your.domain")
+origins_env = os.environ.get("JAI_CORS_ORIGINS", "*")
+allow_origins = [o.strip() for o in origins_env.split(",") if o.strip()] or ["*"]
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=allow_origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 class HeartbeatRequest(BaseModel):
     deviceId: str
@@ -159,27 +177,88 @@ async def api_text(req: WebTextRequest, request: Request):
         except Exception:
             pass
 
+def _ffmpeg_bin() -> str:
+    return os.environ.get("FFMPEG_BIN") or "ffmpeg"
+
+def _ffmpeg_exists() -> bool:
+    bin_path = _ffmpeg_bin()
+    try:
+        if os.path.isabs(bin_path) and os.path.exists(bin_path):
+            return True
+    except Exception:
+        pass
+    return shutil.which(bin_path) is not None
+
+def _convert_to_wav16k_mono(src_path: str) -> str:
+    dst_fd, dst_path = tempfile.mkstemp(suffix=".wav")
+    os.close(dst_fd)
+    # ffmpeg -i input -ac 1 -ar 16000 -y output.wav
+    cmd = [
+        _ffmpeg_bin(), "-y",
+        "-i", src_path,
+        "-ac", "1",
+        "-ar", "16000",
+        dst_path,
+    ]
+    try:
+        subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
+        return dst_path
+    except subprocess.CalledProcessError as e:
+        try:
+            os.remove(dst_path)
+        except Exception:
+            pass
+        raise RuntimeError("ffmpeg conversion failed") from e
+
+def _transcribe_wav(path: str, lang: str) -> str:
+    # Prefer OpenAI Whisper if key and client available
+    api_key = os.environ.get("OPENAI_API_KEY")
+    if OpenAI and api_key:
+        try:
+            client = OpenAI(api_key=api_key)
+            with open(path, "rb") as f:
+                tr = client.audio.transcriptions.create(model="whisper-1", file=f)
+            if hasattr(tr, "text") and tr.text:
+                return tr.text
+        except Exception:
+            pass
+    # Fallback to SpeechRecognition offline API (uses Google Web Speech - internet required)
+    if sr is None:
+        return ""
+    try:
+        r = sr.Recognizer()
+        with sr.AudioFile(path) as source:
+            audio = r.record(source)
+        try:
+            return r.recognize_google(audio, language=lang)
+        except Exception:
+            return ""
+    except Exception:
+        return ""
+
 @app.post("/api/voice")
 async def api_voice(request: Request, file: UploadFile = File(...), lang: str = Form("en-US")):
     rid = request.headers.get("x-request-id") or str(uuid.uuid4())
     token = request_id_ctx_var.set(rid)
     try:
-        if sr is None:
-            return JSONResponse({"error": "SpeechRecognition not available"}, status_code=400)
-        suffix = pathlib.Path(file.filename or "").suffix.lower()
-        if suffix not in {".wav", ".flac"}:
-            return JSONResponse({"error": "Unsupported audio format. Please upload WAV or FLAC."}, status_code=400)
-        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+        # Save uploaded audio (accept webm/ogg/wav/flac/etc.)
+        up_ext = pathlib.Path(file.filename or "").suffix.lower() or ".webm"
+        with tempfile.NamedTemporaryFile(delete=False, suffix=up_ext) as tmp:
             data = await file.read()
             tmp.write(data)
-            tmp_path = tmp.name
-        r = sr.Recognizer()
-        try:
-            with sr.AudioFile(tmp_path) as source:
-                audio = r.record(source)
-            text = r.recognize_google(audio, language=lang)
-        except Exception:
-            text = ""
+            src_path = tmp.name
+
+        # Ensure we have ffmpeg for webm/ogg -> wav conversion
+        if not _ffmpeg_exists():
+            # If file is already wav/flac we can try SpeechRecognition directly; else error
+            if up_ext not in {".wav", ".flac"}:
+                return JSONResponse({"error": "ffmpeg not installed. Install ffmpeg to process web audio."}, status_code=400)
+            wav_path = src_path
+        else:
+            wav_path = _convert_to_wav16k_mono(src_path)
+
+        # Transcribe
+        text = _transcribe_wav(wav_path, lang)
         web_id = request.cookies.get("jai_web_id") or "anon"
         username = f"web:{web_id}"
         if username not in ja_sessions:

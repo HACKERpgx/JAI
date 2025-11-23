@@ -50,7 +50,11 @@
         </select>
         <button id="upload">Transcribe</button>
       </div>
-      <small>Tip: For best results, upload WAV or FLAC. Direct mic recording in mobile browsers may produce formats not yet supported.</small>
+      <div class="row">
+        <button id="recStart">Start Recording</button>
+        <button id="recStop">Stop</button>
+      </div>
+      <small>Mic recording uses MediaRecorder (webm/ogg). Server converts to 16k mono WAV (ffmpeg) and transcribes.</small>
     </div>
 
     <div style="margin-top:12px">
@@ -102,9 +106,49 @@
       push('bot','Upload failed');
     }
   }
+  // MediaRecorder capture (browser mic)
+  let mediaRecorder = null, recChunks = [], recStream = null;
+  async function startRecording(){
+    try{
+      recStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const preferred = [ 'audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus', 'audio/ogg' ];
+      let mime = preferred.find(t => MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(t)) || '';
+      mediaRecorder = new MediaRecorder(recStream, mime ? { mimeType: mime } : {});
+      recChunks = [];
+      mediaRecorder.ondataavailable = e => { if(e.data && e.data.size) recChunks.push(e.data); };
+      mediaRecorder.onstop = async () => {
+        try{
+          const lang = document.getElementById('lang').value;
+          const blob = new Blob(recChunks, { type: mediaRecorder.mimeType || 'audio/webm' });
+          const fd = new FormData();
+          const filename = (blob.type && blob.type.includes('ogg')) ? 'voice.ogg' : 'voice.webm';
+          fd.append('file', blob, filename);
+          fd.append('lang', lang);
+          const res = await fetch('/api/voice', { method:'POST', headers: { 'X-Request-Id': rid() }, body: fd });
+          const data = await res.json();
+          if(data.transcript) push('me', data.transcript);
+          push('bot', data.response || data.error || 'No response');
+        } catch(err){
+          push('bot','Recording upload failed');
+        } finally {
+          if(recStream){ recStream.getTracks().forEach(t => t.stop()); recStream = null; }
+        }
+      };
+      mediaRecorder.start(250);
+    } catch(e){
+      push('bot','Mic permission denied or unsupported browser.');
+    }
+  }
+  function stopRecording(){
+    try{
+      if(mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop();
+    } catch(e) {}
+  }
   document.getElementById('send').addEventListener('click', sendText);
   document.getElementById('txt').addEventListener('keydown', e=>{ if(e.key==='Enter') sendText(); });
   document.getElementById('upload').addEventListener('click', sendVoice);
+  document.getElementById('recStart').addEventListener('click', startRecording);
+  document.getElementById('recStop').addEventListener('click', stopRecording);
 
   if('serviceWorker' in navigator){
     window.addEventListener('load', ()=>{

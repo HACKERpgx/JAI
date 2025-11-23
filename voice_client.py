@@ -38,6 +38,7 @@ JAI_USERNAME = os.environ.get("JAI_USERNAME", "user1")
 JAI_PASSWORD = os.environ.get("JAI_PASSWORD", "pass1")
 WAKE_WORD = os.environ.get("WAKE_WORD", "Activate aj")
 TTS_VOICE = os.environ.get("TTS_VOICE", None)
+VOICE_CLIENT_SUPPRESS_TTS = os.environ.get("VOICE_CLIENT_SUPPRESS_TTS", "true").lower() in {"1", "true", "yes", "on"}
 
 
 class JAIVoiceClient:
@@ -71,7 +72,7 @@ class JAIVoiceClient:
         try:
             response = requests.post(
                 f"{self.server_url}/command",
-                json={"command": command, "suppress_tts": True},
+                json={"command": command, "suppress_tts": VOICE_CLIENT_SUPPRESS_TTS},
                 auth=self.auth,
                 timeout=60  # Increased to 60s for AI responses with Gemini
             )

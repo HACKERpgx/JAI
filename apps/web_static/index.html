@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>JAI Website</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="container">
+    <header class="header">
+      <div class="brand">
+        <div class="logo">JAI</div>
+        <h1>JAI Website</h1>
+      </div>
+      <div class="api-config">
+        <label for="apiBase">API Base</label>
+        <input id="apiBase" type="text" placeholder="http://localhost:8080" />
+        <button id="saveBase">Save</button>
+        <button id="healthBtn" class="secondary">Health</button>
+        <span id="healthStatus" class="status"></span>
+      </div>
+    </header>
+
+    <main class="main">
+      <section class="chat" aria-label="Chat">
+        <div id="messages" class="messages" aria-live="polite"></div>
+        <div class="composer">
+          <input id="textInput" type="text" placeholder="Type a command (e.g., what time is it, news, remind me...)" />
+          <button id="sendBtn" class="primary">Send</button>
+        </div>
+        <div class="voice-controls" aria-label="Voice Recorder">
+          <label for="voiceLang">Language</label>
+          <select id="voiceLang">
+            <option value="en-US" selected>English (US)</option>
+            <option value="ar-SA">Arabic (Saudi Arabia)</option>
+            <option value="ur-PK">Urdu (Pakistan)</option>
+            <option value="fr-FR">French (France)</option>
+          </select>
+          <button id="startRecBtn">Start Recording</button>
+          <button id="stopRecBtn" disabled>Stop</button>
+          <span id="voiceStatus" class="status"></span>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <small>Powered by JAI FastAPI backend. Configure API Base above.</small>
+    </footer>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

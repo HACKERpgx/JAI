@@ -1,7 +1,39 @@
 import subprocess
 import logging
 
- 
+try:
+    import win32gui, win32con
+except Exception:
+    win32gui = None
+    win32con = None
+
+def _restore_focus_by_title(substrings):
+    if win32gui is None:
+        return False
+    found = {"ok": False}
+    def _cb(hwnd, _):
+        try:
+            if not win32gui.IsWindowVisible(hwnd):
+                return True
+            title = (win32gui.GetWindowText(hwnd) or "").lower()
+            if any(s in title for s in substrings):
+                try:
+                    if win32gui.IsIconic(hwnd):
+                        win32gui.ShowWindow(hwnd, 9)
+                    win32gui.SetForegroundWindow(hwnd)
+                    found["ok"] = True
+                    return False
+                except Exception:
+                    return True
+            return True
+        except Exception:
+            return True
+    try:
+        win32gui.EnumWindows(_cb, None)
+    except Exception:
+        return False
+    return found["ok"]
+
 
 def handle_control_command(command, lang="en"):
     command = command.lower().strip()
@@ -70,6 +102,22 @@ def handle_control_command(command, lang="en"):
         except Exception as e:
             logging.error("Failed to restore windows: %s", e)
             return f"Failed to restore windows, {user_name}."
+
+    # Restore/focus Chrome specifically
+    if ("restore" in command or "focus" in command or "bring" in command) and ("chrome" in command or "google chrome" in command):
+        try:
+            if _restore_focus_by_title(["google chrome", "chrome"]):
+                response = f"Restoring Chrome, {user_name}."
+                logging.info("Restored/focused Chrome window")
+                return response
+            # Fallback: start Chrome if no window found
+            subprocess.Popen(["cmd", "/c", "start", "chrome"], shell=True)
+            response = f"Opening Chrome, {user_name}."
+            logging.info("Started Chrome as fallback")
+            return response
+        except Exception as e:
+            logging.error("Failed to restore Chrome: %s", e)
+            return f"Failed to restore Chrome, {user_name}."
 
     # Specific Windows Settings pages
     settings_map = {

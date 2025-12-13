@@ -57,14 +57,13 @@ except Exception:
     win32con = None
     win32clipboard = None
 
-from fastapi import FastAPI, Depends, HTTPException, status, Request, Response
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
-from fastapi.exceptions import RequestValidationError
-from pydantic import BaseModel, Field
 from typing import Optional, Dict, Any, List, Tuple
-from api.auth_routes import router as auth_router
-from api.auth_routes import require_auth
+from fastapi import FastAPI, HTTPException, Request, Depends, Header, Response
+from fastapi.responses import JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.exceptions import RequestValidationError
+from fastapi import APIRouter
+from pydantic import BaseModel, Field
 
 # Language support
 LANGUAGES = {
@@ -248,6 +247,8 @@ VOICE_LISTENER_TIMEOUT_SEC = int(os.environ.get("VOICE_LISTENER_TIMEOUT_SEC", "1
 VOICE_LISTENER_LANGS = [s.strip() for s in os.environ.get("VOICE_LISTENER_LANGS", "ur-PK,hi-IN,en-US,ar-SA").split(",") if s.strip()]
 SCREEN_WATCH_INTERVAL = float(os.environ.get("SCREEN_WATCH_INTERVAL", "0.7"))
 TYPE_DEDUP_WINDOW_SEC = float(os.environ.get("TYPE_DEDUP_WINDOW_SEC", "3.0"))
+VOICE_DEDUP_WINDOW_SEC = float(os.environ.get("VOICE_DEDUP_WINDOW_SEC", "2.0"))
+TTS_CALL_DEDUP_WINDOW_SEC = float(os.environ.get("TTS_CALL_DEDUP_WINDOW_SEC", "4.0"))
 
 # Initialize TTS with comprehensive error handling
 tts = None
@@ -926,6 +927,8 @@ def jai_reply(prompt: str, session: UserSession) -> str:
      
      # Add instruction to avoid repeating time information
      full_prompt += "\n\nIMPORTANT: If the user asks for the time, just return the time in a natural way without repeating it. Do not include the current time in your response unless specifically asked."
+     # Ensure language consistency and avoid echoing the prompt
+     full_prompt += "\nIMPORTANT: Respond in the same language as the user's input. Do not repeat or paraphrase the user's question; answer directly and concisely."
      
      messages = [
          {"role": "system", "content": full_prompt},
@@ -992,10 +995,32 @@ def jai_reply(prompt: str, session: UserSession) -> str:
 # -----------------------------
 # TTS helper
 # -----------------------------
+_TTS_CALL_LOCK = threading.Lock()
+
 def speak_async_text(text: str, logging_extra: dict | None = None, language: str | None = None):
     """Speak text asynchronously using tts_module if available."""
     if not SPEAK_RESPONSES or not tts_module or not text:
         return
+    with _TTS_CALL_LOCK:
+        # Guard: if TTS currently speaking, skip scheduling another speak
+        try:
+            if hasattr(tts_module, "is_speaking") and tts_module.is_speaking():
+                return
+        except Exception:
+            pass
+        # Call-level dedup to avoid re-speaking same text quickly
+        try:
+            norm = (text or "").strip()
+            global _LAST_TTS_CALL_TEXT, _LAST_TTS_CALL_TS
+            if "_LAST_TTS_CALL_TEXT" not in globals():
+                _LAST_TTS_CALL_TEXT, _LAST_TTS_CALL_TS = "", 0.0
+            now = time.time()
+            if norm == _LAST_TTS_CALL_TEXT and (now - _LAST_TTS_CALL_TS) < TTS_CALL_DEDUP_WINDOW_SEC:
+                return
+            _LAST_TTS_CALL_TEXT = norm
+            _LAST_TTS_CALL_TS = now
+        except Exception:
+            pass
     
     def _speak():
         try:
@@ -1183,6 +1208,8 @@ class VoiceCommandListener(threading.Thread):
         self._dictation = False
         self._r = sr.Recognizer() if sr else None
         self._langs = VOICE_LISTENER_LANGS
+        self._last_text = ""
+        self._last_ts = 0.0
         if self._r:
             try:
                 self._r.dynamic_energy_threshold = True
@@ -1210,6 +1237,13 @@ class VoiceCommandListener(threading.Thread):
                 except Exception:
                     pass
                 while not self._stop.is_set():
+                    # If TTS is currently speaking, wait briefly and skip listening to avoid echo
+                    try:
+                        if tts_module is not None and hasattr(tts_module, "is_speaking") and tts_module.is_speaking():
+                            time.sleep(0.2)
+                            continue
+                    except Exception:
+                        pass
                     audio = None
                     try:
                         audio = self._r.listen(source, timeout=VOICE_LISTENER_TIMEOUT_SEC, phrase_time_limit=DICTATION_PHRASE_TIME_LIMIT)
@@ -1230,7 +1264,22 @@ class VoiceCommandListener(threading.Thread):
                         continue
                     if not text:
                         continue
+                    # Drop any recognized text that occurs while TTS is still speaking
+                    try:
+                        if tts_module is not None and hasattr(tts_module, "is_speaking") and tts_module.is_speaking():
+                            continue
+                    except Exception:
+                        pass
                     low = text.lower().strip()
+                    # Deduplicate repeated recognitions within a short window
+                    try:
+                        now = time.time()
+                        if low == self._last_text and (now - self._last_ts) < VOICE_DEDUP_WINDOW_SEC:
+                            continue
+                        self._last_text = low
+                        self._last_ts = now
+                    except Exception:
+                        pass
                     try:
                         logging.info("[Voice] Heard: %s", low, extra={"user": "system"})
                     except Exception:
@@ -1742,20 +1791,13 @@ def execute_command(command: str, session: UserSession, suppress_tts: bool = Fal
     except Exception as e:
         logging.error("Memory storage error: %s", e, extra=logging_extra)
     
-    # Speak response asynchronously via tts.py module (if available)
+    # Speak response asynchronously via centralized helper (dedup + logging)
     should_speak = (SPEAK_RESPONSES and tts_module) and (session.tts_enabled or not suppress_tts)
-    if not should_speak:
-        return response
-
-    def _speak_async(text: str):
+    if should_speak:
         try:
-            lang = speak_lang or detect_language(text)
-            logging.info(f"Speaking response in {LANGUAGES.get(lang, {}).get('name', 'English')}")
-            tts_module.speak(text, language=lang)
-        except Exception as e:
-            logging.error("TTS speak error: %s", e, extra=logging_extra, exc_info=True)
-
-    threading.Thread(target=_speak_async, args=(response,), daemon=True).start()
+            speak_async_text(response, logging_extra, speak_lang)
+        except Exception:
+            pass
     return response
 
 # -----------------------------
@@ -1815,6 +1857,16 @@ async def lifespan(app: FastAPI):
             voice_listener_thread.stop()
     except Exception:
         pass
+
+JAI_API_TOKEN = os.environ.get("JAI_API_TOKEN", "")
+
+auth_router = APIRouter()
+
+def require_auth(authorization: Optional[str] = Header(None)):
+    if JAI_API_TOKEN:
+        if not authorization or authorization != f"Bearer {JAI_API_TOKEN}":
+            raise HTTPException(status_code=401, detail="Invalid token")
+    return {"session": {"user_id": "public"}}
 
 app = FastAPI(title="JAI Networked Assistant", lifespan=lifespan)
 app.add_middleware(
@@ -1880,7 +1932,7 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 
 class CommandRequest(BaseModel):
     command: str
-    suppress_tts: bool = False
+    suppress_tts: bool = True
 
 @app.post("/command")
 def handle_command(cmd: CommandRequest, request: Request):

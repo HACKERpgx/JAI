@@ -7,58 +7,44 @@
   <link rel="manifest" href="/manifest.json" />
   <title>JAI Assistant</title>
   <style>
-    :root { --bg:#0c0c0d; --fg:#e9e9ea; --muted:#9aa0a6; --accent:#6ee7b7; --card:#1a1b1e; }
-    html, body { background: var(--bg); color: var(--fg); font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; margin:0; padding:0; }
-    .shell { max-width: 720px; margin: 0 auto; padding: 16px; }
-    header { display:flex; align-items:center; gap:10px; margin: 4px 0 12px; }
-    .brand { font-weight: 700; letter-spacing: 0.2px; }
-    .card { background: var(--card); border-radius: 12px; padding: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.25); }
-    #log { height: 48vh; overflow:auto; display:flex; flex-direction:column; gap:8px; scroll-behavior: smooth; }
-    .msg { padding:10px 12px; border-radius: 10px; white-space: pre-wrap; line-height: 1.35; }
-    .me  { background:#233; align-self:flex-end; }
-    .bot { background:#222; border: 1px solid #2b2f36; }
-    .row { display:flex; gap:8px; align-items:center; margin-top:10px; }
-    input[type="text"], textarea { flex:1; padding:10px 12px; border-radius:10px; border:1px solid #2b2f36; background:#121315; color:var(--fg); outline:none; }
-    button { background: var(--accent); color:#0c0c0d; border: none; border-radius: 10px; padding: 10px 14px; font-weight: 600; }
-    select, input[type="file"] { color: var(--fg); }
-    small { color: var(--muted); }
+    :root { --bg:#020202; --fg:#c8ffdf; --neon:#39ff14; --dim:#0a0a0a; --grid:#0d1f15; --glass:#041a12; --muted:#8bc9a7; }
+    html, body { margin:0; padding:0; height:100%; background:#000; color: var(--fg); font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; }
+    body { display:flex; align-items:center; justify-content:center; min-height:100svh; overflow:hidden; }
+    #rain { position: fixed; inset:0; z-index:0; filter: blur(2px) saturate(120%); opacity:0.35; pointer-events:none; }
+    .overlay { position: fixed; inset:0; background: radial-gradient(1200px 800px at 50% 60%, rgba(0,255,140,0.06), transparent 60%); z-index:1; pointer-events:none; }
+    .terminal { position: relative; z-index:2; width:min(1100px, 92vw); height:min(70vh, 720px); border:1px solid rgba(57,255,20,0.25); border-radius:14px; background: linear-gradient(180deg, rgba(6,20,14,0.7), rgba(2,10,6,0.85)); box-shadow: 0 0 24px rgba(57,255,20,0.15), inset 0 0 24px rgba(57,255,20,0.05); backdrop-filter: blur(6px); display:flex; flex-direction:column; overflow:hidden; }
+    .term-head { display:flex; align-items:center; gap:10px; padding:10px 14px; border-bottom:1px solid rgba(57,255,20,0.2); color: var(--fg); letter-spacing:0.5px; text-shadow: 0 0 6px rgba(57,255,20,0.35); }
+    .led { width:10px; height:10px; border-radius:50%; background: radial-gradient(circle at 30% 30%, #b6ffd1, #39ff14 40%, #0c3 60%, #062); box-shadow: 0 0 10px #39ff14, 0 0 20px rgba(57,255,20,0.6); }
+    .title { font-weight:700; color:#b6ffd1; }
+    .log { flex:1; padding:16px; overflow:auto; display:flex; flex-direction:column; gap:6px; scrollbar-width: thin; }
+    .line { color:#b6ffd1; text-shadow: 0 0 8px rgba(57,255,20,0.25); white-space: pre-wrap; }
+    .line.me { color:#8fffc9; }
+    .line.bot { color:#caffea; }
+    .prompt { display:flex; align-items:center; gap:10px; padding:14px; border-top:1px solid rgba(57,255,20,0.2); background: linear-gradient(180deg, rgba(0,0,0,0.0), rgba(0,0,0,0.25)); }
+    .caret { color:#39ff14; text-shadow:0 0 8px #39ff14; font-weight:700; }
+    #txt { flex:1; background: transparent; color:#d9ffe8; border:none; outline:none; font: 16px/1.3 ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; caret-color:#39ff14; }
+    #txt::placeholder { color: rgba(165,255,208,0.35); }
+    .blink { width:10px; height:20px; background:#39ff14; box-shadow: 0 0 8px #39ff14, 0 0 16px rgba(57,255,20,0.6); animation: blink 1s step-end infinite; }
+    .send { background: rgba(57,255,20,0.1); border:1px solid rgba(57,255,20,0.35); color:#caffea; padding:8px 12px; border-radius:8px; font-weight:700; text-shadow:0 0 6px rgba(57,255,20,0.4); }
+    .send:hover { background: rgba(57,255,20,0.16); }
+    @keyframes blink { 50% { opacity: 0; } }
+    @media (max-width: 640px){ .terminal{ height:min(72vh, 640px);} #txt{ font-size:15px;} }
   </style>
 </head>
 <body>
-  <div class="shell">
-    <header>
-      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9L12 3z" stroke="#6ee7b7" stroke-width="1.5"/></svg>
-      <div class="brand">JAI Assistant</div>
-    </header>
-
-    <div class="card" id="chat">
-      <div id="log"></div>
-      <div class="row">
-        <input id="txt" type="text" placeholder="Type a command..." />
-        <button id="send">Send</button>
-      </div>
+  <canvas id="rain"></canvas>
+  <div class="overlay"></div>
+  <div class="terminal">
+    <div class="term-head">
+      <div class="led"></div>
+      <div class="title">JAI WEBSITE</div>
     </div>
-
-    <div class="card" style="margin-top:12px">
-      <div class="row">
-        <input id="audio" type="file" accept=".wav,.flac,audio/wav,audio/flac,audio/*" />
-        <select id="lang">
-          <option value="en-US" selected>English (US)</option>
-          <option value="ur-PK">Urdu (PK)</option>
-          <option value="hi-IN">Hindi (IN)</option>
-          <option value="ar-SA">Arabic (SA)</option>
-        </select>
-        <button id="upload">Transcribe</button>
-      </div>
-      <div class="row">
-        <button id="recStart">Start Recording</button>
-        <button id="recStop">Stop</button>
-      </div>
-      <small>Mic recording uses MediaRecorder (webm/ogg). Server converts to 16k mono WAV (ffmpeg) and transcribes.</small>
-    </div>
-
-    <div style="margin-top:12px">
-      <small>Installable: Add to Home Screen for app-like experience.</small>
+    <div id="log" class="log"></div>
+    <div class="prompt">
+      <span class="caret">&gt;</span>
+      <input id="txt" type="text" placeholder="Type a command..." autocomplete="off" spellcheck="false" />
+      <span class="blink"></span>
+      <button id="send" class="send">Send</button>
     </div>
   </div>
 
@@ -67,7 +53,7 @@
   const log = document.getElementById('log');
   function push(role, text){
     const div = document.createElement('div');
-    div.className = 'msg ' + (role === 'me' ? 'me' : 'bot');
+    div.className = 'line ' + (role === 'me' ? 'me' : 'bot');
     div.textContent = text;
     log.appendChild(div);
     log.scrollTop = log.scrollHeight;
@@ -76,7 +62,7 @@
     const input = document.getElementById('txt');
     const text = input.value.trim();
     if(!text) return;
-    push('me', text);
+    push('me', '> ' + text);
     input.value = '';
     try {
       const res = await fetch('/api/text', {
@@ -85,70 +71,45 @@
         body: JSON.stringify({ text })
       });
       const data = await res.json();
-      push('bot', data.response || JSON.stringify(data));
+      push('bot', (data && data.response) ? data.response : JSON.stringify(data));
     } catch(e){
       push('bot', 'Network error');
     }
   }
-  async function sendVoice(){
-    const f = document.getElementById('audio').files[0];
-    const lang = document.getElementById('lang').value;
-    if(!f){ push('bot','Please choose an audio file (WAV/FLAC).'); return; }
-    const fd = new FormData();
-    fd.append('file', f);
-    fd.append('lang', lang);
-    try{
-      const res = await fetch('/api/voice', { method:'POST', headers: { 'X-Request-Id': rid() }, body: fd });
-      const data = await res.json();
-      if(data.transcript) push('me', data.transcript);
-      push('bot', data.response || data.error || 'No response');
-    } catch(e){
-      push('bot','Upload failed');
-    }
-  }
-  // MediaRecorder capture (browser mic)
-  let mediaRecorder = null, recChunks = [], recStream = null;
-  async function startRecording(){
-    try{
-      recStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const preferred = [ 'audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus', 'audio/ogg' ];
-      let mime = preferred.find(t => MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(t)) || '';
-      mediaRecorder = new MediaRecorder(recStream, mime ? { mimeType: mime } : {});
-      recChunks = [];
-      mediaRecorder.ondataavailable = e => { if(e.data && e.data.size) recChunks.push(e.data); };
-      mediaRecorder.onstop = async () => {
-        try{
-          const lang = document.getElementById('lang').value;
-          const blob = new Blob(recChunks, { type: mediaRecorder.mimeType || 'audio/webm' });
-          const fd = new FormData();
-          const filename = (blob.type && blob.type.includes('ogg')) ? 'voice.ogg' : 'voice.webm';
-          fd.append('file', blob, filename);
-          fd.append('lang', lang);
-          const res = await fetch('/api/voice', { method:'POST', headers: { 'X-Request-Id': rid() }, body: fd });
-          const data = await res.json();
-          if(data.transcript) push('me', data.transcript);
-          push('bot', data.response || data.error || 'No response');
-        } catch(err){
-          push('bot','Recording upload failed');
-        } finally {
-          if(recStream){ recStream.getTracks().forEach(t => t.stop()); recStream = null; }
-        }
-      };
-      mediaRecorder.start(250);
-    } catch(e){
-      push('bot','Mic permission denied or unsupported browser.');
-    }
-  }
-  function stopRecording(){
-    try{
-      if(mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop();
-    } catch(e) {}
-  }
   document.getElementById('send').addEventListener('click', sendText);
   document.getElementById('txt').addEventListener('keydown', e=>{ if(e.key==='Enter') sendText(); });
-  document.getElementById('upload').addEventListener('click', sendVoice);
-  document.getElementById('recStart').addEventListener('click', startRecording);
-  document.getElementById('recStop').addEventListener('click', stopRecording);
+  window.addEventListener('load', ()=>{ document.getElementById('txt').focus(); });
+
+  const canvas = document.getElementById('rain');
+  const ctx = canvas.getContext('2d');
+  let fontSize = 16;
+  let columns = 0;
+  let drops = [];
+  const chars = 'アァカサタナハマヤャラワ0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ#$%&*+-<>=?';
+  function resize(){
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    columns = Math.floor(canvas.width / fontSize) + 1;
+    drops = Array(columns).fill(0);
+  }
+  function draw(){
+    ctx.fillStyle = 'rgba(0,0,0,0.06)';
+    ctx.fillRect(0,0,canvas.width,canvas.height);
+    ctx.fillStyle = '#39ff14';
+    ctx.font = fontSize + 'px monospace';
+    for(let i=0;i<drops.length;i++){
+      const text = chars.charAt(Math.floor(Math.random()*chars.length));
+      const x = i * fontSize;
+      const y = drops[i] * fontSize;
+      ctx.fillText(text, x, y);
+      if(y > canvas.height && Math.random() > 0.975) drops[i] = 0;
+      drops[i]++;
+    }
+    requestAnimationFrame(draw);
+  }
+  window.addEventListener('resize', resize);
+  resize();
+  draw();
 
   if('serviceWorker' in navigator){
     window.addEventListener('load', ()=>{

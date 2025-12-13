@@ -8,7 +8,10 @@ import queue
 import logging
 import re
 import os
+import sys
+import time
 from typing import Optional, Dict, Tuple, List
+import win32com.client as win32com_client
 
 # TTS engine is required; detect_language helpers are optional
 try:
@@ -36,9 +39,23 @@ except Exception:
 # Voice and language preferences via environment variables
 TTS_PREFERRED_VOICE = (os.environ.get("TTS_PREFERRED_VOICE", "") or "").lower()
 TTS_FORCE_LANGUAGE = (os.environ.get("TTS_FORCE_LANGUAGE", "") or "").lower()
+TTS_ENGINE = (os.environ.get("TTS_ENGINE", "") or "").lower()
 _TTS_LOCK = threading.Lock()
 _ENGINE_INIT_LOCK = threading.Lock()
 _ENGINE = None
+_LAST_SPOKEN_TEXT = ""
+_LAST_SPOKEN_TS = 0.0
+_DEDUP_WINDOW_SEC = float(os.environ.get("TTS_DEDUP_WINDOW_SEC", "5.0"))
+_SPEAKING = False
+_SPEAKING_UNTIL = 0.0
+_SPEAK_COOLDOWN_SEC = float(os.environ.get("TTS_SPEAK_COOLDOWN_SEC", "0.8"))
+
+def is_speaking() -> bool:
+    try:
+        now = time.time()
+        return bool(_SPEAKING) or (now < _SPEAKING_UNTIL)
+    except Exception:
+        return False
 
 # Language to voice mapping for better TTS quality
 LANGUAGE_VOICE_MAPPING = {
@@ -234,9 +251,11 @@ def _get_engine(language: Optional[str] = None):
     with _ENGINE_INIT_LOCK:
         if _ENGINE is None:
             try:
+                if TTS_ENGINE == "sapi" or sys.version_info >= (3, 13):
+                    return None
                 _ENGINE = pyttsx3.init()
             except Exception as e:
-                logging.error(f"Error initializing TTS engine: {e}", exc_info=True)
+                logging.warning(f"pyttsx3 init failed, will use SAPI fallback: {e}")
                 _ENGINE = None
     return _ENGINE
 
@@ -262,6 +281,18 @@ def speak(text: str, language: Optional[str] = None, rate: Optional[int] = None,
     if not text.strip():
         logging.warning("Empty text provided to speak")
         return False
+    # Anti-repeat guard: skip if same text spoken very recently
+    try:
+        global _LAST_SPOKEN_TEXT, _LAST_SPOKEN_TS
+        norm = (text or "").strip()
+        now = time.time()
+        if norm == _LAST_SPOKEN_TEXT and (now - _LAST_SPOKEN_TS) < _DEDUP_WINDOW_SEC:
+            logging.info("Skipping duplicate TTS within %.1fs window", _DEDUP_WINDOW_SEC)
+            return True
+        _LAST_SPOKEN_TEXT = norm
+        _LAST_SPOKEN_TS = now
+    except Exception:
+        pass
 
     # Auto-detect language if not specified
     if not language:
@@ -287,9 +318,40 @@ def speak(text: str, language: Optional[str] = None, rate: Optional[int] = None,
 
     def run():
         try:
+            global _SPEAKING
             with _TTS_LOCK:
+                _SPEAKING = True
                 engine = _get_engine(language)
                 if engine is None:
+                    # Win32 COM fallback
+                    if win32com_client is not None:
+                        try:
+                            voice = win32com_client.Dispatch("SAPI.SpVoice")
+                            try:
+                                voice.Volume = max(0, min(100, int(volume * 100)))
+                            except Exception:
+                                pass
+                            voice.Speak(text)
+                            result_q.put(True)
+                            return
+                        except Exception:
+                            pass
+                    # PowerShell SAPI fallback
+                    try:
+                        import subprocess
+                        ps_script = (
+                            "$ErrorActionPreference='SilentlyContinue'; "
+                            "$v = New-Object -ComObject SAPI.SpVoice; "
+                            f"$s = @'\n{text}\n'@; "
+                            "$v.Speak($s) | Out-Null"
+                        )
+                        subprocess.run([
+                            "powershell", "-NoProfile", "-Command", ps_script
+                        ], capture_output=True, text=True, timeout=30)
+                        result_q.put(True)
+                        return
+                    except Exception:
+                        pass
                     result_q.put("No TTS engine")
                     return
                 if not _select_voice(engine, language):
@@ -304,6 +366,13 @@ def speak(text: str, language: Optional[str] = None, rate: Optional[int] = None,
             error_msg = f"TTS error: {str(e)}"
             logging.error(error_msg, exc_info=True)
             result_q.put(error_msg)
+        finally:
+            try:
+                global _SPEAKING_UNTIL
+                _SPEAKING = False
+                _SPEAKING_UNTIL = time.time() + _SPEAK_COOLDOWN_SEC
+            except Exception:
+                pass
     
     try:
         # Run the TTS in a separate thread with timeout

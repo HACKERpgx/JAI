@@ -7,7 +7,9 @@ from datetime import datetime
 from typing import Optional
 import uuid
 import os
-from jai_assistant import execute_command, sessions as ja_sessions, UserSession as JAUserSession, request_id_ctx_var
+from dotenv import load_dotenv
+import re
+from jai_assistant import execute_command, sessions as ja_sessions, UserSession as JAUserSession, request_id_ctx_var, detect_language as jai_detect_language
 import tempfile
 import pathlib
 import shutil
@@ -21,7 +23,16 @@ try:
     import speech_recognition as sr
 except Exception:
     sr = None
+try:
+    from deep_translator import GoogleTranslator as WebTranslator
+except Exception:
+    WebTranslator = None
 
+load_dotenv()
+try:
+    load_dotenv('.env.local', override=True)
+except Exception:
+    pass
 app = FastAPI(title="JAI Mobile API")
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "templates"))
@@ -131,7 +142,13 @@ async def mobile_command(req: MobileCommandRequest, authorization: Optional[str]
         if username not in ja_sessions:
             ja_sessions[username] = JAUserSession(username)
         session = ja_sessions[username]
-        result = execute_command(req.text, session, suppress_tts=bool(req.suppressTTS))
+        desired_lang = jai_detect_language(req.text)
+        special = _handle_special_qa(req.text)
+        if special is not None:
+            result = special
+        else:
+            result = execute_command(req.text, session, suppress_tts=bool(req.suppressTTS))
+        result = _ensure_lang(result, desired_lang)
         return {"response": result, "requestId": rid}
     except Exception as e:
         raise HTTPException(status_code=500, detail="Command execution failed")
@@ -169,7 +186,13 @@ async def api_text(req: WebTextRequest, request: Request):
         if username not in ja_sessions:
             ja_sessions[username] = JAUserSession(username)
         session = ja_sessions[username]
-        result = execute_command(req.text, session, suppress_tts=True)
+        desired_lang = jai_detect_language(req.text)
+        special = _handle_special_qa(req.text)
+        if special is not None:
+            result = special
+        else:
+            result = execute_command(req.text, session, suppress_tts=True)
+        result = _ensure_lang(result, desired_lang)
         return {"response": result, "requestId": rid}
     finally:
         try:
@@ -236,6 +259,39 @@ def _transcribe_wav(path: str, lang: str) -> str:
     except Exception:
         return ""
 
+def _lang_code_of(s: str) -> str:
+    try:
+        base = (s or "").split("-", 1)[0].lower()
+        return base if base else "en"
+    except Exception:
+        return "en"
+
+def _ensure_lang(text: str, desired_lang: str) -> str:
+    try:
+        dl = (desired_lang or "en").lower()
+        if not text:
+            return text
+        res_lang = jai_detect_language(text)
+        if res_lang == dl:
+            return text
+        if WebTranslator is not None:
+            try:
+                return WebTranslator(source='auto', target=dl).translate(text)
+            except Exception:
+                return text
+        return text
+    except Exception:
+        return text
+
+def _handle_special_qa(user_text: str) -> Optional[str]:
+    try:
+        low = (user_text or "").strip().lower()
+        if re.search(r"\bwho\s+(?:created|made|built)\s+(?:you|aj|jai)\b", low):
+            return "I was created by Abdul Rehman as a personal AI project, developed without prior professional experience."
+        return None
+    except Exception:
+        return None
+
 @app.post("/api/voice")
 async def api_voice(request: Request, file: UploadFile = File(...), lang: str = Form("en-US")):
     rid = request.headers.get("x-request-id") or str(uuid.uuid4())
@@ -266,7 +322,13 @@ async def api_voice(request: Request, file: UploadFile = File(...), lang: str = 
         session = ja_sessions[username]
         if not text:
             return {"transcript": "", "response": "Could not transcribe."}
-        result = execute_command(text, session, suppress_tts=True)
+        desired_lang = jai_detect_language(text) if text else _lang_code_of(lang)
+        special = _handle_special_qa(text)
+        if special is not None:
+            result = special
+        else:
+            result = execute_command(text, session, suppress_tts=True)
+        result = _ensure_lang(result, desired_lang)
         return {"transcript": text, "response": result, "requestId": rid}
     finally:
         try:

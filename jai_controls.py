@@ -1,5 +1,6 @@
 import subprocess
 import logging
+import re
 
 try:
     import win32gui, win32con
@@ -35,9 +36,179 @@ def _restore_focus_by_title(substrings):
     return found["ok"]
 
 
+# --- Helpers for terminal and color/action parsing ---
+def _best_terminal() -> str:
+    """Return 'ps' for PowerShell as the default/best terminal on Windows."""
+    return "ps"
+
+
+_CMD_COLOR_MAP = {
+    # standard
+    "black": "0", "blue": "1", "green": "2", "aqua": "3", "cyan": "3",
+    "red": "4", "purple": "5", "magenta": "5", "yellow": "6", "brown": "6",
+    "white": "7", "grey": "8", "gray": "8",
+    # bright/light
+    "light gray": "7", "lightgrey": "7", "lightgray": "7",
+    "light blue": "9", "lightblue": "9",
+    "light green": "a", "lightgreen": "a",
+    "light aqua": "b", "lightaqua": "b", "light cyan": "b", "lightcyan": "b",
+    "light red": "c", "lightred": "c",
+    "light purple": "d", "lightpurple": "d", "light magenta": "d", "lightmagenta": "d",
+    "light yellow": "e", "lightyellow": "e",
+    "bright white": "f", "brightwhite": "f",
+}
+
+_PS_COLOR_MAP = {
+    # PowerShell ConsoleColor names
+    "black": "Black",
+    "darkblue": "DarkBlue", "blue": "Blue",
+    "darkgreen": "DarkGreen", "green": "Green",
+    "darkcyan": "DarkCyan", "cyan": "Cyan", "aqua": "Cyan",
+    "darkred": "DarkRed", "red": "Red",
+    "darkmagenta": "DarkMagenta", "magenta": "Magenta", "purple": "Magenta",
+    "darkyellow": "DarkYellow", "yellow": "Yellow", "brown": "DarkYellow",
+    "gray": "Gray", "grey": "Gray", "darkgray": "DarkGray",
+    "white": "White",
+}
+
+
+def _norm_color_name(s: str) -> str:
+    return (s or "").strip().lower()
+
+
+def _extract_color_commands(user_cmd: str, target: str) -> list[str]:
+    """Build color-set commands for the given target ('cmd' or 'ps')."""
+    cmds: list[str] = []
+    try:
+        s = user_cmd.lower()
+        # foreground-only like: change color to red / set color blue
+        m_fg = re.search(r"\b(?:change|set)\s+(?:text\s+)?color\s+(?:to\s+)?([a-z\s]+)\b", s)
+        # explicit foreground/background like: set foreground red / set background black
+        m_fg2 = re.search(r"\b(?:set|change)\s+(?:text\s+)?(?:foreground|text)\s+color\s+(?:to\s+)?([a-z\s]+)\b", s)
+        m_bg = re.search(r"\b(?:set|change)\s+background\s+(?:color\s+)?(?:to\s+)?([a-z\s]+)\b", s)
+
+        fg_name = _norm_color_name(m_fg.group(1)) if m_fg else None
+        if m_fg2:
+            fg_name = _norm_color_name(m_fg2.group(1))
+        bg_name = _norm_color_name(m_bg.group(1)) if m_bg else None
+
+        if not fg_name and not bg_name:
+            return cmds
+
+        if target == "cmd":
+            # default black background if only fg requested
+            bg_hex = _CMD_COLOR_MAP.get(bg_name, "0") if bg_name else "0"
+            fg_hex = _CMD_COLOR_MAP.get(fg_name, None) if fg_name else None
+            if not fg_hex:
+                # default to bright white if only background specified
+                fg_hex = "f"
+            cmds.append(f"color {bg_hex}{fg_hex}".upper())
+        else:
+            ps_segs = []
+            if fg_name:
+                ps_color = _PS_COLOR_MAP.get(fg_name, "Green")
+                ps_segs.append(f"$host.UI.RawUI.ForegroundColor = '{ps_color}'")
+            if bg_name:
+                ps_color = _PS_COLOR_MAP.get(bg_name, "Black")
+                ps_segs.append(f"$host.UI.RawUI.BackgroundColor = '{ps_color}'")
+                # Optional: refresh to apply bg more clearly
+                ps_segs.append("Clear-Host")
+            if ps_segs:
+                cmds.append("; ".join(ps_segs))
+    except Exception:
+        return []
+    return cmds
+
+
+def _collect_actions(user_cmd: str, target: str) -> list[str]:
+    """Collect terminal actions from a natural command string for target shell."""
+    s = (user_cmd or "").lower()
+    actions: list[str] = []
+
+    # 1) pip upgrade
+    if re.search(r"\b(update|upgrade)\s+pip\b", s):
+        actions.append("python -m pip install --upgrade pip")
+
+    # 2) install package(s)
+    pkgs = re.findall(r"\b(?:install|download)\s+([a-z0-9_\-.]+)\b", s)
+    for p in pkgs:
+        # avoid generic words
+        if p in {"library", "package", "packages", "libraries"}:
+            continue
+        actions.append(f"python -m pip install {p}")
+
+    # 3) update/upgrade all packages
+    if re.search(r"\b(update|upgrade)\s+(all\s+)?(libraries|packages|modules)\b", s):
+        if target == "ps":
+            actions.append(
+                "python -m pip list --outdated --format=freeze | ForEach-Object { $_.Split('==')[0] } | ForEach-Object { python -m pip install -U $_ }"
+            )
+        else:
+            actions.append(
+                "for /F \"tokens=1 delims==\" %i in ('python -m pip list --outdated --format=freeze') do python -m pip install -U %i"
+            )
+
+    # 4) colors
+    actions.extend(_extract_color_commands(s, target))
+
+    return [a for a in actions if a]
+
+
 def handle_control_command(command, lang="en"):
     command = command.lower().strip()
     user_name = "Abdul Rahman"
+    
+    # Terminal actions even without explicit "open ..."
+    # e.g., "update all libraries", "upgrade pip", "install pyaudio", "change color to green"
+    try:
+        target = _best_terminal()
+        actions_implicit = _collect_actions(command, target)
+        if actions_implicit:
+            if target == "cmd":
+                cmdline = " && ".join(actions_implicit)
+                subprocess.Popen(["cmd.exe", "/k", cmdline], shell=False)
+                return f"Opening Command Prompt and executing: {cmdline}"
+            else:
+                ps_cmd = "; ".join(actions_implicit)
+                subprocess.Popen(["powershell", "-NoExit", "-Command", ps_cmd], shell=False)
+                return f"Opening PowerShell and executing: {ps_cmd}"
+    except Exception as e:
+        logging.error("Implicit terminal action error: %s", e)
+    
+    # Open Command Prompt / PowerShell/Terminal with optional actions (colors, pip upgrades, installs)
+    # Examples:
+    # - "open cmd"
+    # - "open command prompt and change color to green"
+    # - "open powershell and download pyaudio library"
+    # - "open cmd and install pyaudio"
+    # - "open terminal and update all libraries"
+    # - "open cmd, upgrade pip and install pyaudio"
+    try:
+        open_cmd = any(p in command for p in ["open cmd", "open command prompt", "open command line"]) 
+        open_ps = any(p in command for p in ["open powershell", "open power shell"]) 
+        open_term = any(p in command for p in ["open terminal", "open the terminal", "open shell"]) 
+
+        if open_cmd or open_ps or open_term:
+            target = "cmd" if open_cmd else ("ps" if open_ps else _best_terminal())
+            actions = _collect_actions(command, target)
+
+            if target == "cmd":
+                if actions:
+                    cmdline = " && ".join(actions)
+                    subprocess.Popen(["cmd.exe", "/k", cmdline], shell=False)
+                    return f"Opening Command Prompt and executing: {cmdline}"
+                subprocess.Popen(["cmd.exe"], shell=False)
+                return f"Opening Command Prompt, {user_name}."
+            else:
+                if actions:
+                    ps_cmd = "; ".join(actions)
+                    subprocess.Popen(["powershell", "-NoExit", "-Command", ps_cmd], shell=False)
+                    return f"Opening PowerShell and executing: {ps_cmd}"
+                subprocess.Popen(["powershell"], shell=False)
+                return f"Opening PowerShell, {user_name}."
+    except Exception as e:
+        logging.error("Terminal open/exec error: %s", e)
+        # Fall through to other handlers
     
     # Open applications
     if "open" in command:

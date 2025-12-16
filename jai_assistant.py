@@ -1,4 +1,4 @@
-import os
+﻿import os
 import pathlib
 from datetime import datetime, timedelta
 from dotenv import load_dotenv
@@ -67,10 +67,10 @@ from pydantic import BaseModel, Field
 
 # Language support
 LANGUAGES = {
-    'en': {'name': 'English', 'flag': '🇬🇧'},
-    'ur': {'name': 'Urdu', 'flag': '🇵🇰'},
-    'ar': {'name': 'Arabic', 'flag': '🇸🇦'},
-    'fr': {'name': 'French', 'flag': '🇫🇷'}
+    'en': {'name': 'English', 'flag': 'ðŸ‡¬ðŸ‡§'},
+    'ur': {'name': 'Urdu', 'flag': 'ðŸ‡µðŸ‡°'},
+    'ar': {'name': 'Arabic', 'flag': 'ðŸ‡¸ðŸ‡¦'},
+    'fr': {'name': 'French', 'flag': 'ðŸ‡«ðŸ‡·'}
 }
 
 # Common phrases in different languages
@@ -82,22 +82,22 @@ COMMON_PHRASES = {
         'goodbye': 'Goodbye! Have a great day!'
     },
     'ur': {
-        'welcome': 'ہیلو! میں آپ کی کیسے مدد کر سکتا ہوں؟',
-        'error': 'معذرت، لیکن مجھے ایک مسئلہ پیش آیا ہے۔',
-        'not_understood': 'معذرت، میں آپ کی بات نہیں سمجھ سکا۔',
-        'goodbye': 'الوداع! آپ کا دن اچھا گزرے!'
+        'welcome': 'ÛÛŒÙ„Ùˆ! Ù…ÛŒÚº Ø¢Ù¾ Ú©ÛŒ Ú©ÛŒØ³Û’ Ù…Ø¯Ø¯ Ú©Ø± Ø³Ú©ØªØ§ ÛÙˆÚºØŸ',
+        'error': 'Ù…Ø¹Ø°Ø±ØªØŒ Ù„ÛŒÚ©Ù† Ù…Ø¬Ú¾Û’ Ø§ÛŒÚ© Ù…Ø³Ø¦Ù„Û Ù¾ÛŒØ´ Ø¢ÛŒØ§ ÛÛ’Û”',
+        'not_understood': 'Ù…Ø¹Ø°Ø±ØªØŒ Ù…ÛŒÚº Ø¢Ù¾ Ú©ÛŒ Ø¨Ø§Øª Ù†ÛÛŒÚº Ø³Ù…Ø¬Ú¾ Ø³Ú©Ø§Û”',
+        'goodbye': 'Ø§Ù„ÙˆØ¯Ø§Ø¹! Ø¢Ù¾ Ú©Ø§ Ø¯Ù† Ø§Ú†Ú¾Ø§ Ú¯Ø²Ø±Û’!'
     },
     'ar': {
-        'welcome': 'مرحباً! كيف يمكنني مساعدتك اليوم؟',
-        'error': 'أعتذر، لكن واجهت مشكلة.',
-        'not_understood': 'عذراً، لم أفهم ما تقول.',
-        'goodbye': 'إلى اللقاء! أتمنى لك يوماً سعيداً!'
+        'welcome': 'Ù…Ø±Ø­Ø¨Ø§Ù‹! ÙƒÙŠÙ ÙŠÙ…ÙƒÙ†Ù†ÙŠ Ù…Ø³Ø§Ø¹Ø¯ØªÙƒ Ø§Ù„ÙŠÙˆÙ…ØŸ',
+        'error': 'Ø£Ø¹ØªØ°Ø±ØŒ Ù„ÙƒÙ† ÙˆØ§Ø¬Ù‡Øª Ù…Ø´ÙƒÙ„Ø©.',
+        'not_understood': 'Ø¹Ø°Ø±Ø§Ù‹ØŒ Ù„Ù… Ø£ÙÙ‡Ù… Ù…Ø§ ØªÙ‚ÙˆÙ„.',
+        'goodbye': 'Ø¥Ù„Ù‰ Ø§Ù„Ù„Ù‚Ø§Ø¡! Ø£ØªÙ…Ù†Ù‰ Ù„Ùƒ ÙŠÙˆÙ…Ø§Ù‹ Ø³Ø¹ÙŠØ¯Ø§Ù‹!'
     },
     'fr': {
         'welcome': 'Bonjour ! Comment puis-je vous aider aujourd\'hui ?',
-        'error': 'Je m\'excuse, mais j\'ai rencontré une erreur.',
-        'not_understood': 'Désolé, je n\'ai pas compris.',
-        'goodbye': 'Au revoir ! Passez une excellente journée !'
+        'error': 'Je m\'excuse, mais j\'ai rencontrÃ© une erreur.',
+        'not_understood': 'DÃ©solÃ©, je n\'ai pas compris.',
+        'goodbye': 'Au revoir ! Passez une excellente journÃ©e !'
     }
 }
 
@@ -192,14 +192,14 @@ def detect_language(text: str) -> str:
         text_lower = text.lower()
         
         # Check for Arabic script (Arabic, Urdu, Persian, etc.)
-        if any(char in text_lower for char in ['ا', 'ب', 'ت', 'ث', 'ج', 'ح', 'خ', 'د', 'ذ', 'ر', 'ز', 'س', 'ش', 'ص', 'ض', 'ط', 'ظ', 'ع', 'غ', 'ف', 'ق', 'ك', 'ل', 'م', 'ن', 'ه', 'و', 'ي']):
+        if any(char in text_lower for char in ['Ø§', 'Ø¨', 'Øª', 'Ø«', 'Ø¬', 'Ø­', 'Ø®', 'Ø¯', 'Ø°', 'Ø±', 'Ø²', 'Ø³', 'Ø´', 'Øµ', 'Ø¶', 'Ø·', 'Ø¸', 'Ø¹', 'Øº', 'Ù', 'Ù‚', 'Ùƒ', 'Ù„', 'Ù…', 'Ù†', 'Ù‡', 'Ùˆ', 'ÙŠ']):
             # Check for Urdu-specific characters
-            if any(char in text_lower for char in ['پ', 'ٹ', 'چ', 'ڈ', 'ڑ', 'ژ', 'ک', 'گ', 'ں', 'ہ', 'ھ', 'ے']):
+            if any(char in text_lower for char in ['Ù¾', 'Ù¹', 'Ú†', 'Úˆ', 'Ú‘', 'Ú˜', 'Ú©', 'Ú¯', 'Úº', 'Û', 'Ú¾', 'Û’']):
                 return 'ur'  # Urdu
             return 'ar'  # Default to Arabic for other Arabic script
             
         # Check for French indicators
-        if any(word in text_lower for word in ['bonjour', 'salut', 'merci', 'au revoir', 'comment ça va', 'je m\'appelle']):
+        if any(word in text_lower for word in ['bonjour', 'salut', 'merci', 'au revoir', 'comment Ã§a va', 'je m\'appelle']):
             return 'fr'
             
         # Default to English if no clear indicators found
@@ -408,7 +408,7 @@ if CalendarManager:
         
         logging.info("REMINDER ALERT: %s", message, extra={'user': 'system'})
         print(f"\n{'='*60}")
-        print(f"🔔 REMINDER ALERT 🔔")
+        print(f"ðŸ”” REMINDER ALERT ðŸ””")
         print(f"{'='*60}")
         print(f"Time: {datetime.now().strftime('%I:%M %p')}")
         print(f"Task: {title}")
@@ -429,11 +429,11 @@ except Exception:
     tts_module = None
 
 HUMOROUS_QUIPS = [
-    "Just for you, I’ve polished my circuits to shine!",
-    "Hold on, I’m channeling my inner genius for this one!",
-    "Alright, let’s make some magic happen, shall we?",
-    "Processing at the speed of light… or at least a very fast turtle!",
-    "My processors are humming with excitement, let’s do this!"
+    "Just for you, Iâ€™ve polished my circuits to shine!",
+    "Hold on, Iâ€™m channeling my inner genius for this one!",
+    "Alright, letâ€™s make some magic happen, shall we?",
+    "Processing at the speed of lightâ€¦ or at least a very fast turtle!",
+    "My processors are humming with excitement, letâ€™s do this!"
 ]
 
 # Hardcoded users for basic auth (in production, use a database)
@@ -524,13 +524,13 @@ def get_weather(city: str) -> str:
             wind_speed = data["wind"]["speed"]
             description = data["weather"][0]["description"]
             result = (
-                f"Weather in {city}: {description}, {temp}°C (feels like {feels_like}°C), "
+                f"Weather in {city}: {description}, {temp}Â°C (feels like {feels_like}Â°C), "
                 f"humidity {humidity}%, wind speed {wind_speed} m/s."
             )
             WEATHER_CACHE[city] = (result, datetime.now().timestamp())
             return result
         else:
-            return f"Sorry, I couldn’t find weather data for {city}."
+            return f"Sorry, I couldnâ€™t find weather data for {city}."
     except requests.RequestException as e:
         return f"Failed to fetch weather for {city}. Please try again later."
 
@@ -551,7 +551,7 @@ def get_news(category: Optional[str] = None) -> str:
             headlines = [article["title"] for article in data["articles"][:5]]
             return "Top headlines: " + "; ".join(headlines)
         else:
-            return "Sorry, couldn’t fetch news."
+            return "Sorry, couldnâ€™t fetch news."
     except requests.RequestException as e:
         return f"Failed to fetch news: {str(e)}"
 
@@ -603,34 +603,34 @@ def normalize_math_expression(s: str) -> str:
     if not isinstance(s, str):
         return ""
     s2 = []
-    sup_map = {"⁰":"0","¹":"1","²":"2","³":"3","⁴":"4","⁵":"5","⁶":"6","⁷":"7","⁸":"8","⁹":"9"}
+    sup_map = {"â°":"0","Â¹":"1","Â²":"2","Â³":"3","â´":"4","âµ":"5","â¶":"6","â·":"7","â¸":"8","â¹":"9"}
     i = 0
     while i < len(s):
         ch = s[i]
-        if ch in ("×","·"):
+        if ch in ("Ã—","Â·"):
             s2.append("*")
             i += 1
             continue
-        if ch in ("÷",):
+        if ch in ("Ã·",):
             s2.append("/")
             i += 1
             continue
-        if ch in ("−","–","—"):
+        if ch in ("âˆ’","â€“","â€”"):
             s2.append("-")
             i += 1
             continue
-        if ch == "√":
+        if ch == "âˆš":
             s2.append("sqrt")
             i += 1
             continue
-        if ch == "π":
+        if ch == "Ï€":
             s2.append("pi")
             i += 1
             continue
-        if ch == "⁻" or ch in sup_map:
+        if ch == "â»" or ch in sup_map:
             j = i
             neg = False
-            if j < len(s) and s[j] == "⁻":
+            if j < len(s) and s[j] == "â»":
                 neg = True
                 j += 1
             digits = []
@@ -1380,9 +1380,9 @@ def execute_command(command: str, session: UserSession, suppress_tts: bool = Fal
         elif lang == 'fr':  # French
             greetings = [
                 "Oui, monsieur. Comment puis-je vous aider?",
-                "À votre service, monsieur.",
-                "Enchanté de vous revoir, monsieur.",
-                "Je suis à votre disposition, monsieur."
+                "Ã€ votre service, monsieur.",
+                "EnchantÃ© de vous revoir, monsieur.",
+                "Je suis Ã  votre disposition, monsieur."
             ]
         else:  # English (default)
             greetings = [
@@ -1553,7 +1553,7 @@ def execute_command(command: str, session: UserSession, suppress_tts: bool = Fal
     
     # Who are you - instant
     if intent == "who are you":
-        return "I am JAI — you can call me AJ — your personal AI assistant, sir. At your service."
+        return "I am JAI â€” you can call me AJ â€” your personal AI assistant, sir. At your service."
     
     # Current time - instant
     if intent == "current_time":
@@ -1678,6 +1678,15 @@ def execute_command(command: str, session: UserSession, suppress_tts: bool = Fal
             return f"Corrected: {ans}"
         ans = jai_reply(last_user_q, session)
         try:
+            res_lang = detect_language(ans)
+        except Exception:
+            res_lang = 'en'
+        try:
+            if res_lang != speak_lang and GoogleTranslator is not None:
+                ans = GoogleTranslator(source='auto', target=speak_lang).translate(ans)
+        except Exception:
+            pass
+        try:
             session.memory.add_short_term({"user": last_user_q, "response": ans})
         except Exception:
             pass
@@ -1786,6 +1795,15 @@ def execute_command(command: str, session: UserSession, suppress_tts: bool = Fal
     
     # Default to AI reply (only for complex questions)
     response = jai_reply(command, session)
+    try:
+        res_lang = detect_language(response)
+    except Exception:
+        res_lang = 'en'
+    try:
+        if res_lang != speak_lang and GoogleTranslator is not None:
+            response = GoogleTranslator(source='auto', target=speak_lang).translate(response)
+    except Exception:
+        pass
     try:
         session.memory.add_short_term({"user": command, "response": response})
     except Exception as e:

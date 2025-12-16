@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, Header, Request, Response, UploadFile, File, Form
+from fastapi import FastAPI, Request, UploadFile, File, Form
 from fastapi.responses import JSONResponse, HTMLResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -33,16 +33,12 @@ try:
     load_dotenv('.env.local', override=True)
 except Exception:
     pass
-app = FastAPI(title="JAI Mobile API")
+app = FastAPI(title="JAI Web API")
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "templates"))
 app.mount("/static", StaticFiles(directory=os.path.join(BASE_DIR, "static")), name="static")
-JAI_MOBILE_TOKEN = os.environ.get("JAI_MOBILE_TOKEN", "my-super-secret-token-123")
-if JAI_MOBILE_TOKEN == "my-super-secret-token-123":
-    print("[WARN] Using default JAI_MOBILE_TOKEN; set env JAI_MOBILE_TOKEN for production")
 
-# Store device states (in-memory for simplicity)
-device_states = {}
+ 
 
 # CORS (restrict in production by setting JAI_CORS_ORIGINS="https://your.domain")
 origins_env = os.environ.get("JAI_CORS_ORIGINS", "*")
@@ -55,44 +51,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-class HeartbeatRequest(BaseModel):
-    deviceId: str
-    status: str  # idle|busy|error
-    battery: int
-    appVersion: str
-    timestamp: str
-
-class HeartbeatResponse(BaseModel):
-    intervalMs: int
-    action: str  # none|sync|speak
-    message: Optional[str] = None
-
-class EventRequest(BaseModel):
-    type: str  # error|info
-    message: str
-    data: dict = {}
-
-class MobileCommandRequest(BaseModel):
-    deviceId: str
-    text: str
-    suppressTTS: Optional[bool] = True
-
 class WebTextRequest(BaseModel):
     text: str
-
-# Middleware to validate auth token and request-id
-@app.middleware("http")
-async def validate_auth(request: Request, call_next):
-    path = request.url.path
-    if path.startswith("/api/mobile/"):
-        auth = request.headers.get("authorization")
-        request_id = request.headers.get("x-request-id")
-        if not auth or auth != f"Bearer {JAI_MOBILE_TOKEN}":
-            raise HTTPException(status_code=401, detail="Invalid token")
-        if not request_id:
-            raise HTTPException(status_code=400, detail="Missing X-Request-Id")
-    response = await call_next(request)
-    return response
 
 @app.get("/api/health")
 async def health_check():
@@ -101,62 +61,6 @@ async def health_check():
         "time": datetime.utcnow().isoformat() + "Z"
     }
 
-@app.post("/api/mobile/heartbeat", response_model=HeartbeatResponse)
-async def heartbeat(request: HeartbeatRequest):
-    # Store device state
-    device_states[request.deviceId] = {
-        "status": request.status,
-        "battery": request.battery,
-        "last_seen": request.timestamp
-    }
-    
-    # Simple logic: if battery < 20%, ask to sync
-    action = "none"
-    message = None
-    if request.battery < 20:
-        action = "sync"
-        message = "Low battery - please sync data"
-    elif request.status == "idle":
-        action = "speak"
-        message = "Hello! Ready for next task?"
-    
-    return HeartbeatResponse(
-        intervalMs=60000,  # Poll every 60 seconds
-        action=action,
-        message=message
-    )
-
-@app.post("/api/mobile/event")
-async def event(request: EventRequest):
-    print(f"[{request.type}] {request.message} - Data: {request.data}")
-    return Response(status_code=204)
-
-@app.post("/api/mobile/command")
-async def mobile_command(req: MobileCommandRequest, authorization: Optional[str] = Header(None), x_request_id: Optional[str] = Header(None)):
-    if not authorization or authorization != f"Bearer {JAI_MOBILE_TOKEN}":
-        raise HTTPException(status_code=401, detail="Invalid token")
-    rid = x_request_id or str(uuid.uuid4())
-    token = request_id_ctx_var.set(rid)
-    try:
-        username = f"mobile:{req.deviceId}"
-        if username not in ja_sessions:
-            ja_sessions[username] = JAUserSession(username)
-        session = ja_sessions[username]
-        desired_lang = jai_detect_language(req.text)
-        special = _handle_special_qa(req.text)
-        if special is not None:
-            result = special
-        else:
-            result = execute_command(req.text, session, suppress_tts=bool(req.suppressTTS))
-        result = _ensure_lang(result, desired_lang)
-        return {"response": result, "requestId": rid}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail="Command execution failed")
-    finally:
-        try:
-            request_id_ctx_var.reset(token)
-        except Exception:
-            pass
 
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):

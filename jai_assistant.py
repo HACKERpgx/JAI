@@ -63,7 +63,7 @@ from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.exceptions import RequestValidationError
 from fastapi import APIRouter
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 # Language support
 LANGUAGES = {
@@ -219,6 +219,10 @@ def get_phrase(key: str, lang: str = 'en') -> str:
 current_dir = pathlib.Path(__file__).parent.absolute()
 env_path = current_dir / '.env'
 load_dotenv(dotenv_path=env_path)
+try:
+    load_dotenv(current_dir / '.env.local', override=True)
+except Exception:
+    pass
 
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY") or os.environ.get("OPENAI_API_KEY") or ""
 if not GROQ_API_KEY:
@@ -236,6 +240,10 @@ MATH_SOLVER_URL = os.environ.get("MATH_SOLVER_URL", "https://math-solver1.p.rapi
 
 MEMORY_ACCESS_PASSWORD = os.environ.get("JAI_MEMORY_PASSWORD", "223855734626")
 MEMORY_AUTH_TTL_SEC = int(os.environ.get("JAI_MEMORY_AUTH_TTL_SEC", "900"))
+
+ADMIN_PASSWORD = ""
+ADMIN_AUTH_TTL_SEC = 0
+ADMIN_ALLOWLIST = []
 
 # Speech configuration
 SPEAK_RESPONSES = os.environ.get("SPEAK_RESPONSES", "true").lower() in {"1", "true", "yes", "on"}
@@ -437,13 +445,10 @@ HUMOROUS_QUIPS = [
 ]
 
 # Hardcoded users for basic auth (in production, use a database)
-USERS = {
-    "user1": "pass1",
-    "admin": "adminpass"
-}
+USERS = {}
 
 # Control intents restricted to admin
-RESTRICTED_INTENTS = ["shutdown", "restart", "sleep", "hibernate", "lock"]
+RESTRICTED_INTENTS = []
 
 # -----------------------------
 # User Session Class
@@ -459,6 +464,7 @@ class UserSession:
         self.conversation_history = []  # Store conversation history for context
         self.tts_enabled = False
         self.memory_auth_until = 0
+        self.admin_auth_until = 0
         self.language_mode = "auto"  # 'auto' or 'fixed'
         
     def update_conversation(self, user_input: str, ai_response: str, lang: str = None):
@@ -814,6 +820,7 @@ def classify_intent(command: str) -> tuple[str, Optional[tuple]]:
         "open browser": r"open\s+browser|open\s+tab|open\s+firefox",
         "open app": r"open\s+(notepad|calculator|word|excel|spotify|vscode|code|file explorer|recycle bin|control panel|google chrome|chrome|microsoft store|youtube)",
         "set timer": r"set\s+timer\s+(for\s+)?(\d+)(?:\s+(minutes?|seconds?))?",
+        "terminate": r"terminate\b",
         "shutdown": r"shutdown|power\s+off",
         "restart": r"restart|reboot",
         "sleep": r"sleep|snooze",
@@ -1349,7 +1356,14 @@ def execute_command(command: str, session: UserSession, suppress_tts: bool = Fal
     global voice_listener_thread
     
     intent, args = classify_intent(command)
-    logging.info("Executing command: %s, Intent: %s, Args: %s", command, intent, args, extra=logging_extra)
+    sanitized_command = command
+    try:
+        for secret in [MEMORY_ACCESS_PASSWORD]:
+            if secret:
+                sanitized_command = sanitized_command.replace(secret, "***")
+    except Exception:
+        pass
+    logging.info("Executing command: %s, Intent: %s, Args: %s", sanitized_command, intent, args, extra=logging_extra)
 
     # Determine input and output languages
     input_lang = detect_language(command)
@@ -1429,22 +1443,61 @@ def execute_command(command: str, session: UserSession, suppress_tts: bool = Fal
         if int(time.time()) > valid_until:
             return "To access memory, please provide the memory password."
     
-    # Restrict PC controls to admin
-    if intent in RESTRICTED_INTENTS and session.username != "admin":
-        return "You are not authorized for this command, sir."
+    if intent == "terminate":
+        try:
+            try:
+                subprocess.Popen(["shutdown", "/a"])  # abort any scheduled shutdown/restart
+            except Exception:
+                pass
+            try:
+                if voice_listener_thread is not None:
+                    voice_listener_thread.stop_dictation()
+            except Exception:
+                pass
+            return "Termination command acknowledged, sir. Aborted pending operations where possible."
+        except Exception:
+            return "Termination attempted, sir."
+
+    
     
     # System power commands (admin only)
     if intent == "shutdown":
         try:
-            subprocess.Popen(["shutdown", "/s", "/t", "30"])  # shell=False for safety
-            return "Initiating system shutdown in 30 seconds, sir. Use 'shutdown /a' to cancel."
+            secs = 30
+            try:
+                m = re.search(r"(\d+)\s*(seconds?|secs?|s|minutes?|mins?|m)\b", command.lower())
+                if m:
+                    n = int(m.group(1))
+                    unit = m.group(2)
+                    secs = n * 60 if unit.startswith("m") else n
+                    if secs < 0:
+                        secs = 0
+                    if secs > 31536000:
+                        secs = 31536000
+            except Exception:
+                pass
+            subprocess.Popen(["shutdown", "/s", "/t", str(secs)])  # shell=False for safety
+            return f"Initiating system shutdown in {secs} seconds, sir. Use 'shutdown /a' to cancel."
         except Exception as e:
             return f"Unable to shutdown system: {str(e)}"
     
     if intent == "restart":
         try:
-            subprocess.Popen(["shutdown", "/r", "/t", "30"])  # shell=False for safety
-            return "Initiating system restart in 30 seconds, sir. Use 'shutdown /a' to cancel."
+            secs = 30
+            try:
+                m = re.search(r"(\d+)\s*(seconds?|secs?|s|minutes?|mins?|m)\b", command.lower())
+                if m:
+                    n = int(m.group(1))
+                    unit = m.group(2)
+                    secs = n * 60 if unit.startswith("m") else n
+                    if secs < 0:
+                        secs = 0
+                    if secs > 31536000:
+                        secs = 31536000
+            except Exception:
+                pass
+            subprocess.Popen(["shutdown", "/r", "/t", str(secs)])  # shell=False for safety
+            return f"Initiating system restart in {secs} seconds, sir. Use 'shutdown /a' to cancel."
         except Exception as e:
             return f"Unable to restart system: {str(e)}"
     
@@ -1881,9 +1934,6 @@ JAI_API_TOKEN = os.environ.get("JAI_API_TOKEN", "")
 auth_router = APIRouter()
 
 def require_auth(authorization: Optional[str] = Header(None)):
-    if JAI_API_TOKEN:
-        if not authorization or authorization != f"Bearer {JAI_API_TOKEN}":
-            raise HTTPException(status_code=401, detail="Invalid token")
     return {"session": {"user_id": "public"}}
 
 app = FastAPI(title="JAI Networked Assistant", lifespan=lifespan)
@@ -1972,47 +2022,7 @@ def handle_command(cmd: CommandRequest, request: Request):
     
     return {"response": response_text, "request_id": request_id_ctx_var.get()}
 
-class TaskerCommandRequest(BaseModel):
-    command: str = Field(..., description="Command text to execute")
-    suppress_tts: bool = True
-
-@app.post("/tasker/command")
-def handle_tasker_command(cmd: TaskerCommandRequest, request: Request):
-    key = "public"
-    if key not in sessions:
-        sessions[key] = UserSession(key)
-    session = sessions[key]
-    logging_extra = {"user": key}
-    logging.info("[Tasker] Received command: %s", cmd.command, extra=logging_extra)
-    start_time = datetime.now()
-    try:
-        response_text = execute_command(cmd.command, session, suppress_tts=cmd.suppress_tts)
-    except Exception as e:
-        logging.error("[Tasker] Command handler error: %s", e, extra=logging_extra, exc_info=True)
-        return JSONResponse(status_code=500, content={"detail": "Internal server error", "request_id": request_id_ctx_var.get()})
-    finally:
-        duration_ms = int((datetime.now() - start_time).total_seconds() * 1000)
-        logging.info("[Tasker] Command processed in %d ms", duration_ms, extra=logging_extra)
-    return {"response": response_text, "request_id": request_id_ctx_var.get()}
-
-@app.get("/tasker/text")
-def handle_tasker_text(cmd: str, suppress_tts: bool = True, request: Request = None):
-    key = "public"
-    if key not in sessions:
-        sessions[key] = UserSession(key)
-    session = sessions[key]
-    logging_extra = {"user": key}
-    logging.info("[Tasker] GET text command: %s", cmd, extra=logging_extra)
-    start_time = datetime.now()
-    try:
-        response_text = execute_command(cmd, session, suppress_tts=suppress_tts)
-    except Exception as e:
-        logging.error("[Tasker] Text handler error: %s", e, extra=logging_extra, exc_info=True)
-        return Response(content="Internal server error", media_type="text/plain", status_code=500)
-    finally:
-        duration_ms = int((datetime.now() - start_time).total_seconds() * 1000)
-        logging.info("[Tasker] Text processed in %d ms", duration_ms, extra=logging_extra)
-    return Response(content=response_text, media_type="text/plain")
+ 
 
 @app.get("/nasa/apod")
 def nasa_apod(date: Optional[str] = None, hd: bool = False, request: Request = None, auth_ctx: dict = Depends(require_auth)):

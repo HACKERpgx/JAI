@@ -841,7 +841,7 @@ def classify_intent(command: str) -> tuple[str, Optional[tuple]]:
         "show long term memory": r"(?:show|tell\s+me\s+about)\s+(?:your\s+)?long\s+term\s+memory|list\s+long\s+term\s+memories",
         "close app": r"close\s+(notepad|calculator|word|excel|chrome|google chrome|youtube|browser|file explorer|vscode)",
         "greeting": r"hello|hi|hey|good\s+(morning|evening|night)",
-        "set language": r"speak\s+(hindi|urdu|arabic|russian|spanish|english)",
+        "set language": r"(?:(?:you\s+will\s+)?(?:speak|set|use)\s+(?:only\s+)?(hindi|urdu|arabic|russian|spanish|english))|(?:english\s+only|only\s+english|always\s+english)",
         "auto language": r"(?:auto\s+language|auto\s+lang|speak\s+auto|default\s+language)",
         "who are you": r"who\s+(are\s+you|is\s+(?:jai|aj))",
         "set name": r"my\s+name\s+is\s+(\w+)",
@@ -1376,6 +1376,12 @@ def execute_command(command: str, session: UserSession, suppress_tts: bool = Fal
     if intent == "greeting":
         # Detect language from the command
         lang = detect_language(command)
+        # Respect fixed English preference
+        try:
+            if getattr(session, "language_mode", "auto") != "auto" and (getattr(session, "preferred_lang", "en") or "en") == "en":
+                lang = "en"
+        except Exception:
+            pass
         
         if lang == 'ur':  # Urdu
             greetings = [
@@ -1390,13 +1396,6 @@ def execute_command(command: str, session: UserSession, suppress_tts: bool = Fal
                 "Ana fi khedmatik, hal yumkinuni musa'adatuk?",
                 "Tafaddal, hal yumkinuni musa'adatuk?",
                 "Anaa huna, madha turiid?"
-            ]
-        elif lang == 'fr':  # French
-            greetings = [
-                "Oui, monsieur. Comment puis-je vous aider?",
-                "Ã€ votre service, monsieur.",
-                "EnchantÃ© de vous revoir, monsieur.",
-                "Je suis Ã  votre disposition, monsieur."
             ]
         else:  # English (default)
             greetings = [
@@ -1430,18 +1429,6 @@ def execute_command(command: str, session: UserSession, suppress_tts: bool = Fal
         response = "Voice mode activated. I will respond in both text and voice."
         speak_async_text(response, logging_extra, speak_lang)
         return response
-    
-    try:
-        digits_in_cmd = re.sub(r"\D", "", command)
-        if digits_in_cmd and re.sub(r"\D", "", MEMORY_ACCESS_PASSWORD) == digits_in_cmd:
-            session.memory_auth_until = int(time.time()) + MEMORY_AUTH_TTL_SEC
-            return "Memory access granted."
-    except Exception:
-        pass
-    if is_memory_intent(intent):
-        valid_until = int(getattr(session, "memory_auth_until", 0) or 0)
-        if int(time.time()) > valid_until:
-            return "To access memory, please provide the memory password."
     
     if intent == "terminate":
         try:
@@ -1606,7 +1593,7 @@ def execute_command(command: str, session: UserSession, suppress_tts: bool = Fal
     
     # Who are you - instant
     if intent == "who are you":
-        return "I am JAI â€” you can call me AJ â€” your personal AI assistant, sir. At your service."
+        return "I am JAI — you can call me AJ — your personal AI assistant, sir. At your service."
     
     # Current time - instant
     if intent == "current_time":

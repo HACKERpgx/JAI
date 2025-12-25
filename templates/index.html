@@ -110,19 +110,40 @@
   async function sendText(){
     const input = document.getElementById('txt');
     const text = input.value.trim();
-    if(!text) return;
-    push('me', '> ' + text);
+    const photoInput = document.getElementById('filePhoto');
+    const cameraInput = document.getElementById('fileCamera');
+    const imgFile = (photoInput && photoInput.files && photoInput.files[0]) || (cameraInput && cameraInput.files && cameraInput.files[0]) || null;
+    if(!text && !imgFile) return;
+    if(text) push('me', '> ' + text);
     input.value = '';
     try {
-      const res = await fetch('/api/text', {
-        method:'POST',
-        headers: { 'Content-Type':'application/json', 'X-Request-Id': rid() },
-        body: JSON.stringify({ text })
-      });
+      if(imgFile){
+        await sendImage(imgFile, text);
+        if(photoInput) photoInput.value = '';
+        if(cameraInput) cameraInput.value = '';
+      } else {
+        const res = await fetch('/api/text', {
+          method:'POST',
+          headers: { 'Content-Type':'application/json', 'X-Request-Id': rid() },
+          body: JSON.stringify({ text })
+        });
+        const data = await res.json();
+        push('bot', (data && data.response) ? data.response : JSON.stringify(data));
+      }
+    } catch(e){
+      push('bot', 'Network error');
+    }
+  }
+  async function sendImage(file, prompt){
+    try {
+      const form = new FormData();
+      form.append('file', file);
+      form.append('prompt', prompt || '');
+      const res = await fetch('/api/image', { method:'POST', headers: { 'X-Request-Id': rid() }, body: form });
       const data = await res.json();
       push('bot', (data && data.response) ? data.response : JSON.stringify(data));
     } catch(e){
-      push('bot', 'Network error');
+      push('bot', 'Image analysis failed');
     }
   }
   document.getElementById('send').addEventListener('click', sendText);

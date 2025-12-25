@@ -14,6 +14,8 @@ import tempfile
 import pathlib
 import shutil
 import subprocess
+import base64
+import mimetypes
 from fastapi.middleware.cors import CORSMiddleware
 try:
     from openai import OpenAI
@@ -90,7 +92,14 @@ async def api_text(req: WebTextRequest, request: Request):
         if username not in ja_sessions:
             ja_sessions[username] = JAUserSession(username)
         session = ja_sessions[username]
-        desired_lang = jai_detect_language(req.text)
+        # Force JAI WEBSITE to English-only responses
+        try:
+            session.language_mode = "fixed"
+            session.preferred_lang = "en"
+            session.detected_lang = "en"
+        except Exception:
+            pass
+        desired_lang = "en"
         special = _handle_special_qa(req.text)
         if special is not None:
             result = special
@@ -187,6 +196,50 @@ def _ensure_lang(text: str, desired_lang: str) -> str:
     except Exception:
         return text
 
+def _image_to_data_url(mime: str, data: bytes) -> str:
+    try:
+        b64 = base64.b64encode(data).decode('ascii')
+        return f"data:{mime};base64,{b64}"
+    except Exception:
+        return ""
+
+def _analyze_image_bytes(data: bytes, mime: str, prompt: str) -> str:
+    try:
+        data_url = _image_to_data_url(mime, data)
+        if not data_url:
+            return "Could not read image data."
+        api_key = os.environ.get("OPENAI_API_KEY")
+        if OpenAI and api_key:
+            try:
+                client = OpenAI(api_key=api_key)
+                user_prompt = (prompt or "").strip()
+                if not user_prompt:
+                    user_prompt = "Describe this image in detail and answer any implicit questions. Respond only in English."
+                else:
+                    user_prompt = user_prompt + "\n\nIMPORTANT: Respond only in English."
+                messages = [
+                    {
+                        "role": "user",
+                        "content": [
+                            {"type": "text", "text": user_prompt},
+                            {"type": "image_url", "image_url": {"url": data_url}},
+                        ],
+                    }
+                ]
+                resp = client.chat.completions.create(
+                    model=os.environ.get("JAI_VISION_MODEL", "gpt-4o-mini"),
+                    messages=messages,
+                    max_tokens=800,
+                    temperature=0.2,
+                )
+                text = resp.choices[0].message.content
+                return (text or "").strip() or "No description generated."
+            except Exception:
+                pass
+        return "Image analysis is not available on this server. Set OPENAI_API_KEY to enable vision analysis."
+    except Exception:
+        return "Image analysis failed."
+
 def _handle_special_qa(user_text: str) -> Optional[str]:
     try:
         low = (user_text or "").strip().lower()
@@ -195,6 +248,40 @@ def _handle_special_qa(user_text: str) -> Optional[str]:
         return None
     except Exception:
         return None
+
+@app.post("/api/image")
+async def api_image(request: Request, file: UploadFile = File(...), prompt: str = Form("")):
+    rid = request.headers.get("x-request-id") or str(uuid.uuid4())
+    token = request_id_ctx_var.set(rid)
+    try:
+        web_id = request.cookies.get("jai_web_id") or "anon"
+        username = f"web:{web_id}"
+        if username not in ja_sessions:
+            ja_sessions[username] = JAUserSession(username)
+        session = ja_sessions[username]
+        # Force JAI WEBSITE to English-only responses
+        try:
+            session.language_mode = "fixed"
+            session.preferred_lang = "en"
+            session.detected_lang = "en"
+        except Exception:
+            pass
+
+        data = await file.read()
+        mime = (getattr(file, "content_type", None) or mimetypes.guess_type(file.filename or "")[0] or "application/octet-stream")
+        if not isinstance(mime, str):
+            mime = "application/octet-stream"
+        if not mime.startswith("image/"):
+            return JSONResponse({"error": "Unsupported file type. Please upload an image."}, status_code=400)
+
+        analysis = _analyze_image_bytes(data, mime, prompt)
+        analysis = _ensure_lang(analysis, "en")
+        return {"response": analysis, "requestId": rid}
+    finally:
+        try:
+            request_id_ctx_var.reset(token)
+        except Exception:
+            pass
 
 @app.post("/api/voice")
 async def api_voice(request: Request, file: UploadFile = File(...), lang: str = Form("en-US")):
@@ -226,7 +313,14 @@ async def api_voice(request: Request, file: UploadFile = File(...), lang: str = 
         session = ja_sessions[username]
         if not text:
             return {"transcript": "", "response": "Could not transcribe."}
-        desired_lang = jai_detect_language(text) if text else _lang_code_of(lang)
+        # Force JAI WEBSITE to English-only responses
+        try:
+            session.language_mode = "fixed"
+            session.preferred_lang = "en"
+            session.detected_lang = "en"
+        except Exception:
+            pass
+        desired_lang = "en"
         special = _handle_special_qa(text)
         if special is not None:
             result = special

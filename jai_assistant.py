@@ -466,6 +466,7 @@ class UserSession:
         self.memory_auth_until = 0
         self.admin_auth_until = 0
         self.language_mode = "auto"  # 'auto' or 'fixed'
+        self.persona = None
         
     def update_conversation(self, user_input: str, ai_response: str, lang: str = None):
         """Update conversation history with the latest exchange."""
@@ -926,7 +927,7 @@ def jai_reply(prompt: str, session: UserSession) -> str:
           for item in filtered_context if 'user' in item['content']]
      )
      
-     system_prompt = build_system_prompt(user_name)
+     system_prompt = build_system_prompt(user_name, getattr(session, "persona", None))
      full_prompt = (
          f"{system_prompt}\n"
          f"User query: {prompt}\n{context_str}"

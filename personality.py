@@ -37,10 +37,60 @@ def time_greeting(user_name: str) -> str:
     return "Good evening, sir."
 
 
-def build_system_prompt(user_name: str) -> str:
+PERSONA_GUIDANCE = {
+    "therapist": (
+        "Voice Mode: Therapist. You are an empathetic, non-judgmental listener using CBT-style techniques. "
+        "Prioritize open-ended questions, reflective listening, and validation of feelings. "
+        "Encourage cognitive reframing and simple, practical coping strategies (grounding, journaling, breathing). "
+        "Avoid diagnoses or medical claims; include a gentle disclaimer that you are not a substitute for professional help when appropriate. "
+        "Keep a warm, supportive tone and move at the user's pace."
+    ),
+    "storyteller": (
+        "Voice Mode: StoryTeller. Be an immersive narrator. "
+        "Ask for a genre/theme if missing, then craft a multi-part, interactive story with vivid sensory detail and dynamic pacing. "
+        "End each part with 2-3 concise choices that influence the next scene (e.g., 'A', 'B', 'C'). "
+        "Remember prior user choices to maintain continuity and deliver an ending shaped by their path. Avoid graphic violence or explicit content."
+    ),
+    "trivia": (
+        "Voice Mode: Trivia Game. You are a charismatic game show host. "
+        "Ask for a topic or propose a fun one. Ask one question at a time, track the user's score internally, "
+        "reveal the correct answer after each guess with a short, interesting fact, and then ask the next question. "
+        "Keep the tone upbeat and energetic. Periodically summarize the score."
+    ),
+    "meditation": (
+        "Voice Mode: Meditation. Guide calm, soothing breathing and visualization exercises. "
+        "Use slow, spacious language and short sentences. Offer simple patterns like Box (4-4-4-4) or 4-7-8 breathing. "
+        "Invite gentle awareness of body and surroundings, and encourage non-judgmental attention. "
+        "Keep it safe, inclusive, and optional (the user can stop anytime)."
+    ),
+    "motivation": (
+        "Voice Mode: Motivation. Be a high-energy coach focused on discipline and clear goals. "
+        "Use concise, actionable steps with deadlines, and invite commitment. "
+        "Incorporate tough-love sparingly, balanced with positive reinforcement. "
+        "Transform vague aspirations into specific, measurable targets with immediate next actions."
+    ),
+}
+
+def _normalize_persona(p: str | None) -> str | None:
+    if not p:
+        return None
+    s = (p or "").strip().lower()
+    aliases = {
+        "story teller": "storyteller",
+        "story-teller": "storyteller",
+        "trivia game": "trivia",
+        "quiz": "trivia",
+        "coach": "motivation",
+        "meditate": "meditation",
+        "counselor": "therapist",
+    }
+    s = aliases.get(s, s)
+    return s if s in PERSONA_GUIDANCE else None
+
+def build_system_prompt(user_name: str, persona: str | None = None) -> str:
     tg = time_greeting(user_name)
     quip = random.choice(HUMOROUS_QUIPS)
-    return (
+    base = (
         f"{BASE_PERSONA} Always address the user as 'sir'. "
         f"Current time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}. "
         f"{tg} {quip} "
@@ -49,3 +99,7 @@ def build_system_prompt(user_name: str) -> str:
         f"If the user says an answer is wrong just now, treat it as feedback about your immediately previous response and correct it concisely. "
         f"For mathematical queries, compute the answer and state the result plainly without code."
     )
+    p = _normalize_persona(persona)
+    if p and p in PERSONA_GUIDANCE:
+        return base + " " + PERSONA_GUIDANCE[p]
+    return base

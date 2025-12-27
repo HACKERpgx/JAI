@@ -29,6 +29,10 @@ try:
     from deep_translator import GoogleTranslator as WebTranslator
 except Exception:
     WebTranslator = None
+try:
+    import muse as muse_module
+except Exception:
+    muse_module = None
 
 load_dotenv()
 try:
@@ -55,6 +59,13 @@ app.add_middleware(
 
 class WebTextRequest(BaseModel):
     text: str
+
+class WebPersonaRequest(BaseModel):
+    persona: str
+
+class ImageGenRequest(BaseModel):
+    prompt: str
+    size: Optional[str] = "1024x1024"
 
 @app.get("/api/health")
 async def health_check():
@@ -107,6 +118,130 @@ async def api_text(req: WebTextRequest, request: Request):
             result = execute_command(req.text, session, suppress_tts=True)
         result = _ensure_lang(result, desired_lang)
         return {"response": result, "requestId": rid}
+    finally:
+        try:
+            request_id_ctx_var.reset(token)
+        except Exception:
+            pass
+
+_PERSONA_ALIASES = {
+    "story teller": "storyteller",
+    "story-teller": "storyteller",
+    "trivia game": "trivia",
+    "quiz": "trivia",
+    "coach": "motivation",
+    "meditate": "meditation",
+    "counselor": "therapist",
+}
+_PERSONA_ALLOWED = {"therapist", "storyteller", "trivia", "meditation", "motivation"}
+
+def _normalize_persona(p: str | None) -> str | None:
+    if not p:
+        return None
+    s = (p or "").strip().lower()
+    s = _PERSONA_ALIASES.get(s, s)
+    return s if s in _PERSONA_ALLOWED else None
+
+_PERSONA_ALIASES = {
+    "story teller": "storyteller",
+    "story-teller": "storyteller",
+    "trivia game": "trivia",
+    "quiz": "trivia",
+    "coach": "motivation",
+    "meditate": "meditation",
+    "counselor": "therapist",
+}
+_PERSONA_ALLOWED = {"therapist", "storyteller", "trivia", "meditation", "motivation"}
+
+def _normalize_persona(p: str | None) -> str | None:
+    if not p:
+        return None
+    s = (p or "").strip().lower()
+    s = _PERSONA_ALIASES.get(s, s)
+    return s if s in _PERSONA_ALLOWED else None
+
+@app.get("/api/persona")
+async def api_get_persona(request: Request):
+    web_id = request.cookies.get("jai_web_id") or "anon"
+    username = f"web:{web_id}"
+    if username not in ja_sessions:
+        ja_sessions[username] = JAUserSession(username)
+    session = ja_sessions[username]
+    cur = getattr(session, "persona", None) or ""
+    return {"persona": cur}
+
+@app.post("/api/persona")
+async def api_set_persona(req: WebPersonaRequest, request: Request):
+    web_id = request.cookies.get("jai_web_id") or "anon"
+    username = f"web:{web_id}"
+    if username not in ja_sessions:
+        ja_sessions[username] = JAUserSession(username)
+    session = ja_sessions[username]
+    p = _normalize_persona(req.persona)
+    if not p:
+        return JSONResponse({"error": "Invalid persona"}, status_code=400)
+    try:
+        session.persona = p
+    except Exception:
+        setattr(session, "persona", p)
+    return {"persona": p}
+
+_IMG_LIMIT = int(os.environ.get("JAI_IMG_DAILY_LIMIT", "4") or "4")
+_IMG_QUOTA = {}
+
+def _quota_status(username: str):
+    from datetime import timedelta
+    now = datetime.utcnow()
+    q = _IMG_QUOTA.get(username)
+    if not q or not isinstance(q, dict) or not q.get("reset_at"):
+        q = {"used": 0, "reset_at": now + timedelta(hours=24)}
+        _IMG_QUOTA[username] = q
+    else:
+        if now >= q["reset_at"]:
+            q["used"] = 0
+            q["reset_at"] = now + timedelta(hours=24)
+    remaining = max(0, _IMG_LIMIT - int(q["used"]))
+    secs = max(0.0, (q["reset_at"] - now).total_seconds())
+    hours = secs / 3600.0
+    return {"used": int(q["used"]), "limit": _IMG_LIMIT, "remaining": remaining, "resetInHours": hours, "resetAt": q["reset_at"].isoformat() + "Z"}
+
+@app.get("/api/image/quota")
+async def api_image_quota(request: Request):
+    web_id = request.cookies.get("jai_web_id") or "anon"
+    username = f"web:{web_id}"
+    return _quota_status(username)
+
+@app.post("/api/image/generate")
+async def api_image_generate(req: ImageGenRequest, request: Request):
+    rid = request.headers.get("x-request-id") or str(uuid.uuid4())
+    token = request_id_ctx_var.set(rid)
+    try:
+        web_id = request.cookies.get("jai_web_id") or "anon"
+        username = f"web:{web_id}"
+        status = _quota_status(username)
+        if status["used"] >= status["limit"]:
+            hrs = status.get("resetInHours", 24.0)
+            return JSONResponse({"error": f"You've reached your daily limit of {status['limit']}. Your credits will reset in {hrs:.1f} hours."}, status_code=429)
+        if muse_module is None or not hasattr(muse_module, "generate_image"):
+            return JSONResponse({"error": "Image generation is not available."}, status_code=503)
+        prompt = (req.prompt or "").strip()
+        if not prompt:
+            return JSONResponse({"error": "Please provide a prompt."}, status_code=400)
+        size = (req.size or "1024x1024").strip()
+        try:
+            out_path = muse_module.generate_image(prompt, size=size)
+        except Exception:
+            return JSONResponse({"error": "Image generation failed."}, status_code=500)
+        try:
+            data = pathlib.Path(out_path).read_bytes()
+            data_url = _image_to_data_url("image/png", data)
+        except Exception:
+            data_url = ""
+        q = _IMG_QUOTA.get(username)
+        if q:
+            q["used"] = int(q.get("used", 0)) + 1
+        out_status = _quota_status(username)
+        return {"imageDataUrl": data_url, "status": out_status, "requestId": rid}
     finally:
         try:
             request_id_ctx_var.reset(token)

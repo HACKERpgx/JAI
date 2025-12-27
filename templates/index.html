@@ -29,17 +29,69 @@
     .send:hover { background: rgba(57,255,20,0.16); }
     @keyframes blink { 50% { opacity: 0; } }
     @media (max-width: 640px){ .terminal{ height:min(72vh, 640px);} #txt{ font-size:15px;} }
-    .stacker{ display:flex; flex-direction:column; gap:16px; align-items:center; position:relative; z-index:2; }
+    .stacker{ display:flex; flex-direction:column; gap:16px; align-items:center; position:relative; z-index:2; margin-left:220px; }
     .attach-row{ display:flex; align-items:center; gap:10px; padding:10px 14px; border-top:1px solid rgba(57,255,20,0.2); background: linear-gradient(180deg, rgba(0,0,0,0.0), rgba(0,0,0,0.25)); }
     .icon-btn{ width:36px; height:36px; border-radius:9999px; border:1px solid rgba(57,255,20,0.35); background: rgba(57,255,20,0.08); color:#b6ffd1; display:grid; place-items:center; transition: background .2s ease, transform .06s ease, color .2s ease, box-shadow .2s ease; }
     .icon-btn:hover{ background: rgba(57,255,20,0.14); color:#d8ffe9; }
     .icon-btn:active{ transform: scale(0.98); }
     .icon-btn:focus-visible{ outline: 3px solid rgba(57,255,20,0.35); outline-offset: 2px; }
+    .sidebar{ position:fixed; left:0; top:0; bottom:0; width:220px; background: linear-gradient(180deg, rgba(4,26,18,0.8), rgba(2,10,6,0.92)); border-right:1px solid rgba(57,255,20,0.2); backdrop-filter: blur(6px); z-index:3; display:flex; flex-direction:column; gap:8px; padding:14px 10px; }
+    .brand{ font-weight:800; letter-spacing:1px; color:#b6ffd1; text-shadow: 0 0 10px rgba(57,255,20,0.35); padding:8px 10px; border-bottom:1px solid rgba(57,255,20,0.2); margin-bottom:8px; }
+    .nav-item{ text-align:left; background: rgba(57,255,20,0.06); border:1px solid rgba(57,255,20,0.25); color:#caffea; padding:10px 12px; border-radius:10px; font-weight:700; cursor:pointer; }
+    .nav-item:hover{ background: rgba(57,255,20,0.12); }
+    .nav-item.active{ background: rgba(57,255,20,0.18); box-shadow: 0 0 14px rgba(57,255,20,0.15) inset; }
+    .voice-dashboard{ position:relative; z-index:2; margin-left:220px; width:min(1100px, 92vw); }
+    .image-dashboard{ position:relative; z-index:2; margin-left:220px; width:min(1100px, 92vw); }
+    .voice-panel{ border:1px solid rgba(57,255,20,0.25); border-radius:14px; background: linear-gradient(180deg, rgba(6,20,14,0.7), rgba(2,10,6,0.85)); box-shadow: 0 0 24px rgba(57,255,20,0.15), inset 0 0 24px rgba(57,255,20,0.05); backdrop-filter: blur(6px); padding:14px; }
+    .voice-head{ display:flex; align-items:center; justify-content:space-between; gap:10px; padding:4px 6px 10px 6px; border-bottom:1px solid rgba(57,255,20,0.2); margin-bottom:12px; }
+    .voice-title{ font-weight:800; color:#b6ffd1; text-shadow: 0 0 6px rgba(57,255,20,0.35); letter-spacing:0.6px; }
+    .modes{ display:grid; grid-template-columns: repeat(5, minmax(0,1fr)); gap:12px; }
+    .mode-card{ display:flex; flex-direction:column; align-items:center; gap:8px; padding:12px; border:1px solid rgba(57,255,20,0.25); border-radius:12px; background: rgba(57,255,20,0.06); cursor:pointer; transition: transform .1s ease, background .2s ease; }
+    .mode-card:hover{ transform: translateY(-1px); background: rgba(57,255,20,0.12); }
+    .mode-card.active{ outline: 2px solid rgba(57,255,20,0.5); background: rgba(57,255,20,0.16); }
+    .mode-label{ font-weight:700; color:#d8ffe9; font-size:14px; text-align:center; }
+    .voice-controls{ display:flex; align-items:center; justify-content:space-between; gap:12px; margin-top:14px; padding-top:12px; border-top:1px solid rgba(57,255,20,0.2); }
+    .mic-btn{ width:48px; height:48px; border-radius:9999px; background: rgba(57,255,20,0.12); border:1px solid rgba(57,255,20,0.35); color:#caffea; display:grid; place-items:center; font-weight:800; }
+    .mic-btn.recording{ background: rgba(255, 80, 80, 0.18); border-color: rgba(255,80,80,0.5); }
+    .wave{ display:flex; align-items:flex-end; gap:3px; height:28px; flex:1; padding:0 6px; }
+    .bar{ width:4px; height:6px; background:#39ff14; box-shadow: 0 0 8px rgba(57,255,20,0.4); opacity:0.6; border-radius:2px; transform-origin: bottom center; animation: pulseIdle 1.4s ease-in-out infinite; }
+    .wave.listening .bar{ animation: pulseListen 0.8s ease-in-out infinite; }
+    .wave.speaking .bar{ animation: pulseSpeak 0.5s ease-in-out infinite; }
+    @keyframes pulseIdle { 50% { transform: scaleY(1.2); opacity:0.7; } }
+    @keyframes pulseListen { 25% { transform: scaleY(2.2); opacity:1; } 75% { transform: scaleY(0.8); opacity:0.7; } }
+    @keyframes pulseSpeak { 20% { transform: scaleY(2.8); opacity:1; } 60% { transform: scaleY(1.2); opacity:0.85; } }
+    .voice-log{ margin-top:12px; max-height:220px; overflow:auto; display:flex; flex-direction:column; gap:6px; }
+    .vline{ color:#b6ffd1; text-shadow: 0 0 8px rgba(57,255,20,0.25); white-space: pre-wrap; }
+    .vline.me{ color:#8fffc9; }
+    .vline.bot{ color:#caffea; }
+    .img-status{ margin:10px 0; padding:8px 10px; border:1px solid rgba(57,255,20,0.25); border-radius:8px; background: rgba(57,255,20,0.06); color:#caffea; font-weight:700; }
+    .img-form{ display:flex; gap:10px; align-items:center; margin:10px 0; }
+    .img-input{ flex:1; background: transparent; color:#d9ffe8; border:1px solid rgba(57,255,20,0.35); border-radius:8px; padding:8px 10px; }
+    .img-select{ background: transparent; color:#d9ffe8; border:1px solid rgba(57,255,20,0.35); border-radius:8px; padding:8px 10px; }
+    .img-btn{ background: rgba(57,255,20,0.1); border:1px solid rgba(57,255,20,0.35); color:#caffea; padding:8px 12px; border-radius:8px; font-weight:700; }
+    .img-btn:hover{ background: rgba(57,255,20,0.16); }
+    .img-error{ margin:8px 0; color:#ffd1d1; background: rgba(255,80,80,0.12); border:1px solid rgba(255,80,80,0.4); padding:8px 10px; border-radius:8px; display:none; }
+    .img-result{ margin-top:12px; display:flex; align-items:center; justify-content:center; }
+    .img-result img{ max-width:100%; border-radius:10px; border:1px solid rgba(57,255,20,0.25); box-shadow: 0 0 24px rgba(57,255,20,0.15); }
+    .img-loading{ display:none; width:22px; height:22px; border:3px solid rgba(57,255,20,0.25); border-top-color:#39ff14; border-radius:50%; animation: spin 0.8s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .tooltip{ position:relative; display:flex; align-items:center; gap:6px; }
+    .tip-icon{ width:22px; height:22px; display:grid; place-items:center; border-radius:50%; border:1px solid rgba(57,255,20,0.35); background: rgba(57,255,20,0.08); color:#b6ffd1; font-weight:800; cursor:default; }
+    .tip-bubble{ display:none; position:absolute; top:120%; right:0; min-width:280px; max-width:380px; background: rgba(6,20,14,0.95); border:1px solid rgba(57,255,20,0.35); color:#d8ffe9; padding:10px 12px; border-radius:10px; box-shadow: 0 0 14px rgba(57,255,20,0.15); z-index:5; }
+    .tooltip:hover .tip-bubble{ display:block; }
+    @media (max-width: 940px){ .modes{ grid-template-columns: repeat(2, minmax(0,1fr)); } }
+    @media (max-width: 640px){ .stacker{ margin-left:0; } .voice-dashboard{ margin-left:0; } .sidebar{ position:static; width:auto; flex-direction:row; gap:8px; border:0; background:transparent; padding:8px; } .brand{ border:0; margin:0; padding:0 8px; } }
   </style>
 </head>
 <body>
   <canvas id="rain"></canvas>
   <div class="overlay"></div>
+  <nav class="sidebar">
+    <div class="brand">JAI</div>
+    <button id="navChat" class="nav-item active">Chat</button>
+    <button id="navVoice" class="nav-item">Voice Mode</button>
+    <button id="navImage" class="nav-item">Image Generator</button>
+  </nav>
   <div class="stacker">
     <div class="terminal">
     <div class="term-head">
@@ -96,6 +148,94 @@
     <input id="fileCamera" type="file" accept="image/*" capture="environment" style="display:none" />
     </div>
   </div>
+  <div id="voiceDash" class="voice-dashboard" style="display:none">
+    <div class="voice-panel">
+      <div class="voice-head">
+        <div class="voice-title">Voice Mode</div>
+      </div>
+      <div class="modes">
+        <div class="mode-card" data-persona="therapist" id="modeTherapist" aria-label="Therapist">
+          <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="12" cy="8" r="4"/>
+            <path d="M4 20c1.5-3 4.5-5 8-5s6.5 2 8 5"/>
+            <path d="M8 14c0 0 1.5 2 4 2s4-2 4-2"/>
+          </svg>
+          <div class="mode-label">Therapist</div>
+        </div>
+        <div class="mode-card" data-persona="storyteller" id="modeStory" aria-label="StoryTeller">
+          <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M4 5h12a4 4 0 0 1 4 4v10H8a4 4 0 0 1-4-4V5z"/>
+            <path d="M8 9h8M8 13h6"/>
+          </svg>
+          <div class="mode-label">StoryTeller</div>
+        </div>
+        <div class="mode-card" data-persona="trivia" id="modeTrivia" aria-label="Trivia Game">
+          <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="12" cy="12" r="9"/>
+            <path d="M9 10a3 3 0 1 1 6 0c0 2-3 2.5-3 5"/>
+            <circle cx="12" cy="17" r="1"/>
+          </svg>
+          <div class="mode-label">Trivia Game</div>
+        </div>
+        <div class="mode-card" data-persona="meditation" id="modeMeditation" aria-label="Meditation">
+          <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="12" cy="5" r="2.5"/>
+            <path d="M6 21c2-2 4-3 6-3s4 1 6 3M6 14c2-1 4-2 6-2s4 1 6 2"/>
+          </svg>
+          <div class="mode-label">Meditation</div>
+        </div>
+        <div class="mode-card" data-persona="motivation" id="modeMotivation" aria-label="Motivation">
+          <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M5 12l4 4L19 6"/>
+            <path d="M3 12a9 9 0 1 0 18 0a9 9 0 1 0 -18 0"/>
+          </svg>
+          <div class="mode-label">Motivation</div>
+        </div>
+      </div>
+      <div class="voice-controls">
+        <button id="btnMic" class="mic-btn" aria-label="Record"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10a7 7 0 0 1-14 0"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg></button>
+        <div id="wave" class="wave">
+          <div class="bar" style="animation-delay:0ms"></div>
+          <div class="bar" style="animation-delay:60ms"></div>
+          <div class="bar" style="animation-delay:120ms"></div>
+          <div class="bar" style="animation-delay:180ms"></div>
+          <div class="bar" style="animation-delay:240ms"></div>
+          <div class="bar" style="animation-delay:300ms"></div>
+          <div class="bar" style="animation-delay:360ms"></div>
+          <div class="bar" style="animation-delay:420ms"></div>
+          <div class="bar" style="animation-delay:480ms"></div>
+          <div class="bar" style="animation-delay:540ms"></div>
+          <div class="bar" style="animation-delay:600ms"></div>
+          <div class="bar" style="animation-delay:660ms"></div>
+        </div>
+      </div>
+      <div id="voiceLog" class="voice-log"></div>
+    </div>
+  </div>
+  <div id="imageDash" class="image-dashboard" style="display:none">
+    <div class="voice-panel">
+      <div class="voice-head">
+        <div class="voice-title">Image Generator</div>
+        <div class="tooltip" aria-label="Usage limits">
+          <span class="tip-icon">i</span>
+          <div class="tip-bubble">Text-to-image generation is limited to 4 per 24 hours for free users.</div>
+        </div>
+      </div>
+      <div id="imgStatus" class="img-status">0 of 4 images used today</div>
+      <div class="img-form">
+        <input id="imgPrompt" class="img-input" type="text" placeholder="Describe the image you want..." autocomplete="off" spellcheck="false" />
+        <select id="imgSize" class="img-select">
+          <option value="512x512">512x512</option>
+          <option value="768x768">768x768</option>
+          <option value="1024x1024" selected>1024x1024</option>
+        </select>
+        <button id="imgGenerate" class="img-btn">Generate</button>
+        <div id="imgLoading" class="img-loading" aria-hidden="true"></div>
+      </div>
+      <div id="imgError" class="img-error" role="alert"></div>
+      <div class="img-result"><img id="imgPreview" alt="Generated image" style="display:none" /></div>
+    </div>
+  </div>
 
 <script>
   function rid(){ return ([1e7]+-1e3+-4e3+-8e3+-1e11).replace(/[018]/g,c=>(c^crypto.getRandomValues(new Uint8Array(1))[0]&15>>c/4).toString(16)); }
@@ -107,6 +247,72 @@
     log.appendChild(div);
     log.scrollTop = log.scrollHeight;
   }
+
+  // Image generator logic
+  const imgStatus = document.getElementById('imgStatus');
+  const imgPrompt = document.getElementById('imgPrompt');
+  const imgSize = document.getElementById('imgSize');
+  const imgGenerate = document.getElementById('imgGenerate');
+  const imgError = document.getElementById('imgError');
+  const imgPreview = document.getElementById('imgPreview');
+  const imgLoading = document.getElementById('imgLoading');
+
+  function setImgLoading(on){
+    try{
+      if(on){
+        imgLoading.style.display = '';
+        imgGenerate.disabled = true;
+        imgPrompt.disabled = true;
+        imgSize.disabled = true;
+      } else {
+        imgLoading.style.display = 'none';
+        imgGenerate.disabled = false;
+        imgPrompt.disabled = false;
+        imgSize.disabled = false;
+      }
+    }catch(_){ }
+  }
+
+  function updateImageStatusText(st){
+    if(!st) return;
+    const used = st.used || 0; const limit = st.limit || 4; const rem = st.remaining ?? Math.max(0, limit - used);
+    imgStatus.textContent = `${used} of ${limit} images used today` + (typeof rem === 'number' ? ` • ${rem} remaining` : '');
+  }
+  async function refreshImageQuota(){
+    try{
+      const res = await fetch('/api/image/quota');
+      const data = await res.json();
+      updateImageStatusText(data);
+      imgError.style.display = 'none';
+      imgError.textContent = '';
+    }catch(_){ /* ignore */ }
+  }
+  async function generateImage(){
+    const prompt = (imgPrompt.value || '').trim();
+    if(!prompt){ imgError.textContent = 'Please enter a prompt.'; imgError.style.display = ''; return; }
+    imgError.style.display = 'none'; imgError.textContent = '';
+    try{
+      setImgLoading(true);
+      imgPreview.style.display = 'none'; imgPreview.removeAttribute('src');
+      const res = await fetch('/api/image/generate', { method:'POST', headers:{ 'Content-Type':'application/json', 'X-Request-Id': rid() }, body: JSON.stringify({ prompt, size: imgSize.value }) });
+      const data = await res.json();
+      if(!res.ok){
+        imgError.textContent = (data && data.error) ? data.error : 'Generation failed';
+        imgError.style.display = '';
+        await refreshImageQuota();
+        return;
+      }
+      updateImageStatusText(data && data.status);
+      const url = data && data.imageDataUrl;
+      if(url){
+        imgPreview.src = url; imgPreview.style.display = '';
+      } else {
+        imgError.textContent = 'No image returned.'; imgError.style.display = '';
+      }
+    }catch(_){ imgError.textContent = 'Network error'; imgError.style.display = ''; }
+    finally{ setImgLoading(false); }
+  }
+  imgGenerate.addEventListener('click', generateImage);
   async function sendText(){
     const input = document.getElementById('txt');
     const text = input.value.trim();
@@ -217,6 +423,120 @@
     window.addEventListener('load', ()=>{
       navigator.serviceWorker.register('/service-worker.js').catch(()=>{});
     });
+  }
+
+  const navChat = document.getElementById('navChat');
+  const navVoice = document.getElementById('navVoice');
+  const navImage = document.getElementById('navImage');
+  const stacker = document.querySelector('.stacker');
+  const voiceDash = document.getElementById('voiceDash');
+  const imageDash = document.getElementById('imageDash');
+  function setView(view){
+    if(view === 'voice'){
+      voiceDash.style.display = '';
+      stacker.style.display = 'none';
+      imageDash.style.display = 'none';
+      navVoice.classList.add('active');
+      navChat.classList.remove('active');
+      navImage.classList.remove('active');
+    } else if(view === 'image'){
+      imageDash.style.display = '';
+      voiceDash.style.display = 'none';
+      stacker.style.display = 'none';
+      navImage.classList.add('active');
+      navChat.classList.remove('active');
+      navVoice.classList.remove('active');
+      refreshImageQuota();
+    } else {
+      voiceDash.style.display = 'none';
+      imageDash.style.display = 'none';
+      stacker.style.display = '';
+      navChat.classList.add('active');
+      navVoice.classList.remove('active');
+      navImage.classList.remove('active');
+    }
+  }
+  navChat.addEventListener('click', ()=> setView('chat'));
+  navVoice.addEventListener('click', ()=> setView('voice'));
+  navImage.addEventListener('click', ()=> setView('image'));
+
+  const cards = Array.from(document.querySelectorAll('.mode-card'));
+  function highlightCard(id){
+    cards.forEach(c=> c.classList.toggle('active', c.id === id));
+  }
+  async function setPersona(p){
+    try{
+      const res = await fetch('/api/persona', { method:'POST', headers:{ 'Content-Type':'application/json' }, body: JSON.stringify({ persona:p }) });
+      const data = await res.json();
+      return !!data && !data.error;
+    }catch(_){ return false }
+  }
+  cards.forEach(c=> c.addEventListener('click', async ()=>{
+    const p = c.getAttribute('data-persona');
+    const ok = await setPersona(p);
+    if(ok) highlightCard(c.id);
+  }));
+
+  const voiceLog = document.getElementById('voiceLog');
+  function vpush(role, text){
+    const d = document.createElement('div');
+    d.className = 'vline ' + (role==='me'?'me':'bot');
+    d.textContent = text;
+    voiceLog.appendChild(d);
+    voiceLog.scrollTop = voiceLog.scrollHeight;
+  }
+
+  const wave = document.getElementById('wave');
+  function setWave(mode){
+    wave.classList.remove('listening','speaking');
+    if(mode==='listening') wave.classList.add('listening');
+    if(mode==='speaking') wave.classList.add('speaking');
+  }
+
+  const btnMic = document.getElementById('btnMic');
+  let mediaStream = null; let mediaRecorder = null; let chunks = []; let recording = false;
+  async function startRec(){
+    try{
+      mediaStream = await navigator.mediaDevices.getUserMedia({ audio:true });
+      mediaRecorder = new MediaRecorder(mediaStream, { mimeType: 'audio/webm' });
+      chunks = [];
+      mediaRecorder.ondataavailable = e=>{ if(e.data && e.data.size>0) chunks.push(e.data) };
+      mediaRecorder.onstop = async ()=>{
+        try{ mediaStream.getTracks().forEach(t=> t.stop()); }catch(_){ }
+        const blob = new Blob(chunks, { type: 'audio/webm' });
+        const fd = new FormData();
+        fd.append('file', blob, 'voice.webm');
+        fd.append('lang', 'en-US');
+        setWave('');
+        try{
+          const res = await fetch('/api/voice', { method:'POST', body: fd, headers: { 'X-Request-Id': rid() } });
+          const data = await res.json();
+          const t = (data && data.transcript) || '';
+          const r = (data && data.response) || '';
+          if(t) vpush('me', '> ' + t);
+          if(r){ vpush('bot', r); speak(r); }
+        }catch(_){ vpush('bot', 'Voice processing failed'); }
+      };
+      mediaRecorder.start();
+      recording = true;
+      btnMic.classList.add('recording');
+      setWave('listening');
+    }catch(_){ vpush('bot', 'Microphone permission denied'); }
+  }
+  function stopRec(){
+    try{ if(mediaRecorder && recording){ mediaRecorder.stop(); } }catch(_){ }
+    recording = false;
+    btnMic.classList.remove('recording');
+  }
+  btnMic.addEventListener('click', ()=>{ if(recording){ stopRec(); } else { startRec(); } });
+
+  function speak(text){
+    try{
+      const u = new SpeechSynthesisUtterance(text);
+      u.onstart = ()=> setWave('speaking');
+      u.onend = ()=> setWave('');
+      speechSynthesis.speak(u);
+    }catch(_){ /* no-op */ }
   }
 </script>
 </body>

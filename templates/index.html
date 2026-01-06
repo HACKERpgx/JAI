@@ -90,8 +90,7 @@
     <div class="brand">JAI</div>
     <button id="navChat" class="nav-item active">Chat</button>
     <button id="navVoice" class="nav-item">Voice Mode</button>
-    <button id="navImage" class="nav-item">Image Generator</button>
-  </nav>
+      </nav>
   <div class="stacker">
     <div class="terminal">
     <div class="term-head">
@@ -212,31 +211,7 @@
       <div id="voiceLog" class="voice-log"></div>
     </div>
   </div>
-  <div id="imageDash" class="image-dashboard" style="display:none">
-    <div class="voice-panel">
-      <div class="voice-head">
-        <div class="voice-title">Image Generator</div>
-        <div class="tooltip" aria-label="Usage limits">
-          <span class="tip-icon">i</span>
-          <div class="tip-bubble">Text-to-image generation is limited to 4 per 24 hours for free users.</div>
-        </div>
-      </div>
-      <div id="imgStatus" class="img-status">0 of 4 images used today</div>
-      <div class="img-form">
-        <input id="imgPrompt" class="img-input" type="text" placeholder="Describe the image you want..." autocomplete="off" spellcheck="false" />
-        <select id="imgSize" class="img-select">
-          <option value="512x512">512x512</option>
-          <option value="768x768">768x768</option>
-          <option value="1024x1024" selected>1024x1024</option>
-        </select>
-        <button id="imgGenerate" class="img-btn">Generate</button>
-        <div id="imgLoading" class="img-loading" aria-hidden="true"></div>
-      </div>
-      <div id="imgError" class="img-error" role="alert"></div>
-      <div class="img-result"><img id="imgPreview" alt="Generated image" style="display:none" /></div>
-    </div>
-  </div>
-
+  
 <script>
   function rid(){ return ([1e7]+-1e3+-4e3+-8e3+-1e11).replace(/[018]/g,c=>(c^crypto.getRandomValues(new Uint8Array(1))[0]&15>>c/4).toString(16)); }
   const log = document.getElementById('log');
@@ -248,72 +223,7 @@
     log.scrollTop = log.scrollHeight;
   }
 
-  // Image generator logic
-  const imgStatus = document.getElementById('imgStatus');
-  const imgPrompt = document.getElementById('imgPrompt');
-  const imgSize = document.getElementById('imgSize');
-  const imgGenerate = document.getElementById('imgGenerate');
-  const imgError = document.getElementById('imgError');
-  const imgPreview = document.getElementById('imgPreview');
-  const imgLoading = document.getElementById('imgLoading');
-
-  function setImgLoading(on){
-    try{
-      if(on){
-        imgLoading.style.display = '';
-        imgGenerate.disabled = true;
-        imgPrompt.disabled = true;
-        imgSize.disabled = true;
-      } else {
-        imgLoading.style.display = 'none';
-        imgGenerate.disabled = false;
-        imgPrompt.disabled = false;
-        imgSize.disabled = false;
-      }
-    }catch(_){ }
-  }
-
-  function updateImageStatusText(st){
-    if(!st) return;
-    const used = st.used || 0; const limit = st.limit || 4; const rem = st.remaining ?? Math.max(0, limit - used);
-    imgStatus.textContent = `${used} of ${limit} images used today` + (typeof rem === 'number' ? ` • ${rem} remaining` : '');
-  }
-  async function refreshImageQuota(){
-    try{
-      const res = await fetch('/api/image/quota');
-      const data = await res.json();
-      updateImageStatusText(data);
-      imgError.style.display = 'none';
-      imgError.textContent = '';
-    }catch(_){ /* ignore */ }
-  }
-  async function generateImage(){
-    const prompt = (imgPrompt.value || '').trim();
-    if(!prompt){ imgError.textContent = 'Please enter a prompt.'; imgError.style.display = ''; return; }
-    imgError.style.display = 'none'; imgError.textContent = '';
-    try{
-      setImgLoading(true);
-      imgPreview.style.display = 'none'; imgPreview.removeAttribute('src');
-      const res = await fetch('/api/image/generate', { method:'POST', headers:{ 'Content-Type':'application/json', 'X-Request-Id': rid() }, body: JSON.stringify({ prompt, size: imgSize.value }) });
-      const data = await res.json();
-      if(!res.ok){
-        imgError.textContent = (data && data.error) ? data.error : 'Generation failed';
-        imgError.style.display = '';
-        await refreshImageQuota();
-        return;
-      }
-      updateImageStatusText(data && data.status);
-      const url = data && data.imageDataUrl;
-      if(url){
-        imgPreview.src = url; imgPreview.style.display = '';
-      } else {
-        imgError.textContent = 'No image returned.'; imgError.style.display = '';
-      }
-    }catch(_){ imgError.textContent = 'Network error'; imgError.style.display = ''; }
-    finally{ setImgLoading(false); }
-  }
-  imgGenerate.addEventListener('click', generateImage);
-  async function sendText(){
+    async function sendText(){
     const input = document.getElementById('txt');
     const text = input.value.trim();
     const photoInput = document.getElementById('filePhoto');

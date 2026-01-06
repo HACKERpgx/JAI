@@ -17,6 +17,11 @@ import subprocess
 import base64
 import mimetypes
 from fastapi.middleware.cors import CORSMiddleware
+from io import BytesIO
+try:
+    from PIL import Image
+except Exception:
+    Image = None
 try:
     from openai import OpenAI
 except Exception:
@@ -41,6 +46,15 @@ except Exception:
     pass
 app = FastAPI(title="JAI Web API")
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+# Also load env files relative to server directory to avoid CWD issues
+try:
+    load_dotenv(os.path.join(BASE_DIR, '.env'), override=False)
+except Exception:
+    pass
+try:
+    load_dotenv(os.path.join(BASE_DIR, '.env.local'), override=True)
+except Exception:
+    pass
 templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "templates"))
 app.mount("/static", StaticFiles(directory=os.path.join(BASE_DIR, "static")), name="static")
 
@@ -63,9 +77,6 @@ class WebTextRequest(BaseModel):
 class WebPersonaRequest(BaseModel):
     persona: str
 
-class ImageGenRequest(BaseModel):
-    prompt: str
-    size: Optional[str] = "1024x1024"
 
 @app.get("/api/health")
 async def health_check():
@@ -186,67 +197,8 @@ async def api_set_persona(req: WebPersonaRequest, request: Request):
         setattr(session, "persona", p)
     return {"persona": p}
 
-_IMG_LIMIT = int(os.environ.get("JAI_IMG_DAILY_LIMIT", "4") or "4")
-_IMG_QUOTA = {}
 
-def _quota_status(username: str):
-    from datetime import timedelta
-    now = datetime.utcnow()
-    q = _IMG_QUOTA.get(username)
-    if not q or not isinstance(q, dict) or not q.get("reset_at"):
-        q = {"used": 0, "reset_at": now + timedelta(hours=24)}
-        _IMG_QUOTA[username] = q
-    else:
-        if now >= q["reset_at"]:
-            q["used"] = 0
-            q["reset_at"] = now + timedelta(hours=24)
-    remaining = max(0, _IMG_LIMIT - int(q["used"]))
-    secs = max(0.0, (q["reset_at"] - now).total_seconds())
-    hours = secs / 3600.0
-    return {"used": int(q["used"]), "limit": _IMG_LIMIT, "remaining": remaining, "resetInHours": hours, "resetAt": q["reset_at"].isoformat() + "Z"}
 
-@app.get("/api/image/quota")
-async def api_image_quota(request: Request):
-    web_id = request.cookies.get("jai_web_id") or "anon"
-    username = f"web:{web_id}"
-    return _quota_status(username)
-
-@app.post("/api/image/generate")
-async def api_image_generate(req: ImageGenRequest, request: Request):
-    rid = request.headers.get("x-request-id") or str(uuid.uuid4())
-    token = request_id_ctx_var.set(rid)
-    try:
-        web_id = request.cookies.get("jai_web_id") or "anon"
-        username = f"web:{web_id}"
-        status = _quota_status(username)
-        if status["used"] >= status["limit"]:
-            hrs = status.get("resetInHours", 24.0)
-            return JSONResponse({"error": f"You've reached your daily limit of {status['limit']}. Your credits will reset in {hrs:.1f} hours."}, status_code=429)
-        if muse_module is None or not hasattr(muse_module, "generate_image"):
-            return JSONResponse({"error": "Image generation is not available."}, status_code=503)
-        prompt = (req.prompt or "").strip()
-        if not prompt:
-            return JSONResponse({"error": "Please provide a prompt."}, status_code=400)
-        size = (req.size or "1024x1024").strip()
-        try:
-            out_path = muse_module.generate_image(prompt, size=size)
-        except Exception:
-            return JSONResponse({"error": "Image generation failed."}, status_code=500)
-        try:
-            data = pathlib.Path(out_path).read_bytes()
-            data_url = _image_to_data_url("image/png", data)
-        except Exception:
-            data_url = ""
-        q = _IMG_QUOTA.get(username)
-        if q:
-            q["used"] = int(q.get("used", 0)) + 1
-        out_status = _quota_status(username)
-        return {"imageDataUrl": data_url, "status": out_status, "requestId": rid}
-    finally:
-        try:
-            request_id_ctx_var.reset(token)
-        except Exception:
-            pass
 
 def _ffmpeg_bin() -> str:
     return os.environ.get("FFMPEG_BIN") or "ffmpeg"
@@ -331,12 +283,23 @@ def _ensure_lang(text: str, desired_lang: str) -> str:
     except Exception:
         return text
 
-def _image_to_data_url(mime: str, data: bytes) -> str:
+
+
+
+def _load_and_convert(img: Image.Image, fmt_label: str) -> bytes:
+    bio = BytesIO()
     try:
-        b64 = base64.b64encode(data).decode('ascii')
-        return f"data:{mime};base64,{b64}"
-    except Exception:
-        return ""
+        # Ensure correct mode for JPEG
+        if fmt_label == "JPEG" and img.mode in {"RGBA", "P"}:
+            img = img.convert("RGB")
+        img.save(bio, format=fmt_label)
+        return bio.getvalue()
+    finally:
+        try:
+            bio.close()
+        except Exception:
+            pass
+
 
 def _analyze_image_bytes(data: bytes, mime: str, prompt: str) -> str:
     try:

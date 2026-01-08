@@ -65,6 +65,13 @@ from fastapi.exceptions import RequestValidationError
 from fastapi import APIRouter
 from pydantic import BaseModel
 
+# Import Gmail OAuth functionality
+try:
+    from gmail_oauth import send_gmail_email, test_gmail_connection
+    GMAIL_AVAILABLE = True
+except ImportError:
+    GMAIL_AVAILABLE = False
+
 # Language support
 LANGUAGES = {
     'en': {'name': 'English', 'flag': 'ðŸ‡¬ðŸ‡§'},
@@ -869,6 +876,8 @@ def classify_intent(command: str) -> tuple[str, Optional[tuple]]:
         "muse_transcribe": r"(?:muse\s+)?transcribe\s+(.+)",
         "muse_detect": r"(?:muse\s+)?detect\s+objects\s+in\s+(.+)",
         "muse_search": r"(?:muse\s+)?search\s+images?\s+for\s+(.+)",
+        "send_email": r"send\s+(?:an?\s+)?email\s+(?:to\s+)?(.+?)(?:\s+(?:with|about|subject)\s+(.+))?$|email\s+(.+?)(?:\s+(?:with|about|subject)\s+(.+))?$",
+        "test_gmail": r"test\s+gmail|gmail\s+test|check\s+gmail",
         "current_time": r"what time is it|what's the time|tell me the time|current time|time now"  # Current time
     }
     for intent, pattern in patterns.items():
@@ -1603,6 +1612,59 @@ def execute_command(command: str, session: UserSession, suppress_tts: bool = Fal
         date_str = current_time.strftime("%A, %B %d, %Y")
         return f"The current time is {time_str}, {date_str}, sir."
 
+    # Gmail functionality
+    if intent == "send_email":
+        if not GMAIL_AVAILABLE:
+            return "Gmail functionality is not available. Please install the required packages: pip install google-auth google-auth-oauthlib google-auth-httplib2 google-api-python-client"
+        
+        try:
+            # Parse email arguments
+            recipient = None
+            subject = "Email from JAI Assistant"
+            body = "This is an automated email from JAI Assistant."
+            
+            if args:
+                if len(args) >= 1 and args[0]:
+                    recipient = args[0].strip()
+                if len(args) >= 2 and args[1]:
+                    subject = args[1].strip()
+                # For body, we'll use a simple default or ask user
+            
+            if not recipient:
+                return "Please specify a recipient email address. Example: 'send email to user@example.com with subject Meeting Update'"
+            
+            # Validate email format
+            import re
+            email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+            if not re.match(email_pattern, recipient):
+                return f"Invalid email address format: {recipient}"
+            
+            # Send email
+            result = send_gmail_email(recipient, subject, body)
+            if result['success']:
+                return f"Email sent successfully to {recipient}. Message ID: {result.get('message_id', 'N/A')}"
+            else:
+                return f"Failed to send email: {result.get('error', 'Unknown error')}"
+                
+        except Exception as e:
+            logging.error(f"Gmail send error: {e}", extra=logging_extra)
+            return f"Error sending email: {str(e)}"
+
+    if intent == "test_gmail":
+        if not GMAIL_AVAILABLE:
+            return "Gmail functionality is not available. Please install the required packages."
+        
+        try:
+            result = test_gmail_connection()
+            if result['success']:
+                return f"Gmail connection successful! Connected as: {result.get('email_address', 'Unknown')}. Total messages: {result.get('messages_total', 'Unknown')}"
+            else:
+                return f"Gmail connection failed: {result.get('error', 'Unknown error')}. Please ensure credentials.json is properly configured."
+                
+        except Exception as e:
+            logging.error(f"Gmail test error: {e}", extra=logging_extra)
+            return f"Error testing Gmail connection: {str(e)}"
+
     if intent == "muse_image" and args:
         if muse_module is None:
             return "Muse features are not available."
@@ -2010,6 +2072,132 @@ def handle_command(cmd: CommandRequest, request: Request):
     
     return {"response": response_text, "request_id": request_id_ctx_var.get()}
 
+# Web API endpoints for JAI website
+class TextRequest(BaseModel):
+    text: str
+
+class PersonaRequest(BaseModel):
+    persona: str
+
+@app.post("/api/text")
+def handle_api_text(req: TextRequest, request: Request):
+    """Handle text commands from JAI website"""
+    key = "web"
+    if key not in sessions:
+        sessions[key] = UserSession(key)
+    session = sessions[key]
+    logging_extra = {"user": key}
+    logging.info("Received web text: %s", req.text, extra=logging_extra)
+    
+    try:
+        response_text = execute_command(req.text, session, suppress_tts=True)
+        return {"response": response_text, "request_id": request_id_ctx_var.get()}
+    except Exception as e:
+        logging.error("Web text handler error: %s", e, extra=logging_extra, exc_info=True)
+        return JSONResponse(status_code=500, content={"detail": "Internal server error", "request_id": request_id_ctx_var.get()})
+
+@app.post("/api/persona")
+def handle_api_persona(req: PersonaRequest, request: Request):
+    """Handle persona selection from JAI website"""
+    logging.info("Persona selected: %s", req.persona, extra={"user": "web"})
+    
+    # Store persona in session or handle as needed
+    # For now, just return success
+    return {"success": True, "persona": req.persona, "request_id": request_id_ctx_var.get()}
+
+@app.post("/api/voice")
+async def handle_api_voice(request: Request):
+    """Handle voice recording from JAI website"""
+    import speech_recognition as sr
+    from io import BytesIO
+    
+    key = "web"
+    if key not in sessions:
+        sessions[key] = UserSession(key)
+    session = sessions[key]
+    logging_extra = {"user": key}
+    
+    try:
+        # Get audio file from form data
+        form = await request.form()
+        audio_file = form.get("file")
+        lang = form.get("lang", "en-US")
+        
+        if not audio_file:
+            return JSONResponse(status_code=400, content={"detail": "No audio file provided", "request_id": request_id_ctx_var.get()})
+        
+        # Read audio data
+        audio_data = await audio_file.read()
+        
+        # Use speech recognition to transcribe
+        if sr is None:
+            return JSONResponse(status_code=500, content={"detail": "Speech recognition not available", "request_id": request_id_ctx_var.get()})
+        
+        recognizer = sr.Recognizer()
+        audio_file_obj = BytesIO(audio_data)
+        
+        # Convert audio to AudioFile format
+        with sr.AudioFile(audio_file_obj) as source:
+            audio = recognizer.record(source)
+        
+        # Recognize speech
+        try:
+            transcript = recognizer.recognize_google(audio, language=lang)
+        except sr.UnknownValueError:
+            transcript = ""
+        except sr.RequestError as e:
+            logging.error("Speech recognition error: %s", e, extra=logging_extra)
+            transcript = ""
+        
+        logging.info("Voice transcript: %s", transcript, extra=logging_extra)
+        
+        # Process the transcribed text
+        if transcript.strip():
+            response_text = execute_command(transcript, session, suppress_tts=True)
+        else:
+            response_text = "I couldn't understand what you said. Please try again."
+        
+        return {
+            "transcript": transcript,
+            "response": response_text,
+            "request_id": request_id_ctx_var.get()
+        }
+        
+    except Exception as e:
+        logging.error("Voice handler error: %s", e, extra=logging_extra, exc_info=True)
+        return JSONResponse(status_code=500, content={"detail": "Voice processing failed", "request_id": request_id_ctx_var.get()})
+
+@app.post("/api/image")
+async def handle_api_image(request: Request):
+    """Handle image analysis from JAI website"""
+    key = "web"
+    if key not in sessions:
+        sessions[key] = UserSession(key)
+    session = sessions[key]
+    logging_extra = {"user": key}
+    
+    try:
+        # Get image file and prompt from form data
+        form = await request.form()
+        image_file = form.get("file")
+        prompt = form.get("prompt", "")
+        
+        if not image_file:
+            return JSONResponse(status_code=400, content={"detail": "No image file provided", "request_id": request_id_ctx_var.get()})
+        
+        # For now, return a simple response
+        # TODO: Integrate with Muse module for actual image analysis
+        response_text = f"I can see you've uploaded an image. Prompt: {prompt}"
+        
+        return {
+            "response": response_text,
+            "request_id": request_id_ctx_var.get()
+        }
+        
+    except Exception as e:
+        logging.error("Image handler error: %s", e, extra=logging_extra, exc_info=True)
+        return JSONResponse(status_code=500, content={"detail": "Image processing failed", "request_id": request_id_ctx_var.get()})
+
  
 
 @app.get("/nasa/apod")
@@ -2029,4 +2217,4 @@ def nasa_apod(date: Optional[str] = None, hd: bool = False, request: Request = N
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8001)
+    uvicorn.run(app, host="0.0.0.0", port=8080)

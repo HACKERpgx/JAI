@@ -251,13 +251,28 @@ def _get_engine(language: Optional[str] = None):
     with _ENGINE_INIT_LOCK:
         if _ENGINE is None:
             try:
-                if TTS_ENGINE == "sapi" or sys.version_info >= (3, 13):
-                    return None
+                # Try to initialize pyttsx3 even on Python 3.13
                 _ENGINE = pyttsx3.init()
+                logging.info("pyttsx3 engine initialized successfully")
             except Exception as e:
                 logging.warning(f"pyttsx3 init failed, will use SAPI fallback: {e}")
                 _ENGINE = None
     return _ENGINE
+
+def get_engine(language: Optional[str] = None):
+    """Public function to get TTS engine"""
+    return _get_engine(language)
+
+def get_voices():
+    """Get list of available voices"""
+    engine = _get_engine()
+    if engine:
+        try:
+            return engine.getProperty('voices')
+        except Exception as e:
+            logging.error(f"Error getting voices: {e}")
+            return []
+    return []
 
 def speak(text: str, language: Optional[str] = None, rate: Optional[int] = None, 
           volume: float = 0.9, timeout: int = 20) -> bool:
@@ -397,3 +412,13 @@ def speak(text: str, language: Optional[str] = None, rate: Optional[int] = None,
     except Exception as e:
         logging.error(f"TTS thread error: {e}", exc_info=True)
         return False
+
+def shutdown():
+    """Shutdown TTS engine"""
+    global _ENGINE
+    try:
+        if _ENGINE:
+            _ENGINE.stop()
+            _ENGINE = None
+    except Exception:
+        pass

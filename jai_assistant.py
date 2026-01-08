@@ -67,10 +67,14 @@ from pydantic import BaseModel
 
 # Import Gmail OAuth functionality
 try:
-    from gmail_oauth import send_gmail_email, test_gmail_connection
+    from jai_gmail import send_gmail_email, test_gmail_connection
     GMAIL_AVAILABLE = True
 except ImportError:
-    GMAIL_AVAILABLE = False
+    try:
+        from gmail_oauth import send_gmail_email, test_gmail_connection
+        GMAIL_AVAILABLE = True
+    except ImportError:
+        GMAIL_AVAILABLE = False
 
 # Language support
 LANGUAGES = {

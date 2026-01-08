@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "jai-gmail"
+version = "0.1.0"
+description = "Gmail OAuth and email sending helper for JAI Assistant"
+readme = "README.md"
+authors = [{ name = "HACKERpgx" }]
+license = { text = "MIT" }
+requires-python = ">=3.10"
+dependencies = [
+  "google-auth==2.25.2",
+  "google-auth-oauthlib==1.2.0",
+  "google-auth-httplib2==0.2.0",
+  "google-api-python-client==2.108.0"
+]
+
+[project.urls]
+Homepage = "https://github.com/HACKERpgx/jai-gmail"
+Repository = "https://github.com/HACKERpgx/jai-gmail"
+Issues = "https://github.com/HACKERpgx/jai-gmail/issues"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]

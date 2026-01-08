@@ -16,3 +16,6 @@ build/
 *.pyz
 *.toc
 *.zip
+credentials.json
+token.json
+token.pickle

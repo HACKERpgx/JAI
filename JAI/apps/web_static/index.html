@@ -3,7 +3,6 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta name="google" content="notranslate" />
   <title>JAI Website</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
@@ -11,14 +10,14 @@
   <div class="container">
     <header class="header">
       <div class="brand">
-        <div class="logo" translate="no">JAI</div>
-        <h1 translate="no">JAI Website</h1>
+        <div class="logo">JAI</div>
+        <h1>JAI Website</h1>
       </div>
       <div class="api-config">
-        <label for="apiBase" translate="no">API Base</label>
+        <label for="apiBase">API Base</label>
         <input id="apiBase" type="text" placeholder="http://localhost:8080" />
-        <button id="saveBase" translate="no">Save</button>
-        <button id="healthBtn" class="secondary" translate="no">Health</button>
+        <button id="saveBase">Save</button>
+        <button id="healthBtn" class="secondary">Health</button>
         <span id="healthStatus" class="status"></span>
       </div>
     </header>
@@ -27,26 +26,26 @@
       <section class="chat" aria-label="Chat">
         <div id="messages" class="messages" aria-live="polite"></div>
         <div class="composer">
-          <input id="textInput" type="text" placeholder="Type a command (e.g., what time is it, news, remind me...)" translate="no" />
-          <button id="sendBtn" class="primary" translate="no">Send</button>
+          <input id="textInput" type="text" placeholder="Type a command (e.g., what time is it, news, remind me...)" />
+          <button id="sendBtn" class="primary">Send</button>
         </div>
         <div class="voice-controls" aria-label="Voice Recorder">
-          <label for="voiceLang" translate="no">Language</label>
+          <label for="voiceLang">Language</label>
           <select id="voiceLang">
             <option value="en-US" selected>English (US)</option>
             <option value="ar-SA">Arabic (Saudi Arabia)</option>
             <option value="ur-PK">Urdu (Pakistan)</option>
             <option value="fr-FR">French (France)</option>
           </select>
-          <button id="startRecBtn" class="voice-btn" type="button" translate="no">🎤 Start Recording</button>
-          <button id="stopRecBtn" class="voice-btn stop-btn" disabled type="button" translate="no">⏹️ Stop</button>
+          <button id="startRecBtn">Start Recording</button>
+          <button id="stopRecBtn" disabled>Stop</button>
           <span id="voiceStatus" class="status"></span>
         </div>
       </section>
 
       <section class="compose-demo" aria-label="Messaging Composer (Figma style)">
         <div class="compose-card">
-          <input type="text" class="compose-input" placeholder="Message..." aria-label="Message input" translate="no" />
+          <input type="text" class="compose-input" placeholder="Message..." aria-label="Message input" />
           <div class="compose-actions" role="group" aria-label="Composer actions">
             <button class="icon-btn" aria-label="Photos" title="Photos">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">

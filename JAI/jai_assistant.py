@@ -65,21 +65,6 @@ from fastapi.exceptions import RequestValidationError
 from fastapi import APIRouter
 from pydantic import BaseModel
 
-# Import Gmail OAuth functionality with security
-try:
-    from jai_gmail import send_gmail_email, test_gmail_connection
-    from jai_security_config import get_security_config, validate_api_scopes
-    GMAIL_AVAILABLE = True
-    SECURITY_AVAILABLE = True
-except ImportError:
-    try:
-        from gmail_oauth import send_gmail_email, test_gmail_connection
-        GMAIL_AVAILABLE = True
-        SECURITY_AVAILABLE = False
-    except ImportError:
-        GMAIL_AVAILABLE = False
-        SECURITY_AVAILABLE = False
-
 # Language support
 LANGUAGES = {
     'en': {'name': 'English', 'flag': 'ðŸ‡¬ðŸ‡§'},
@@ -198,7 +183,7 @@ console.addFilter(_UserFieldFilter())
 console.addFilter(_RequestIdFilter())
 
 # -----------------------------
-# Language Detection and Response (English Only with Translation)
+# Language Detection and Response
 # -----------------------------
 def detect_language(text: str) -> str:
     """Detect the language of the input text."""
@@ -206,102 +191,23 @@ def detect_language(text: str) -> str:
         # Check for specific language indicators first
         text_lower = text.lower()
         
-        # Urdu indicators
-        urdu_patterns = ['یہ', 'ہوں', 'کے', 'میں', 'سے', 'کی', 'کا', 'ہے', 'آپ', 'آج', 'کل', 'اب']
-        if any(pattern in text for pattern in urdu_patterns):
-            return 'ur'
-        
-        # Arabic indicators  
-        arabic_patterns = ['في', 'من', 'إلى', 'على', 'مع', 'هذا', 'هذه', 'التي', 'الذي', 'الذين']
-        if any(pattern in text for pattern in arabic_patterns):
-            return 'ar'
-        
-        # French indicators
-        french_patterns = ['le', 'la', 'de', 'et', 'est', 'dans', 'pour', 'avec', 'vous', 'votre', 'ce', 'cette']
-        if any(pattern in text for pattern in french_patterns):
+        # Check for Arabic script (Arabic, Urdu, Persian, etc.)
+        if any(char in text_lower for char in ['Ø§', 'Ø¨', 'Øª', 'Ø«', 'Ø¬', 'Ø­', 'Ø®', 'Ø¯', 'Ø°', 'Ø±', 'Ø²', 'Ø³', 'Ø´', 'Øµ', 'Ø¶', 'Ø·', 'Ø¸', 'Ø¹', 'Øº', 'Ù', 'Ù‚', 'Ùƒ', 'Ù„', 'Ù…', 'Ù†', 'Ù‡', 'Ùˆ', 'ÙŠ']):
+            # Check for Urdu-specific characters
+            if any(char in text_lower for char in ['Ù¾', 'Ù¹', 'Ú†', 'Úˆ', 'Ú‘', 'Ú˜', 'Ú©', 'Ú¯', 'Úº', 'Û', 'Ú¾', 'Û’']):
+                return 'ur'  # Urdu
+            return 'ar'  # Default to Arabic for other Arabic script
+            
+        # Check for French indicators
+        if any(word in text_lower for word in ['bonjour', 'salut', 'merci', 'au revoir', 'comment Ã§a va', 'je m\'appelle']):
             return 'fr'
-        
-        # Hindi indicators
-        hindi_patterns = ['है', 'हूं', 'के', 'में', 'से', 'पर', 'आप', 'आज', 'कल', 'अभी']
-        if any(pattern in text for pattern in hindi_patterns):
-            return 'hi'
-        
-        # Default to English for JAI responses
+            
+        # Default to English if no clear indicators found
         return 'en'
         
     except Exception as e:
-        logging.error(f"Language detection error: {e}")
-        return 'en'
-
-def translate_to_english(text: str, source_lang: str = None) -> str:
-    """Translate text to English using available translation methods."""
-    if source_lang == 'en':
-        return text
-    
-    try:
-        # Try using Google Translate API (if available)
-        try:
-            import googletrans
-            translator = googletrans.Translator()
-            result = translator.translate(text, src=source_lang, dest='en')
-            if result and result.text:
-                logging.info(f"Translated from {source_lang} to English: {text[:50]}... -> {result.text[:50]}...")
-                return result.text
-        except Exception as e:
-            logging.debug(f"Google Translate not available: {e}")
-        
-        # Try using basic translation dictionaries
-        translations = {
-            'ur': {
-                'آپ کیسے ہیں': 'how are you',
-                'میں خوش آمدید': 'welcome',
-                'شکریہ': 'thank you',
-                'السلام': 'hello',
-                'خیر': 'no',
-                'جی ہاں': 'yes',
-                'برائے مہربانی': 'please',
-                'میں مدد کریں': 'help me'
-            },
-            'ar': {
-                'كيف حالك': 'how are you',
-                'مرحبا': 'hello',
-                'شكرا': 'thank you',
-                'لا': 'no',
-                'نعم': 'yes',
-                'من فضلك': 'please',
-                'ساعدني': 'help me'
-            },
-            'fr': {
-                'comment allez-vous': 'how are you',
-                'bonjour': 'hello',
-                'merci': 'thank you',
-                'non': 'no',
-                'oui': 'yes',
-                's\'il vous plaît': 'please',
-                'aidez-moi': 'help me'
-            },
-            'hi': {
-                'आप कैसे हैं': 'how are you',
-                'नमस्ते': 'hello',
-                'धन्यवाद': 'thank you',
-                'नहीं': 'no',
-                'हाँ': 'yes',
-                'कृपया करें': 'please',
-                'मददि': 'help me'
-            }
-        }
-        
-        # Simple word-by-word translation
-        if source_lang in translations:
-            for foreign, english in translations[source_lang].items():
-                text = text.replace(foreign, english)
-        
-        logging.info(f"Basic translation from {source_lang}: {text[:50]}...")
-        return text
-        
-    except Exception as e:
-        logging.error(f"Translation error: {e}")
-        return text  # Return original if translation fails  # Fallback to English
+        logging.error(f"Error detecting language: {e}")
+        return 'en'  # Fallback to English
 
 def get_phrase(key: str, lang: str = 'en') -> str:
     """Get a localized phrase."""
@@ -963,8 +869,6 @@ def classify_intent(command: str) -> tuple[str, Optional[tuple]]:
         "muse_transcribe": r"(?:muse\s+)?transcribe\s+(.+)",
         "muse_detect": r"(?:muse\s+)?detect\s+objects\s+in\s+(.+)",
         "muse_search": r"(?:muse\s+)?search\s+images?\s+for\s+(.+)",
-        "send_email": r"send\s+(?:an?\s+)?email\s+(?:to\s+)?(.+?)(?:\s+(?:with|about|subject)\s+(.+))?$|email\s+(.+?)(?:\s+(?:with|about|subject)\s+(.+))?$",
-        "test_gmail": r"test\s+gmail|gmail\s+test|check\s+gmail",
         "current_time": r"what time is it|what's the time|tell me the time|current time|time now"  # Current time
     }
     for intent, pattern in patterns.items():
@@ -1452,11 +1356,7 @@ def execute_command(command: str, session: UserSession, suppress_tts: bool = Fal
     logging_extra = {"user": session.username}
     global voice_listener_thread
     
-    # ALWAYS respond in English - translate input if needed
-    input_lang = detect_language(command)
-    translated_command = translate_to_english(command, input_lang)
-    
-    intent, args = classify_intent(translated_command)
+    intent, args = classify_intent(command)
     sanitized_command = command
     try:
         for secret in [MEMORY_ACCESS_PASSWORD]:
@@ -1464,21 +1364,45 @@ def execute_command(command: str, session: UserSession, suppress_tts: bool = Fal
                 sanitized_command = sanitized_command.replace(secret, "***")
     except Exception:
         pass
-    
-    logging.info("Executing command: %s (Detected: %s, Translated: %s), Intent: %s, Args: %s", 
-                 command[:50], input_lang, translated_command[:50], intent, args, extra=logging_extra)
+    logging.info("Executing command: %s, Intent: %s, Args: %s", sanitized_command, intent, args, extra=logging_extra)
 
-    # JAI ALWAYS responds in English
-    speak_lang = "en"  # Force English responses
+    # Determine input and output languages
+    input_lang = detect_language(command)
+    if getattr(session, "language_mode", "auto") == "auto":
+        speak_lang = input_lang or "en"
+    else:
+        speak_lang = session.preferred_lang or "en"
     
-    # Quick greetings - instant response like JARVIS
+    # Quick greetings - instant response like JARVIS with language-specific greetings
     if intent == "greeting":
-        greetings = [
-            "Hello! How can I assist you today?",
-            "Hi there! What can I help you with?",
-            "Good day! How may I assist you?",
-            "Greetings! What can I do for you today?"
-        ]
+        # Detect language from the command
+        lang = detect_language(command)
+        # Respect fixed English preference
+        try:
+            if getattr(session, "language_mode", "auto") != "auto" and (getattr(session, "preferred_lang", "en") or "en") == "en":
+                lang = "en"
+        except Exception:
+            pass
+        
+        if lang == 'ur':  # Urdu
+            greetings = [
+                "Jee haan, aapki kya madad karun?",
+                "Meharbani farmaen, main aapki kya madad kar sakta hoon?",
+                "Bil-farmayen, aap kya chahenge?",
+                "Tayyar hoon, aap farmaaiye"
+            ]
+        elif lang == 'ar':  # Arabic
+            greetings = [
+                "Na'am, kayfa yumkinuni musa'adatuk?",
+                "Ana fi khedmatik, hal yumkinuni musa'adatuk?",
+                "Tafaddal, hal yumkinuni musa'adatuk?",
+                "Anaa huna, madha turiid?"
+            ]
+        else:  # English (default)
+            greetings = [
+                "Yes, sir. How may I assist you?",
+                "At your service, sir.",
+                "Good to see you, sir.",
                 "Ready and waiting, sir."
             ]
         resp_greet = random.choice(greetings)
@@ -1678,59 +1602,6 @@ def execute_command(command: str, session: UserSession, suppress_tts: bool = Fal
         time_str = current_time.strftime("%I:%M %p")
         date_str = current_time.strftime("%A, %B %d, %Y")
         return f"The current time is {time_str}, {date_str}, sir."
-
-    # Gmail functionality
-    if intent == "send_email":
-        if not GMAIL_AVAILABLE:
-            return "Gmail functionality is not available. Please install the required packages: pip install google-auth google-auth-oauthlib google-auth-httplib2 google-api-python-client"
-        
-        try:
-            # Parse email arguments
-            recipient = None
-            subject = "Email from JAI Assistant"
-            body = "This is an automated email from JAI Assistant."
-            
-            if args:
-                if len(args) >= 1 and args[0]:
-                    recipient = args[0].strip()
-                if len(args) >= 2 and args[1]:
-                    subject = args[1].strip()
-                # For body, we'll use a simple default or ask user
-            
-            if not recipient:
-                return "Please specify a recipient email address. Example: 'send email to user@example.com with subject Meeting Update'"
-            
-            # Validate email format
-            import re
-            email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
-            if not re.match(email_pattern, recipient):
-                return f"Invalid email address format: {recipient}"
-            
-            # Send email
-            result = send_gmail_email(recipient, subject, body)
-            if result['success']:
-                return f"Email sent successfully to {recipient}. Message ID: {result.get('message_id', 'N/A')}"
-            else:
-                return f"Failed to send email: {result.get('error', 'Unknown error')}"
-                
-        except Exception as e:
-            logging.error(f"Gmail send error: {e}", extra=logging_extra)
-            return f"Error sending email: {str(e)}"
-
-    if intent == "test_gmail":
-        if not GMAIL_AVAILABLE:
-            return "Gmail functionality is not available. Please install the required packages."
-        
-        try:
-            result = test_gmail_connection()
-            if result['success']:
-                return f"Gmail connection successful! Connected as: {result.get('email_address', 'Unknown')}. Total messages: {result.get('messages_total', 'Unknown')}"
-            else:
-                return f"Gmail connection failed: {result.get('error', 'Unknown error')}. Please ensure credentials.json is properly configured."
-                
-        except Exception as e:
-            logging.error(f"Gmail test error: {e}", extra=logging_extra)
-            return f"Error testing Gmail connection: {str(e)}"
 
     if intent == "muse_image" and args:
         if muse_module is None:
@@ -2139,132 +2010,6 @@ def handle_command(cmd: CommandRequest, request: Request):
     
     return {"response": response_text, "request_id": request_id_ctx_var.get()}
 
-# Web API endpoints for JAI website
-class TextRequest(BaseModel):
-    text: str
-
-class PersonaRequest(BaseModel):
-    persona: str
-
-@app.post("/api/text")
-def handle_api_text(req: TextRequest, request: Request):
-    """Handle text commands from JAI website"""
-    key = "web"
-    if key not in sessions:
-        sessions[key] = UserSession(key)
-    session = sessions[key]
-    logging_extra = {"user": key}
-    logging.info("Received web text: %s", req.text, extra=logging_extra)
-    
-    try:
-        response_text = execute_command(req.text, session, suppress_tts=True)
-        return {"response": response_text, "request_id": request_id_ctx_var.get()}
-    except Exception as e:
-        logging.error("Web text handler error: %s", e, extra=logging_extra, exc_info=True)
-        return JSONResponse(status_code=500, content={"detail": "Internal server error", "request_id": request_id_ctx_var.get()})
-
-@app.post("/api/persona")
-def handle_api_persona(req: PersonaRequest, request: Request):
-    """Handle persona selection from JAI website"""
-    logging.info("Persona selected: %s", req.persona, extra={"user": "web"})
-    
-    # Store persona in session or handle as needed
-    # For now, just return success
-    return {"success": True, "persona": req.persona, "request_id": request_id_ctx_var.get()}
-
-@app.post("/api/voice")
-async def handle_api_voice(request: Request):
-    """Handle voice recording from JAI website"""
-    import speech_recognition as sr
-    from io import BytesIO
-    
-    key = "web"
-    if key not in sessions:
-        sessions[key] = UserSession(key)
-    session = sessions[key]
-    logging_extra = {"user": key}
-    
-    try:
-        # Get audio file from form data
-        form = await request.form()
-        audio_file = form.get("file")
-        lang = form.get("lang", "en-US")
-        
-        if not audio_file:
-            return JSONResponse(status_code=400, content={"detail": "No audio file provided", "request_id": request_id_ctx_var.get()})
-        
-        # Read audio data
-        audio_data = await audio_file.read()
-        
-        # Use speech recognition to transcribe
-        if sr is None:
-            return JSONResponse(status_code=500, content={"detail": "Speech recognition not available", "request_id": request_id_ctx_var.get()})
-        
-        recognizer = sr.Recognizer()
-        audio_file_obj = BytesIO(audio_data)
-        
-        # Convert audio to AudioFile format
-        with sr.AudioFile(audio_file_obj) as source:
-            audio = recognizer.record(source)
-        
-        # Recognize speech
-        try:
-            transcript = recognizer.recognize_google(audio, language=lang)
-        except sr.UnknownValueError:
-            transcript = ""
-        except sr.RequestError as e:
-            logging.error("Speech recognition error: %s", e, extra=logging_extra)
-            transcript = ""
-        
-        logging.info("Voice transcript: %s", transcript, extra=logging_extra)
-        
-        # Process the transcribed text
-        if transcript.strip():
-            response_text = execute_command(transcript, session, suppress_tts=True)
-        else:
-            response_text = "I couldn't understand what you said. Please try again."
-        
-        return {
-            "transcript": transcript,
-            "response": response_text,
-            "request_id": request_id_ctx_var.get()
-        }
-        
-    except Exception as e:
-        logging.error("Voice handler error: %s", e, extra=logging_extra, exc_info=True)
-        return JSONResponse(status_code=500, content={"detail": "Voice processing failed", "request_id": request_id_ctx_var.get()})
-
-@app.post("/api/image")
-async def handle_api_image(request: Request):
-    """Handle image analysis from JAI website"""
-    key = "web"
-    if key not in sessions:
-        sessions[key] = UserSession(key)
-    session = sessions[key]
-    logging_extra = {"user": key}
-    
-    try:
-        # Get image file and prompt from form data
-        form = await request.form()
-        image_file = form.get("file")
-        prompt = form.get("prompt", "")
-        
-        if not image_file:
-            return JSONResponse(status_code=400, content={"detail": "No image file provided", "request_id": request_id_ctx_var.get()})
-        
-        # For now, return a simple response
-        # TODO: Integrate with Muse module for actual image analysis
-        response_text = f"I can see you've uploaded an image. Prompt: {prompt}"
-        
-        return {
-            "response": response_text,
-            "request_id": request_id_ctx_var.get()
-        }
-        
-    except Exception as e:
-        logging.error("Image handler error: %s", e, extra=logging_extra, exc_info=True)
-        return JSONResponse(status_code=500, content={"detail": "Image processing failed", "request_id": request_id_ctx_var.get()})
-
  
 
 @app.get("/nasa/apod")
@@ -2284,4 +2029,4 @@ def nasa_apod(date: Optional[str] = None, hd: bool = False, request: Request = N
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8080)
+    uvicorn.run(app, host="0.0.0.0", port=8001)

@@ -1477,10 +1477,9 @@ def execute_command(command: str, session: UserSession, suppress_tts: bool = Fal
             "Hello! How can I assist you today?",
             "Hi there! What can I help you with?",
             "Good day! How may I assist you?",
-            "Greetings! What can I do for you today?"
+            "Greetings! What can I do for you today?",
+            "Ready and waiting, sir."
         ]
-                "Ready and waiting, sir."
-            ]
         resp_greet = random.choice(greetings)
         try:
             if getattr(session, "tts_enabled", False):

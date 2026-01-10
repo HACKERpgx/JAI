@@ -1,0 +1,340 @@
+import os
+import pathlib
+from datetime import datetime
+from dotenv import load_dotenv
+import requests
+import re
+from fuzzywuzzy import fuzz
+import subprocess
+import random
+import logging
+import threading
+import queue
+
+from fastapi import FastAPI, Depends, HTTPException, status
+from fastapi.security import HTTPBasic, HTTPBasicCredentials
+from pydantic import BaseModel
+from typing import Optional
+
+# Assuming these are available; adjust if needed
+from memory import JAIMemory
+try:
+    from jai_controls import handle_control_command
+except ImportError:
+    def handle_control_command(command, lang): return None
+try:
+    from openai import OpenAI
+except ImportError:
+    raise ImportError("Install openai==1.108.0")
+try:
+    from deep_translator import GoogleTranslator
+except ImportError:
+    raise ImportError("Install deep-translator==1.11.4")
+
+# Setup logging
+logging.basicConfig(level=logging.INFO, filename='jai_assistant.log', filemode='a',
+                    format='%(asctime)s - %(levelname)s - %(message)s - User: %(user)s',
+                    force=True)
+
+# -----------------------------
+# Configuration
+# -----------------------------
+current_dir = pathlib.Path(__file__).parent.absolute()
+env_path = current_dir / '.env'
+load_dotenv(dotenv_path=env_path)
+
+OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
+if not OPENAI_API_KEY:
+    raise ValueError("OPENAI_API_KEY not found in .env file")
+
+WEATHER_API_KEY = os.environ.get("OPENWEATHER_API_KEY", "7922cf46be42b4c464ae24c9b2501d15")
+NEWS_API_KEY = os.environ.get("NEWS_API_KEY", "your_news_api_key_here")  # Add to .env
+
+COUNTRIES = {
+    "Pakistan": "Islamabad",
+    "India": "New Delhi",
+    "Canada": "Toronto",
+    "UAE": "Dubai",
+    "America": "New York",
+    "Saudi Arabia": "Riyadh"
+}
+WEATHER_CACHE = {}
+CACHE_DURATION = 600  # 10 minutes
+
+client = OpenAI(base_url="https://openrouter.ai/api/v1", api_key=OPENAI_API_KEY)
+translator = GoogleTranslator(source='auto', target='en')
+
+HUMOROUS_QUIPS = [
+    "Just for you, I’ve polished my circuits to shine!",
+    "Hold on, I’m channeling my inner genius for this one!",
+    "Alright, let’s make some magic happen, shall we?",
+    "Processing at the speed of light… or at least a very fast turtle!",
+    "My processors are humming with excitement, let’s do this!"
+]
+
+# Hardcoded users for basic auth (in production, use a database)
+USERS = {
+    "user1": "pass1",
+    "admin": "adminpass"
+}
+
+# Control intents restricted to admin
+RESTRICTED_INTENTS = ["shutdown", "restart", "sleep", "hibernate", "lock"]
+
+# -----------------------------
+# User Session Class
+# -----------------------------
+class UserSession:
+    def __init__(self, username: str):
+        self.username = username
+        self.memory = JAIMemory()
+        self.preferred_lang = "en"
+        self.user_name = "User"  # Default, can be set via command
+
+# Global sessions dictionary
+sessions: dict[str, UserSession] = {}
+
+# -----------------------------
+# Weather Function
+# -----------------------------
+def get_weather(city: str) -> str:
+    if city in WEATHER_CACHE:
+        data, timestamp = WEATHER_CACHE[city]
+        if datetime.now().timestamp() - timestamp < CACHE_DURATION:
+            return data
+    
+    url = f"http://api.openweathermap.org/data/2.5/weather?q={city}&appid={WEATHER_API_KEY}&units=metric"
+    try:
+        response = requests.get(url)
+        response.raise_for_status()
+        data = response.json()
+        
+        if data["cod"] == 200:
+            temp = data["main"]["temp"]
+            feels_like = data["main"]["feels_like"]
+            humidity = data["main"]["humidity"]
+            wind_speed = data["wind"]["speed"]
+            description = data["weather"][0]["description"]
+            result = (
+                f"Weather in {city}: {description}, {temp}°C (feels like {feels_like}°C), "
+                f"humidity {humidity}%, wind speed {wind_speed} m/s."
+            )
+            WEATHER_CACHE[city] = (result, datetime.now().timestamp())
+            return result
+        else:
+            return f"Sorry, I couldn’t find weather data for {city}."
+    except requests.RequestException as e:
+        return f"Failed to fetch weather for {city}. Please try again later."
+
+# -----------------------------
+# News Function (New Feature)
+# -----------------------------
+def get_news(category: Optional[str] = None) -> str:
+    url = f"https://newsapi.org/v2/top-headlines?country=us&apiKey={NEWS_API_KEY}"
+    if category:
+        url += f"&category={category}"
+    try:
+        response = requests.get(url)
+        response.raise_for_status()
+        data = response.json()
+        if data["status"] == "ok":
+            headlines = [article["title"] for article in data["articles"][:5]]
+            return "Top headlines: " + "; ".join(headlines)
+        else:
+            return "Sorry, couldn’t fetch news."
+    except requests.RequestException as e:
+        return f"Failed to fetch news: {str(e)}"
+
+# -----------------------------
+# Intent Classification
+# -----------------------------
+def classify_intent(command: str) -> tuple[str, Optional[tuple]]:
+    command = command.lower().strip()
+    patterns = {
+        "screenshot": r"screenshot|screen\s+capture|snap",
+        "mouse up": r"mouse\s+up|move\s+up",
+        "open browser": r"open\s+browser|open\s+tab|open\s+firefox",
+        "open app": r"open\s+(notepad|calculator|word|excel|spotify|vscode|code|file explorer|recycle bin|control panel|google chrome|microsoft store)",
+        "set timer": r"set\s+timer\s+(for\s+)?(\d+)(?:\s+(minutes?|seconds?))?",
+        "shutdown": r"shutdown|power\s+off",
+        "restart": r"restart|reboot",
+        "sleep": r"sleep|snooze",
+        "hibernate": r"hibernate",
+        "lock": r"lock\s+screen",  # Expanded PC control
+        "download from chrome": r"download\s+(.+)\s+from\s+chrome",
+        "volume": r"set\s+volume\s+to\s+(\d+)|mute|unmute",
+        "media": r"play|pause|next\s+track|previous\s+track",
+        "system info": r"check\s+(battery|cpu|ram|memory|disk)",
+        "search": r"search\s+(.+)",
+        "search memory": r"search\s+memory\s+(.+)",
+        "remember": r"remember\s+(.+)",
+        "update": r"update\s+(.+?)\s+(to|with)\s+(.+)",
+        "forget": r"forget\s+(.+)",
+        "recall": r"recall\s+(.+)",
+        "show short term memory": r"show\s+short\s+term\s+memory|list\s+short\s+term\s+memories",
+        "show long term memory": r"show\s+long\s+term\s+memory|list\s+long\s+term\s+memories",
+        "exit": r"exit|quit|stop",
+        "greeting": r"hello|hi|hey|good\s+(morning|evening|night)",
+        "set language": r"speak\s+(hindi|urdu|arabic|russian|spanish|english)",
+        "who are you": r"who\s+(are\s+you|is\s+jai)",
+        "set name": r"my\s+name\s+is\s+(\w+)",
+        "weather": r"weather(?:\s+in\s+(.+))?",
+        "news": r"news(?:\s+(in|about)\s+(.+))?"  # New intent for news
+    }
+    for intent, pattern in patterns.items():
+        match = re.match(pattern, command)
+        if match:
+            return intent, match.groups() if match.groups() else None
+    for intent in patterns:
+        if fuzz.partial_ratio(command, intent.replace(" ", "")) > 85:
+            return intent, None
+    return "query", None
+
+# -----------------------------
+# JAI Reply (Enhanced for Smarter Responses)
+# -----------------------------
+def jai_reply(prompt: str, session: UserSession) -> str:
+    user_name = session.memory.recall_long_term("user_name") or session.user_name
+    context = session.memory.get_short_term(limit=10)  # Increased limit for better context
+    context_str = "\nRecent interactions:\n" + "\n".join(
+        [f"Q: {item['content']['user']} A: {item['content']['response']}"
+         for item in context if isinstance(item['content'], dict) and 'user' in item['content']]
+    )
+    current_hour = datetime.now().hour
+    time_prompt = ""
+    if current_hour >= 22 or current_hour < 6:
+        time_prompt = "It's late—maybe time for a story or a lullaby?"
+    elif current_hour < 12:
+        time_prompt = f"Good morning, {user_name}! Ready to conquer the day?"
+    elif current_hour < 18:
+        time_prompt = f"Afternoon, {user_name}! Need a quick boost or a joke?"
+    else:
+        time_prompt = f"Evening, {user_name}! Wrapping up or just getting started?"
+    
+    quip = random.choice(HUMOROUS_QUIPS)
+    full_prompt = (
+        f"You are JAI, a witty, helpful, and intelligent personal assistant. Address the user as {user_name}. "
+        f"Use a playful, humorous tone with insightful responses. Current time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}. "
+        f"Keep responses concise, relevant, and engaging. Incorporate context for continuity. {time_prompt}\n"
+        f"User query: {prompt}\n{context_str}\n{quip}"
+    )
+    messages = [
+        {"role": "system", "content": full_prompt},
+        {"role": "user", "content": prompt}
+    ]
+    try:
+        res = client.chat.completions.create(model="openai/gpt-4o-mini", messages=messages)  # Upgraded model for smarter responses
+        answer = res.choices[0].message.content
+        lang = session.preferred_lang
+        if lang != "en" and translator:
+            try:
+                translated_answer = translator.translate(text=answer, dest=lang)
+                return translated_answer
+            except Exception:
+                return f"Sorry, translation to {lang} failed. English response: {answer}"
+        return answer
+    except Exception as e:
+        fallback = session.memory.recall_long_term(prompt) or (
+            f"Whoops, {user_name}, something went wrong! Try again or ask something else."
+        )
+        return fallback
+
+# -----------------------------
+# Execute Command
+# -----------------------------
+def execute_command(command: str, session: UserSession) -> str:
+    # Input validation
+    if not command or not isinstance(command, str) or len(command) > 1000:  # Arbitrary max length
+        return "Invalid or empty command."
+    
+    # Set logging extra for user
+    logging_extra = {"user": session.username}
+    
+    intent, args = classify_intent(command)
+    logging.info("Executing command: %s, Intent: %s, Args: %s", command, intent, args, extra=logging_extra)
+    
+    # Restrict PC controls to admin
+    if intent in RESTRICTED_INTENTS and session.username != "admin":
+        return "You are not authorized for this command."
+    
+    # Handle control commands
+    control_response = handle_control_command(command, session.preferred_lang)
+    if control_response:
+        return control_response
+    
+    # Weather
+    if intent == "weather":
+        if args and args[0]:
+            requested = args[0].capitalize()
+            for country, city in COUNTRIES.items():
+                if fuzz.partial_ratio(requested.lower(), country.lower()) > 90:
+                    return get_weather(city)
+            return get_weather(requested)
+        return get_weather("Islamabad")  # Default
+    
+    # News (New Feature)
+    if intent == "news":
+        category = args[1] if args and len(args) > 1 else None
+        return get_news(category)
+    
+    # Set name
+    if intent == "set name" and args:
+        session.user_name = args[0]
+        session.memory.remember_long_term("user_name", args[0], importance=0.9)
+        return f"Got it, I'll call you {args[0]} from now on!"
+    
+    # Set language
+    if intent == "set language":
+        lang_map = {"hindi": "hi", "urdu": "ur", "arabic": "ar", "russian": "ru", "spanish": "es", "english": "en"}
+        for key, code in lang_map.items():
+            if key in command.lower():
+                session.preferred_lang = code
+                session.memory.remember_long_term("preferred_language", code, importance=0.9)
+                return f"Language set to {key}."
+    
+    # Expanded PC controls example (lock screen)
+    if intent == "lock":
+        try:
+            subprocess.call("rundll32.exe user32.dll,LockWorkStation")
+            return "Screen locked."
+        except Exception as e:
+            return f"Failed to lock screen: {str(e)}"
+    
+    # Default to AI reply
+    response = jai_reply(command, session)
+    try:
+        session.memory.add_short_term({"user": command, "response": response})
+    except Exception as e:
+        logging.error("Memory storage error: %s", e, extra=logging_extra)
+    return response
+
+# -----------------------------
+# FastAPI App
+# -----------------------------
+app = FastAPI(title="JAI Networked Assistant")
+
+security = HTTPBasic()
+
+class CommandRequest(BaseModel):
+    command: str
+
+@app.post("/command")
+def handle_command(request: CommandRequest, credentials: HTTPBasicCredentials = Depends(security)):
+    username = credentials.username
+    password = credentials.password
+    if USERS.get(username) != password:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
+    
+    if username not in sessions:
+        sessions[username] = UserSession(username)
+    
+    session = sessions[username]
+    logging_extra = {"user": username}
+    logging.info("Received command: %s", request.command, extra=logging_extra)
+    
+    response = execute_command(request.command, session)
+    return {"response": response}
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)

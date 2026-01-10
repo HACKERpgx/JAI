@@ -83,3 +83,189 @@ button.secondary { background: #0b1426; color: var(--text); }
 .icon-btn:hover { background: #e9ecef; color: #1f2937; }
 .icon-btn:active { transform: scale(0.98); }
 .icon-btn:focus-visible { outline: 3px solid rgba(90, 160, 255, 0.3); outline-offset: 2px; }
+
+/* Prevent Google Translate */
+html, body {
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+}
+
+.notranslate {
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+}
+
+/* Hide Google Translate widget */
+.goog-te-banner-frame, .goog-te-balloon-frame {
+  display: none !important;
+  visibility: hidden !important;
+}
+
+.goog-te-gadget {
+  display: none !important;
+  visibility: hidden !important;
+}
+
+/* Prevent translation on all important elements */
+h1, h2, h3, h4, h5, h6,
+.logo, .brand, .header,
+button, label, input, select, option,
+.placeholder {
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+}
+
+/* Voice Controls Styles */
+.voice-controls {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin-top: 12px;
+  padding: 12px;
+  background: #0e1830;
+  border: 1px solid #223055;
+  border-radius: 10px;
+}
+
+.voice-controls label {
+  font-size: 14px;
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.voice-controls select {
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid #26365c;
+  background: #0b1426;
+  color: var(--text);
+  font-size: 14px;
+}
+
+.voice-btn {
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 14px;
+  transition: all 0.2s ease;
+  position: relative;
+  overflow: hidden;
+  border: 1px solid #2b3a5e;
+  background: #0b1426;
+  color: var(--text);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.voice-btn:hover {
+  background: #15213d;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(90, 160, 255, 0.2);
+}
+
+.voice-btn:active {
+  transform: translateY(0) scale(0.98);
+}
+
+.voice-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.voice-btn:disabled:hover {
+  background: #0b1426;
+  transform: none;
+  box-shadow: none;
+}
+
+/* Recording animation */
+.voice-btn.recording {
+  background: linear-gradient(135deg, var(--danger), #ff8787);
+  color: white;
+  border-color: var(--danger);
+  animation: pulse 1.5s infinite;
+}
+
+.voice-btn.recording:hover {
+  background: linear-gradient(135deg, #ff5252, var(--danger));
+  transform: translateY(-1px);
+}
+
+@keyframes pulse {
+  0% { box-shadow: 0 0 0 0 rgba(255, 107, 107, 0.7); }
+  70% { box-shadow: 0 0 0 10px rgba(255, 107, 107, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(255, 107, 107, 0); }
+}
+
+/* Stop button specific styles */
+.voice-btn.stop-btn {
+  background: linear-gradient(135deg, var(--danger), #ff8787);
+  color: white;
+  border: none;
+}
+
+.voice-btn.stop-btn:hover {
+  background: linear-gradient(135deg, #ff5252, var(--danger));
+}
+
+.voice-btn.stop-btn:disabled {
+  background: #444;
+  color: #999;
+}
+
+/* Microphone button specific styles */
+#startRecBtn::before {
+  content: "🎤";
+  font-size: 16px;
+  margin-right: 4px;
+}
+
+#startRecBtn.recording::before {
+  content: "🔴";
+  animation: blink 1s infinite;
+}
+
+@keyframes blink {
+  0%, 50% { opacity: 1; }
+  51%, 100% { opacity: 0.3; }
+}
+
+/* Voice status indicator */
+.voice-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.voice-status.recording {
+  background: rgba(255, 107, 107, 0.2);
+  color: var(--danger);
+}
+
+.voice-status.processing {
+  background: rgba(90, 160, 255, 0.2);
+  color: var(--accent);
+}
+
+.voice-status.error {
+  background: rgba(255, 107, 107, 0.2);
+  color: var(--danger);
+}
+
+.voice-status.success {
+  background: rgba(124, 240, 255, 0.2);
+  color: var(--accent-2);
+}

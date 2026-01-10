@@ -65,16 +65,20 @@ from fastapi.exceptions import RequestValidationError
 from fastapi import APIRouter
 from pydantic import BaseModel
 
-# Import Gmail OAuth functionality
+# Import Gmail OAuth functionality with security
 try:
     from jai_gmail import send_gmail_email, test_gmail_connection
+    from jai_security_config import get_security_config, validate_api_scopes
     GMAIL_AVAILABLE = True
+    SECURITY_AVAILABLE = True
 except ImportError:
     try:
         from gmail_oauth import send_gmail_email, test_gmail_connection
         GMAIL_AVAILABLE = True
+        SECURITY_AVAILABLE = False
     except ImportError:
         GMAIL_AVAILABLE = False
+        SECURITY_AVAILABLE = False
 
 # Language support
 LANGUAGES = {
@@ -194,7 +198,7 @@ console.addFilter(_UserFieldFilter())
 console.addFilter(_RequestIdFilter())
 
 # -----------------------------
-# Language Detection and Response
+# Language Detection and Response (English Only with Translation)
 # -----------------------------
 def detect_language(text: str) -> str:
     """Detect the language of the input text."""
@@ -202,23 +206,102 @@ def detect_language(text: str) -> str:
         # Check for specific language indicators first
         text_lower = text.lower()
         
-        # Check for Arabic script (Arabic, Urdu, Persian, etc.)
-        if any(char in text_lower for char in ['Ø§', 'Ø¨', 'Øª', 'Ø«', 'Ø¬', 'Ø­', 'Ø®', 'Ø¯', 'Ø°', 'Ø±', 'Ø²', 'Ø³', 'Ø´', 'Øµ', 'Ø¶', 'Ø·', 'Ø¸', 'Ø¹', 'Øº', 'Ù', 'Ù‚', 'Ùƒ', 'Ù„', 'Ù…', 'Ù†', 'Ù‡', 'Ùˆ', 'ÙŠ']):
-            # Check for Urdu-specific characters
-            if any(char in text_lower for char in ['Ù¾', 'Ù¹', 'Ú†', 'Úˆ', 'Ú‘', 'Ú˜', 'Ú©', 'Ú¯', 'Úº', 'Û', 'Ú¾', 'Û’']):
-                return 'ur'  # Urdu
-            return 'ar'  # Default to Arabic for other Arabic script
-            
-        # Check for French indicators
-        if any(word in text_lower for word in ['bonjour', 'salut', 'merci', 'au revoir', 'comment Ã§a va', 'je m\'appelle']):
+        # Urdu indicators
+        urdu_patterns = ['یہ', 'ہوں', 'کے', 'میں', 'سے', 'کی', 'کا', 'ہے', 'آپ', 'آج', 'کل', 'اب']
+        if any(pattern in text for pattern in urdu_patterns):
+            return 'ur'
+        
+        # Arabic indicators  
+        arabic_patterns = ['في', 'من', 'إلى', 'على', 'مع', 'هذا', 'هذه', 'التي', 'الذي', 'الذين']
+        if any(pattern in text for pattern in arabic_patterns):
+            return 'ar'
+        
+        # French indicators
+        french_patterns = ['le', 'la', 'de', 'et', 'est', 'dans', 'pour', 'avec', 'vous', 'votre', 'ce', 'cette']
+        if any(pattern in text for pattern in french_patterns):
             return 'fr'
-            
-        # Default to English if no clear indicators found
+        
+        # Hindi indicators
+        hindi_patterns = ['है', 'हूं', 'के', 'में', 'से', 'पर', 'आप', 'आज', 'कल', 'अभी']
+        if any(pattern in text for pattern in hindi_patterns):
+            return 'hi'
+        
+        # Default to English for JAI responses
         return 'en'
         
     except Exception as e:
-        logging.error(f"Error detecting language: {e}")
-        return 'en'  # Fallback to English
+        logging.error(f"Language detection error: {e}")
+        return 'en'
+
+def translate_to_english(text: str, source_lang: str = None) -> str:
+    """Translate text to English using available translation methods."""
+    if source_lang == 'en':
+        return text
+    
+    try:
+        # Try using Google Translate API (if available)
+        try:
+            import googletrans
+            translator = googletrans.Translator()
+            result = translator.translate(text, src=source_lang, dest='en')
+            if result and result.text:
+                logging.info(f"Translated from {source_lang} to English: {text[:50]}... -> {result.text[:50]}...")
+                return result.text
+        except Exception as e:
+            logging.debug(f"Google Translate not available: {e}")
+        
+        # Try using basic translation dictionaries
+        translations = {
+            'ur': {
+                'آپ کیسے ہیں': 'how are you',
+                'میں خوش آمدید': 'welcome',
+                'شکریہ': 'thank you',
+                'السلام': 'hello',
+                'خیر': 'no',
+                'جی ہاں': 'yes',
+                'برائے مہربانی': 'please',
+                'میں مدد کریں': 'help me'
+            },
+            'ar': {
+                'كيف حالك': 'how are you',
+                'مرحبا': 'hello',
+                'شكرا': 'thank you',
+                'لا': 'no',
+                'نعم': 'yes',
+                'من فضلك': 'please',
+                'ساعدني': 'help me'
+            },
+            'fr': {
+                'comment allez-vous': 'how are you',
+                'bonjour': 'hello',
+                'merci': 'thank you',
+                'non': 'no',
+                'oui': 'yes',
+                's\'il vous plaît': 'please',
+                'aidez-moi': 'help me'
+            },
+            'hi': {
+                'आप कैसे हैं': 'how are you',
+                'नमस्ते': 'hello',
+                'धन्यवाद': 'thank you',
+                'नहीं': 'no',
+                'हाँ': 'yes',
+                'कृपया करें': 'please',
+                'मददि': 'help me'
+            }
+        }
+        
+        # Simple word-by-word translation
+        if source_lang in translations:
+            for foreign, english in translations[source_lang].items():
+                text = text.replace(foreign, english)
+        
+        logging.info(f"Basic translation from {source_lang}: {text[:50]}...")
+        return text
+        
+    except Exception as e:
+        logging.error(f"Translation error: {e}")
+        return text  # Return original if translation fails  # Fallback to English
 
 def get_phrase(key: str, lang: str = 'en') -> str:
     """Get a localized phrase."""
@@ -1369,7 +1452,11 @@ def execute_command(command: str, session: UserSession, suppress_tts: bool = Fal
     logging_extra = {"user": session.username}
     global voice_listener_thread
     
-    intent, args = classify_intent(command)
+    # ALWAYS respond in English - translate input if needed
+    input_lang = detect_language(command)
+    translated_command = translate_to_english(command, input_lang)
+    
+    intent, args = classify_intent(translated_command)
     sanitized_command = command
     try:
         for secret in [MEMORY_ACCESS_PASSWORD]:
@@ -1377,45 +1464,21 @@ def execute_command(command: str, session: UserSession, suppress_tts: bool = Fal
                 sanitized_command = sanitized_command.replace(secret, "***")
     except Exception:
         pass
-    logging.info("Executing command: %s, Intent: %s, Args: %s", sanitized_command, intent, args, extra=logging_extra)
-
-    # Determine input and output languages
-    input_lang = detect_language(command)
-    if getattr(session, "language_mode", "auto") == "auto":
-        speak_lang = input_lang or "en"
-    else:
-        speak_lang = session.preferred_lang or "en"
     
-    # Quick greetings - instant response like JARVIS with language-specific greetings
+    logging.info("Executing command: %s (Detected: %s, Translated: %s), Intent: %s, Args: %s", 
+                 command[:50], input_lang, translated_command[:50], intent, args, extra=logging_extra)
+
+    # JAI ALWAYS responds in English
+    speak_lang = "en"  # Force English responses
+    
+    # Quick greetings - instant response like JARVIS
     if intent == "greeting":
-        # Detect language from the command
-        lang = detect_language(command)
-        # Respect fixed English preference
-        try:
-            if getattr(session, "language_mode", "auto") != "auto" and (getattr(session, "preferred_lang", "en") or "en") == "en":
-                lang = "en"
-        except Exception:
-            pass
-        
-        if lang == 'ur':  # Urdu
-            greetings = [
-                "Jee haan, aapki kya madad karun?",
-                "Meharbani farmaen, main aapki kya madad kar sakta hoon?",
-                "Bil-farmayen, aap kya chahenge?",
-                "Tayyar hoon, aap farmaaiye"
-            ]
-        elif lang == 'ar':  # Arabic
-            greetings = [
-                "Na'am, kayfa yumkinuni musa'adatuk?",
-                "Ana fi khedmatik, hal yumkinuni musa'adatuk?",
-                "Tafaddal, hal yumkinuni musa'adatuk?",
-                "Anaa huna, madha turiid?"
-            ]
-        else:  # English (default)
-            greetings = [
-                "Yes, sir. How may I assist you?",
-                "At your service, sir.",
-                "Good to see you, sir.",
+        greetings = [
+            "Hello! How can I assist you today?",
+            "Hi there! What can I help you with?",
+            "Good day! How may I assist you?",
+            "Greetings! What can I do for you today?"
+        ]
                 "Ready and waiting, sir."
             ]
         resp_greet = random.choice(greetings)

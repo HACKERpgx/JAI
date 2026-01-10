@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JAI Voice Test - Debug Page</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .test-section {
+            background: white;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+        }
+        .success { background: #d4edda; color: #155724; }
+        .error { background: #f8d7da; color: #721c24; }
+        .info { background: #d1ecf1; color: #0c5460; }
+        button {
+            padding: 10px 20px;
+            margin: 5px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .mic-btn {
+            background: #007bff;
+            color: white;
+        }
+        .mic-btn.recording {
+            background: #dc3545;
+            animation: pulse 1.5s infinite;
+        }
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(220, 53, 69, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(220, 53, 69, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(220, 53, 69, 0); }
+        }
+        #log {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            padding: 10px;
+            height: 200px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <h1>🎤 JAI Voice Recording Test</h1>
+    
+    <div class="test-section">
+        <h2>Browser Compatibility Check</h2>
+        <div id="browser-check"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>Microphone Permission Test</h2>
+        <button id="test-permission" class="mic-btn">Test Microphone Access</button>
+        <div id="permission-status"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>Recording Test</h2>
+        <button id="start-test" class="mic-btn">🎤 Start Recording</button>
+        <button id="stop-test" class="mic-btn" disabled>⏹️ Stop Recording</button>
+        <div id="recording-status"></div>
+        <audio id="audio-playback" controls style="width: 100%; margin-top: 10px;"></audio>
+    </div>
+
+    <div class="test-section">
+        <h2>API Connection Test</h2>
+        <button id="test-api" class="mic-btn">Test Voice API</button>
+        <div id="api-status"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>Debug Log</h2>
+        <div id="log"></div>
+        <button onclick="clearLog()">Clear Log</button>
+    </div>
+
+    <script>
+        let mediaRecorder = null;
+        let audioChunks = [];
+        let testStream = null;
+
+        function log(message, type = 'info') {
+            const logEl = document.getElementById('log');
+            const timestamp = new Date().toLocaleTimeString();
+            logEl.innerHTML += `<div style="color: ${type === 'error' ? 'red' : type === 'success' ? 'green' : 'black'}">[${timestamp}] ${message}</div>`;
+            logEl.scrollTop = logEl.scrollHeight;
+            console.log(message);
+        }
+
+        function clearLog() {
+            document.getElementById('log').innerHTML = '';
+        }
+
+        function showStatus(elementId, message, type = 'info') {
+            const el = document.getElementById(elementId);
+            el.innerHTML = `<div class="status ${type}">${message}</div>`;
+        }
+
+        // Browser compatibility check
+        function checkBrowserCompatibility() {
+            const checks = [];
+            
+            if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+                checks.push('✅ MediaDevices API supported');
+            } else {
+                checks.push('❌ MediaDevices API not supported');
+            }
+            
+            if (window.MediaRecorder) {
+                checks.push('✅ MediaRecorder API supported');
+            } else {
+                checks.push('❌ MediaRecorder API not supported');
+            }
+            
+            if (window.speechSynthesis) {
+                checks.push('✅ Speech Synthesis API supported');
+            } else {
+                checks.push('❌ Speech Synthesis API not supported');
+            }
+            
+            if (window.speechRecognition) {
+                checks.push('✅ Speech Recognition API supported');
+            } else {
+                checks.push('❌ Speech Recognition API not supported (using server-side)');
+            }
+            
+            document.getElementById('browser-check').innerHTML = checks.join('<br>');
+            log('Browser compatibility check completed');
+        }
+
+        // Test microphone permission
+        async function testMicrophonePermission() {
+            try {
+                log('Requesting microphone permission...');
+                testStream = await navigator.mediaDevices.getUserMedia({ 
+                    audio: {
+                        echoCancellation: true,
+                        noiseSuppression: true,
+                        sampleRate: 44100
+                    }
+                });
+                
+                showStatus('permission-status', '✅ Microphone access granted!', 'success');
+                log('Microphone access granted', 'success');
+                
+                // Test audio levels
+                const audioContext = new AudioContext();
+                const analyzer = audioContext.createAnalyser();
+                const microphone = audioContext.createMediaStreamSource(testStream);
+                microphone.connect(analyzer);
+                
+                const checkAudioLevel = () => {
+                    const dataArray = new Uint8Array(analyzer.frequencyBinCount);
+                    analyzer.getByteFrequencyData(dataArray);
+                    const average = dataArray.reduce((a, b) => a + b) / dataArray.length;
+                    
+                    if (average > 10) {
+                        log(`Audio level detected: ${Math.round(average)}`, 'success');
+                    }
+                };
+                
+                const interval = setInterval(checkAudioLevel, 500);
+                
+                // Stop after 5 seconds
+                setTimeout(() => {
+                    clearInterval(interval);
+                    if (testStream) {
+                        testStream.getTracks().forEach(track => track.stop());
+                        testStream = null;
+                    }
+                }, 5000);
+                
+            } catch (error) {
+                showStatus('permission-status', `❌ Error: ${error.message}`, 'error');
+                log(`Microphone permission error: ${error.message}`, 'error');
+            }
+        }
+
+        // Test recording
+        async function startRecording() {
+            try {
+                log('Starting recording test...');
+                
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                
+                const options = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+                    ? { mimeType: 'audio/webm;codecs=opus' }
+                    : {};
+                
+                mediaRecorder = new MediaRecorder(stream, options);
+                audioChunks = [];
+                
+                mediaRecorder.ondataavailable = (event) => {
+                    if (event.data.size > 0) {
+                        audioChunks.push(event.data);
+                        log(`Audio chunk received: ${event.data.size} bytes`);
+                    }
+                };
+                
+                mediaRecorder.onstop = () => {
+                    log('Recording stopped');
+                    const blob = new Blob(audioChunks, { type: mediaRecorder.mimeType || 'audio/webm' });
+                    const audioUrl = URL.createObjectURL(blob);
+                    const audio = document.getElementById('audio-playback');
+                    audio.src = audioUrl;
+                    
+                    showStatus('recording-status', '✅ Recording completed! Play audio below:', 'success');
+                    log(`Recording completed: ${blob.size} bytes`, 'success');
+                    
+                    // Stop all tracks
+                    stream.getTracks().forEach(track => track.stop());
+                };
+                
+                mediaRecorder.start(100);
+                
+                document.getElementById('start-test').disabled = true;
+                document.getElementById('start-test').classList.add('recording');
+                document.getElementById('stop-test').disabled = false;
+                
+                showStatus('recording-status', '🔴 Recording... Speak now!', 'info');
+                log('Recording started');
+                
+            } catch (error) {
+                showStatus('recording-status', `❌ Recording error: ${error.message}`, 'error');
+                log(`Recording error: ${error.message}`, 'error');
+            }
+        }
+
+        function stopRecording() {
+            if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+                mediaRecorder.stop();
+                
+                document.getElementById('start-test').disabled = false;
+                document.getElementById('start-test').classList.remove('recording');
+                document.getElementById('stop-test').disabled = true;
+            }
+        }
+
+        // Test API connection
+        async function testVoiceAPI() {
+            try {
+                log('Testing voice API connection...');
+                
+                // Create a test audio blob
+                const testAudio = new Blob(['test audio data'], { type: 'audio/webm' });
+                const formData = new FormData();
+                formData.append('file', testAudio, 'test.webm');
+                formData.append('lang', 'en-US');
+                
+                const response = await fetch('http://localhost:8080/api/voice', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    showStatus('api-status', '✅ API connection successful!', 'success');
+                    log('API connection successful', 'success');
+                    log(`API Response: ${JSON.stringify(data)}`);
+                } else {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+            } catch (error) {
+                showStatus('api-status', `❌ API connection failed: ${error.message}`, 'error');
+                log(`API connection error: ${error.message}`, 'error');
+            }
+        }
+
+        // Event listeners
+        document.getElementById('test-permission').addEventListener('click', testMicrophonePermission);
+        document.getElementById('start-test').addEventListener('click', startRecording);
+        document.getElementById('stop-test').addEventListener('click', stopRecording);
+        document.getElementById('test-api').addEventListener('click', testVoiceAPI);
+
+        // Initialize
+        window.addEventListener('load', () => {
+            log('JAI Voice Test page loaded');
+            checkBrowserCompatibility();
+        });
+    </script>
+</body>
+</html>

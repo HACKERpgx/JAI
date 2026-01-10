@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JAI Button Click Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .test-container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin: 20px 0;
+        }
+        button {
+            padding: 12px 24px;
+            margin: 10px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: all 0.2s ease;
+        }
+        .mic-btn {
+            background: #007bff;
+            color: white;
+        }
+        .mic-btn:hover {
+            background: #0056b3;
+            transform: translateY(-2px);
+        }
+        .mic-btn:active {
+            transform: translateY(0) scale(0.98);
+        }
+        .mic-btn.recording {
+            background: #dc3545;
+            animation: pulse 1.5s infinite;
+        }
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(220, 53, 69, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(220, 53, 69, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(220, 53, 69, 0); }
+        }
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+            font-weight: bold;
+        }
+        .success { background: #d4edda; color: #155724; }
+        .error { background: #f8d7da; color: #721c24; }
+        .info { background: #d1ecf1; color: #0c5460; }
+        #log {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            padding: 10px;
+            height: 200px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 12px;
+            white-space: pre-wrap;
+        }
+    </style>
+</head>
+<body>
+    <h1>🎤 JAI Button Click Test</h1>
+    
+    <div class="test-container">
+        <h2>Basic Button Test</h2>
+        <button id="testBtn1" class="mic-btn">Test Button 1 (Direct)</button>
+        <button id="testBtn2" class="mic-btn">Test Button 2 (QuerySelector)</button>
+        <button id="testBtn3" class="mic-btn">Test Button 3 (JAI Style)</button>
+        <div id="buttonStatus" class="status info">Click any button to test</div>
+    </div>
+
+    <div class="test-container">
+        <h2>Event Listener Test</h2>
+        <button id="startRecBtn" class="mic-btn">🎤 Start Recording</button>
+        <button id="stopRecBtn" class="mic-btn" disabled>⏹️ Stop Recording</button>
+        <div id="recordingStatus" class="status info">Ready to test recording</div>
+    </div>
+
+    <div class="test-container">
+        <h2>Debug Log</h2>
+        <div id="log"></div>
+        <button onclick="clearLog()">Clear Log</button>
+    </div>
+
+    <script>
+        let isRecording = false;
+        let clickCount = 0;
+
+        function log(message, type = 'info') {
+            const logEl = document.getElementById('log');
+            const timestamp = new Date().toLocaleTimeString();
+            const color = type === 'error' ? 'red' : type === 'success' ? 'green' : 'black';
+            logEl.innerHTML += `<div style="color: ${color}">[${timestamp}] ${message}</div>`;
+            logEl.scrollTop = logEl.scrollHeight;
+            console.log(message);
+        }
+
+        function clearLog() {
+            document.getElementById('log').innerHTML = '';
+        }
+
+        function updateStatus(elementId, message, type = 'info') {
+            const el = document.getElementById(elementId);
+            el.textContent = message;
+            el.className = `status ${type}`;
+        }
+
+        // Test 1: Direct getElementById
+        const testBtn1 = document.getElementById('testBtn1');
+        if (testBtn1) {
+            testBtn1.addEventListener('click', function(e) {
+                clickCount++;
+                log(`✅ Direct button 1 clicked! Count: ${clickCount}`, 'success');
+                updateStatus('buttonStatus', `Button 1 clicked ${clickCount} times`, 'success');
+            });
+            log('✅ Button 1 event listener attached successfully', 'success');
+        } else {
+            log('❌ Button 1 not found!', 'error');
+        }
+
+        // Test 2: QuerySelector
+        const testBtn2 = document.querySelector('#testBtn2');
+        if (testBtn2) {
+            testBtn2.addEventListener('click', function(e) {
+                clickCount++;
+                log(`✅ QuerySelector button 2 clicked! Count: ${clickCount}`, 'success');
+                updateStatus('buttonStatus', `Button 2 clicked ${clickCount} times`, 'success');
+            });
+            log('✅ Button 2 event listener attached successfully', 'success');
+        } else {
+            log('❌ Button 2 not found!', 'error');
+        }
+
+        // Test 3: JAI-style initialization
+        function initializeJAIStyle() {
+            const testBtn3 = document.getElementById('testBtn3');
+            if (testBtn3) {
+                testBtn3.addEventListener('click', function(e) {
+                    clickCount++;
+                    log(`✅ JAI-style button 3 clicked! Count: ${clickCount}`, 'success');
+                    updateStatus('buttonStatus', `Button 3 clicked ${clickCount} times`, 'success');
+                    
+                    // Add visual feedback
+                    this.style.transform = 'scale(0.95)';
+                    setTimeout(() => {
+                        this.style.transform = 'scale(1)';
+                    }, 100);
+                });
+                log('✅ Button 3 event listener attached successfully', 'success');
+            } else {
+                log('❌ Button 3 not found!', 'error');
+            }
+        }
+
+        // Test 4: Voice recording simulation
+        function initializeVoiceTest() {
+            const startBtn = document.getElementById('startRecBtn');
+            const stopBtn = document.getElementById('stopRecBtn');
+
+            if (startBtn) {
+                startBtn.addEventListener('click', function(e) {
+                    log('🎤 Start recording button clicked!', 'success');
+                    isRecording = true;
+                    startBtn.disabled = true;
+                    startBtn.classList.add('recording');
+                    stopBtn.disabled = false;
+                    updateStatus('recordingStatus', '🔴 Recording... Click Stop to finish', 'error');
+                });
+                log('✅ Start recording event listener attached', 'success');
+            } else {
+                log('❌ Start recording button not found!', 'error');
+            }
+
+            if (stopBtn) {
+                stopBtn.addEventListener('click', function(e) {
+                    log('⏹️ Stop recording button clicked!', 'success');
+                    isRecording = false;
+                    startBtn.disabled = false;
+                    startBtn.classList.remove('recording');
+                    stopBtn.disabled = true;
+                    updateStatus('recordingStatus', '✅ Recording stopped', 'success');
+                });
+                log('✅ Stop recording event listener attached', 'success');
+            } else {
+                log('❌ Stop recording button not found!', 'error');
+            }
+        }
+
+        // Initialize everything when DOM is ready
+        document.addEventListener('DOMContentLoaded', function() {
+            log('🚀 DOM loaded - Initializing tests...');
+            
+            // Wait a bit for everything to be ready
+            setTimeout(() => {
+                initializeJAIStyle();
+                initializeVoiceTest();
+                log('✅ All tests initialized successfully!', 'success');
+                updateStatus('buttonStatus', 'All tests ready - Click any button to test', 'success');
+            }, 100);
+        });
+
+        // Also test immediate execution
+        log('📝 Script started - DOM may still be loading...');
+    </script>
+</body>
+</html>

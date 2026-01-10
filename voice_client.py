@@ -33,7 +33,7 @@ logging.basicConfig(
 # Load configuration
 load_dotenv()
 
-JAI_SERVER = os.environ.get("JAI_SERVER", "http://localhost:8001")
+JAI_SERVER = os.environ.get("JAI_SERVER", "http://localhost:8080")
 JAI_USERNAME = os.environ.get("JAI_USERNAME", "user1")
 JAI_PASSWORD = os.environ.get("JAI_PASSWORD", "pass1")
 WAKE_WORD = os.environ.get("WAKE_WORD", "Activate aj")

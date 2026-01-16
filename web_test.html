@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>JAI Web Interface Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-section { margin: 20px 0; padding: 15px; border: 1px solid #ccc; }
+        button { padding: 10px 15px; margin: 5px; cursor: pointer; }
+        .status { margin: 10px 0; padding: 10px; }
+        .success { background: #d4edda; color: #155724; }
+        .error { background: #f8d7da; color: #721c24; }
+        .info { background: #d1ecf1; color: #0c5460; }
+    </style>
+</head>
+<body>
+    <h1>JAI Web Interface Test</h1>
+    
+    <div class="test-section">
+        <h2>1. Server Connection Test</h2>
+        <button onclick="testServer()">Test Server Connection</button>
+        <div id="serverStatus" class="status">Click to test...</div>
+    </div>
+    
+    <div class="test-section">
+        <h2>2. Microphone Test</h2>
+        <button onclick="testMicrophone()">Test Microphone</button>
+        <div id="micStatus" class="status">Click to test...</div>
+    </div>
+    
+    <div class="test-section">
+        <h2>3. Voice Recording Test</h2>
+        <button id="startTest" onclick="startTestRecording()">Start Recording</button>
+        <button id="stopTest" onclick="stopTestRecording()" disabled>Stop Recording</button>
+        <div id="recordingStatus" class="status">Click start to test...</div>
+    </div>
+    
+    <div class="test-section">
+        <h2>4. API Test</h2>
+        <input type="text" id="testCommand" placeholder="Enter command..." style="width: 300px; padding: 5px;">
+        <button onclick="testAPI()">Send Command</button>
+        <div id="apiStatus" class="status">Enter command and click send...</div>
+    </div>
+
+    <script>
+        let mediaRecorder = null;
+        let audioChunks = [];
+        let isRecording = false;
+
+        function updateStatus(elementId, message, type) {
+            const element = document.getElementById(elementId);
+            element.textContent = message;
+            element.className = `status ${type}`;
+        }
+
+        async function testServer() {
+            updateStatus('serverStatus', 'Testing server...', 'info');
+            try {
+                const response = await fetch('http://localhost:8080/healthz');
+                if (response.ok) {
+                    const data = await response.json();
+                    updateStatus('serverStatus', `✅ Server OK: ${data.status}`, 'success');
+                } else {
+                    updateStatus('serverStatus', `❌ Server Error: ${response.status}`, 'error');
+                }
+            } catch (error) {
+                updateStatus('serverStatus', `❌ Server Connection Failed: ${error.message}`, 'error');
+            }
+        }
+
+        async function testMicrophone() {
+            updateStatus('micStatus', 'Testing microphone...', 'info');
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                updateStatus('micStatus', '✅ Microphone access granted', 'success');
+                stream.getTracks().forEach(track => track.stop());
+            } catch (error) {
+                updateStatus('micStatus', `❌ Microphone Error: ${error.message}`, 'error');
+            }
+        }
+
+        async function startTestRecording() {
+            updateStatus('recordingStatus', 'Starting recording...', 'info');
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ 
+                    audio: { 
+                        echoCancellation: true, 
+                        noiseSuppression: true 
+                    } 
+                });
+                
+                mediaRecorder = new MediaRecorder(stream);
+                audioChunks = [];
+                
+                mediaRecorder.ondataavailable = event => {
+                    if (event.data.size > 0) {
+                        audioChunks.push(event.data);
+                    }
+                };
+                
+                mediaRecorder.onstop = async () => {
+                    updateStatus('recordingStatus', 'Processing audio...', 'info');
+                    const blob = new Blob(audioChunks, { type: 'audio/webm' });
+                    await sendAudioToServer(blob);
+                };
+                
+                mediaRecorder.start();
+                isRecording = true;
+                
+                document.getElementById('startTest').disabled = true;
+                document.getElementById('stopTest').disabled = false;
+                updateStatus('recordingStatus', '🎤 Recording... Speak now!', 'success');
+                
+            } catch (error) {
+                updateStatus('recordingStatus', `❌ Recording Error: ${error.message}`, 'error');
+            }
+        }
+
+        function stopTestRecording() {
+            if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+                mediaRecorder.stop();
+                isRecording = false;
+                document.getElementById('startTest').disabled = false;
+                document.getElementById('stopTest').disabled = true;
+            }
+        }
+
+        async function sendAudioToServer(blob) {
+            try {
+                const formData = new FormData();
+                formData.append('file', blob, 'voice.webm');
+                formData.append('lang', 'en-US');
+                
+                const response = await fetch('http://localhost:8080/api/voice', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    updateStatus('recordingStatus', 
+                        `✅ Success! Transcript: "${data.transcript || 'N/A'}" | Response: "${data.response || 'N/A'}"`, 
+                        'success'
+                    );
+                } else {
+                    updateStatus('recordingStatus', `❌ Server Error: ${response.status}`, 'error');
+                }
+            } catch (error) {
+                updateStatus('recordingStatus', `❌ Upload Error: ${error.message}`, 'error');
+            }
+        }
+
+        async function testAPI() {
+            const command = document.getElementById('testCommand').value;
+            if (!command) {
+                updateStatus('apiStatus', 'Please enter a command', 'error');
+                return;
+            }
+            
+            updateStatus('apiStatus', 'Sending command...', 'info');
+            try {
+                const response = await fetch('http://localhost:8080/api/text', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ text: command })
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    updateStatus('apiStatus', `✅ Response: ${data.response || 'N/A'}`, 'success');
+                } else {
+                    updateStatus('apiStatus', `❌ Error: ${response.status}`, 'error');
+                }
+            } catch (error) {
+                updateStatus('apiStatus', `❌ Request Error: ${error.message}`, 'error');
+            }
+        }
+
+        // Auto-test server on load
+        window.onload = () => {
+            testServer();
+        };
+    </script>
+</body>
+</html>

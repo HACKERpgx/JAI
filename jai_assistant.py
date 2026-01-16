@@ -59,11 +59,12 @@ except Exception:
 
 from typing import Optional, Dict, Any, List, Tuple
 from fastapi import FastAPI, HTTPException, Request, Depends, Header, Response
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.exceptions import RequestValidationError
 from fastapi import APIRouter
 from pydantic import BaseModel
+from memory_sqlite import init_db, store_message, get_recent_messages, upsert_user_profile, update_user_preferences
 
 # Import Gmail OAuth functionality with security
 try:
@@ -2053,6 +2054,7 @@ def require_auth(authorization: Optional[str] = Header(None)):
     return {"session": {"user_id": "public"}}
 
 app = FastAPI(title="JAI Networked Assistant", lifespan=lifespan)
+init_db()
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -2067,6 +2069,245 @@ app.include_router(auth_router)
 @app.get("/healthz")
 def healthz():
     return {"status": "ok", "time": datetime.utcnow().isoformat(), "request_id": request_id_ctx_var.get()}
+
+@app.get("/", response_class=HTMLResponse)
+async def web_interface():
+    """Original JAI web interface with added voice client feature"""
+    try:
+        with open("templates/index.html", "r", encoding="utf-8") as f:
+            matrix_html = f.read()
+        return HTMLResponse(content=matrix_html)
+    except Exception:
+        try:
+            with open("JAI/templates/index.html", "r", encoding="utf-8") as f:
+                matrix_html = f.read()
+            return HTMLResponse(content=matrix_html)
+        except Exception:
+            pass
+    # Read the original HTML file
+    try:
+        with open("apps/web_static/index.html", "r", encoding="utf-8") as f:
+            original_html = f.read()
+    except:
+        # Fallback if file not found
+        original_html = """
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>JAI Website</title>
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <div class="brand">
+                <div class="logo">JAI</div>
+                <h1>JAI Website</h1>
+            </div>
+            <div class="api-config">
+                <label for="apiBase">API Base</label>
+                <input id="apiBase" type="text" placeholder="http://localhost:8080" />
+                <button id="saveBase">Save</button>
+                <button id="healthBtn" class="secondary">Health</button>
+                <span id="healthStatus" class="status"></span>
+            </div>
+        </header>
+        <main class="main">
+            <section class="chat" aria-label="Chat">
+                <div id="messages" class="messages" aria-live="polite"></div>
+                <div class="composer">
+                    <input id="textInput" type="text" placeholder="Type a command (e.g., what time is it, news, remind me...)" />
+                    <button id="sendBtn" class="primary">Send</button>
+                </div>
+                <div class="voice-controls" aria-label="Voice Recorder">
+                    <label for="voiceLang">Language</label>
+                    <select id="voiceLang">
+                        <option value="en-US" selected>English (US)</option>
+                        <option value="ar-SA">Arabic (Saudi Arabia)</option>
+                        <option value="ur-PK">Urdu (Pakistan)</option>
+                        <option value="fr-FR">French (France)</option>
+                    </select>
+                    <button id="startRecBtn" class="voice-btn" type="button">Start Recording</button>
+                    <button id="stopRecBtn" class="voice-btn stop-btn" disabled type="button">Stop</button>
+                    <span id="voiceStatus" class="status"></span>
+                </div>
+            </section>
+        </main>
+    </div>
+    <script src="app.js"></script>
+</body>
+</html>
+        """
+    
+    # Add voice client feature to the original HTML
+    voice_client_html = """
+        
+        <!-- Voice Client Feature Added -->
+        <div class="voice-client-section" style="margin: 20px; padding: 15px; background: #f8f9fa; border-radius: 8px; border: 1px solid #e9ecef; text-align: center;">
+            <h4 style="margin: 0 0 10px 0; color: #495057;">Voice Client Mode</h4>
+            <button id="btnMic" class="mic-btn" style="padding: 12px 20px; background: #28a745; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 16px; display: inline-flex; align-items: center; gap: 8px;">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M12 1a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
+                    <path d="M19 10a7 7 0 0 1-14 0"></path>
+                    <line x1="12" y1="19" x2="12" y2="23"></line>
+                    <line x1="8" y1="23" x2="16" y2="23"></line>
+                </svg>
+                <span id="micButtonText">Talk to JAI</span>
+            </button>
+            <div id="micStatus" style="margin-top: 10px; font-size: 14px; color: #6c757d;">Click microphone to start talking</div>
+        </div>
+
+    <style>
+        .voice-client-section {
+            margin: 20px auto !important;
+            max-width: 600px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border: 1px solid #e9ecef;
+            text-align: center;
+        }
+        .mic-btn {
+            padding: 12px 20px;
+            background: #28a745;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.2s;
+        }
+        .mic-btn:hover {
+            background: #218838;
+            transform: scale(1.05);
+        }
+        .mic-btn.recording {
+            background: #dc3545;
+        }
+    </style>
+
+    <script>
+        // Voice client functionality
+        let voiceClientRecorder = null;
+        let voiceClientChunks = [];
+        let isVoiceClientRecording = false;
+
+        const btnMic = document.getElementById('btnMic');
+        const micStatus = document.getElementById('micStatus');
+        const micButtonText = document.getElementById('micButtonText');
+
+        function updateMicStatus(message, isActive = false) {
+            if (micStatus) micStatus.textContent = message;
+            if (btnMic) {
+                btnMic.className = isActive ? 'mic-btn recording' : 'mic-btn';
+            }
+            if (micButtonText) {
+                micButtonText.textContent = isActive ? 'Stop Recording' : 'Talk to JAI';
+            }
+        }
+
+        async function toggleVoiceClient() {
+            if (isVoiceClientRecording) {
+                stopVoiceClientRecording();
+            } else {
+                startVoiceClientRecording();
+            }
+        }
+
+        async function startVoiceClientRecording() {
+            try {
+                updateMicStatus('Listening... Speak now!', true);
+                
+                const stream = await navigator.mediaDevices.getUserMedia({ 
+                    audio: { 
+                        echoCancellation: true, 
+                        noiseSuppression: true 
+                    } 
+                });
+                
+                voiceClientRecorder = new MediaRecorder(stream);
+                voiceClientChunks = [];
+                
+                voiceClientRecorder.ondataavailable = event => {
+                    if (event.data.size > 0) {
+                        voiceClientChunks.push(event.data);
+                    }
+                };
+                
+                voiceClientRecorder.onstop = async () => {
+                    updateMicStatus('Processing...', true);
+                    const blob = new Blob(voiceClientChunks, { type: 'audio/webm' });
+                    await sendVoiceClientAudio(blob);
+                    
+                    stream.getTracks().forEach(track => track.stop());
+                };
+                
+                voiceClientRecorder.start();
+                isVoiceClientRecording = true;
+                
+            } catch (error) {
+                updateMicStatus(`Microphone Error: ${error.message}`, false);
+                console.error('Voice client error:', error);
+            }
+        }
+
+        function stopVoiceClientRecording() {
+            if (voiceClientRecorder && voiceClientRecorder.state !== 'inactive') {
+                voiceClientRecorder.stop();
+                isVoiceClientRecording = false;
+            }
+        }
+
+        async function sendVoiceClientAudio(blob) {
+            try {
+                const formData = new FormData();
+                formData.append('file', blob, 'voice.webm');
+                formData.append('lang', 'en-US');
+                
+                const response = await fetch('/api/voice', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.transcript) {
+                        addMessage('You', data.transcript);
+                    }
+                    if (data.response) {
+                        addMessage('JAI', data.response);
+                        updateMicStatus('Success! Click to talk again', false);
+                    }
+                } else {
+                    updateMicStatus(`Server Error: ${response.status}`, false);
+                }
+            } catch (error) {
+                updateMicStatus(`Upload Error: ${error.message}`, false);
+                console.error('Voice client upload error:', error);
+            }
+        }
+
+        // Add event listener for voice client
+        if (btnMic) {
+            btnMic.addEventListener('click', toggleVoiceClient);
+        }
+
+        // Initialize voice client status
+        updateMicStatus('Click microphone to start talking', false);
+    </script>
+    """
+    
+    # Insert voice client feature before closing body tag
+    if "</body>" in original_html:
+        modified_html = original_html.replace("</body>", voice_client_html + "</body>")
+    else:
+        modified_html = original_html + voice_client_html
+    
+    return HTMLResponse(content=modified_html)
 
 @app.middleware("http")
 async def add_request_id_middleware(request: Request, call_next):
@@ -2157,6 +2398,12 @@ def handle_api_text(req: TextRequest, request: Request):
     
     try:
         response_text = execute_command(req.text, session, suppress_tts=True)
+        try:
+            sid = request.headers.get("X-Request-ID") or str(uuid.uuid4())
+            store_message(user_id=key, role="user", content=req.text, session_id=sid)
+            store_message(user_id=key, role="assistant", content=response_text, session_id=sid)
+        except Exception:
+            pass
         return {"response": response_text, "request_id": request_id_ctx_var.get()}
     except Exception as e:
         logging.error("Web text handler error: %s", e, extra=logging_extra, exc_info=True)
@@ -2222,6 +2469,14 @@ async def handle_api_voice(request: Request):
             response_text = execute_command(transcript, session, suppress_tts=True)
         else:
             response_text = "I couldn't understand what you said. Please try again."
+        
+        try:
+            sid = request.headers.get("X-Request-ID") or str(uuid.uuid4())
+            if transcript:
+                store_message(user_id=key, role="user", content=transcript, session_id=sid)
+            store_message(user_id=key, role="assistant", content=response_text, session_id=sid)
+        except Exception:
+            pass
         
         return {
             "transcript": transcript,

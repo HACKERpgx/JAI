@@ -90,6 +90,7 @@
     <div class="brand">JAI</div>
     <button id="navChat" class="nav-item active">Chat</button>
     <button id="navVoice" class="nav-item">Voice Mode</button>
+    <button id="navImage" class="nav-item">Image Generator</button>
       </nav>
   <div class="stacker">
     <div class="terminal">
@@ -211,6 +212,7 @@
       <div id="voiceLog" class="voice-log"></div>
     </div>
   </div>
+  <div id="imageDash" class="image-dashboard" style="display:none"></div>
   
 <script>
   function rid(){ return ([1e7]+-1e3+-4e3+-8e3+-1e11).replace(/[018]/g,c=>(c^crypto.getRandomValues(new Uint8Array(1))[0]&15>>c/4).toString(16)); }
@@ -367,8 +369,8 @@
     }
   }
   navChat.addEventListener('click', ()=> setView('chat'));
-  navVoice.addEventListener('click', ()=> setView('voice'));
-  navImage.addEventListener('click', ()=> setView('image'));
+  navVoice.addEventListener('click', ()=> { window.location.href = 'https://grok.com/'; });
+  navImage.addEventListener('click', ()=> { window.location.href = 'https://app.leonardo.ai/'; });
 
   const cards = Array.from(document.querySelectorAll('.mode-card'));
   function highlightCard(id){

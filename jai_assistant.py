@@ -64,6 +64,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.exceptions import RequestValidationError
 from fastapi import APIRouter
 from pydantic import BaseModel
+from memory_sqlite import init_db, store_message, get_recent_messages, upsert_user_profile, update_user_preferences
 
 # Import Gmail OAuth functionality with security
 try:
@@ -2053,6 +2054,7 @@ def require_auth(authorization: Optional[str] = Header(None)):
     return {"session": {"user_id": "public"}}
 
 app = FastAPI(title="JAI Networked Assistant", lifespan=lifespan)
+init_db()
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -2071,6 +2073,17 @@ def healthz():
 @app.get("/", response_class=HTMLResponse)
 async def web_interface():
     """Original JAI web interface with added voice client feature"""
+    try:
+        with open("templates/index.html", "r", encoding="utf-8") as f:
+            matrix_html = f.read()
+        return HTMLResponse(content=matrix_html)
+    except Exception:
+        try:
+            with open("JAI/templates/index.html", "r", encoding="utf-8") as f:
+                matrix_html = f.read()
+            return HTMLResponse(content=matrix_html)
+        except Exception:
+            pass
     # Read the original HTML file
     try:
         with open("apps/web_static/index.html", "r", encoding="utf-8") as f:
@@ -2115,8 +2128,8 @@ async def web_interface():
                         <option value="ur-PK">Urdu (Pakistan)</option>
                         <option value="fr-FR">French (France)</option>
                     </select>
-                    <button id="startRecBtn" class="voice-btn" type="button">🎤 Start Recording</button>
-                    <button id="stopRecBtn" class="voice-btn stop-btn" disabled type="button">⏹️ Stop</button>
+                    <button id="startRecBtn" class="voice-btn" type="button">Start Recording</button>
+                    <button id="stopRecBtn" class="voice-btn stop-btn" disabled type="button">Stop</button>
                     <span id="voiceStatus" class="status"></span>
                 </div>
             </section>
@@ -2132,7 +2145,7 @@ async def web_interface():
         
         <!-- Voice Client Feature Added -->
         <div class="voice-client-section" style="margin: 20px; padding: 15px; background: #f8f9fa; border-radius: 8px; border: 1px solid #e9ecef; text-align: center;">
-            <h4 style="margin: 0 0 10px 0; color: #495057;">🎙️ Voice Client Mode</h4>
+            <h4 style="margin: 0 0 10px 0; color: #495057;">Voice Client Mode</h4>
             <button id="btnMic" class="mic-btn" style="padding: 12px 20px; background: #28a745; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 16px; display: inline-flex; align-items: center; gap: 8px;">
                 <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M12 1a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
@@ -2207,7 +2220,7 @@ async def web_interface():
 
         async function startVoiceClientRecording() {
             try {
-                updateMicStatus('🎤 Listening... Speak now!', true);
+                updateMicStatus('Listening... Speak now!', true);
                 
                 const stream = await navigator.mediaDevices.getUserMedia({ 
                     audio: { 
@@ -2226,7 +2239,7 @@ async def web_interface():
                 };
                 
                 voiceClientRecorder.onstop = async () => {
-                    updateMicStatus('🔄 Processing...', true);
+                    updateMicStatus('Processing...', true);
                     const blob = new Blob(voiceClientChunks, { type: 'audio/webm' });
                     await sendVoiceClientAudio(blob);
                     
@@ -2237,7 +2250,7 @@ async def web_interface():
                 isVoiceClientRecording = true;
                 
             } catch (error) {
-                updateMicStatus(`❌ Microphone Error: ${error.message}`, false);
+                updateMicStatus(`Microphone Error: ${error.message}`, false);
                 console.error('Voice client error:', error);
             }
         }
@@ -2267,13 +2280,13 @@ async def web_interface():
                     }
                     if (data.response) {
                         addMessage('JAI', data.response);
-                        updateMicStatus('✅ Success! Click to talk again', false);
+                        updateMicStatus('Success! Click to talk again', false);
                     }
                 } else {
-                    updateMicStatus(`❌ Server Error: ${response.status}`, false);
+                    updateMicStatus(`Server Error: ${response.status}`, false);
                 }
             } catch (error) {
-                updateMicStatus(`❌ Upload Error: ${error.message}`, false);
+                updateMicStatus(`Upload Error: ${error.message}`, false);
                 console.error('Voice client upload error:', error);
             }
         }
@@ -2385,6 +2398,12 @@ def handle_api_text(req: TextRequest, request: Request):
     
     try:
         response_text = execute_command(req.text, session, suppress_tts=True)
+        try:
+            sid = request.headers.get("X-Request-ID") or str(uuid.uuid4())
+            store_message(user_id=key, role="user", content=req.text, session_id=sid)
+            store_message(user_id=key, role="assistant", content=response_text, session_id=sid)
+        except Exception:
+            pass
         return {"response": response_text, "request_id": request_id_ctx_var.get()}
     except Exception as e:
         logging.error("Web text handler error: %s", e, extra=logging_extra, exc_info=True)
@@ -2450,6 +2469,14 @@ async def handle_api_voice(request: Request):
             response_text = execute_command(transcript, session, suppress_tts=True)
         else:
             response_text = "I couldn't understand what you said. Please try again."
+        
+        try:
+            sid = request.headers.get("X-Request-ID") or str(uuid.uuid4())
+            if transcript:
+                store_message(user_id=key, role="user", content=transcript, session_id=sid)
+            store_message(user_id=key, role="assistant", content=response_text, session_id=sid)
+        except Exception:
+            pass
         
         return {
             "transcript": transcript,

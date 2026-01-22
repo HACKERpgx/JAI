@@ -11,6 +11,7 @@ import requests
 from requests.auth import HTTPBasicAuth
 from dotenv import load_dotenv
 import re
+import subprocess
 
 # Import JAI modules
 try:
@@ -58,6 +59,35 @@ class JAIVoiceClient:
         except Exception as e:
             logging.error("Failed to initialize voice listener: %s", e)
             raise
+    
+    def _open_brightness_settings(self) -> bool:
+        try:
+            subprocess.Popen(["cmd", "/c", "start", "", "ms-settings:display"], shell=True)
+            return True
+        except Exception as e:
+            logging.error("Open brightness settings failed: %s", e)
+            return False
+    
+    def _set_brightness(self, level: int) -> str:
+        try:
+            level = max(0, min(100, int(level)))
+        except Exception:
+            return "Please specify a brightness between 0 and 100."
+        try:
+            ps = (
+                f"$m=Get-WmiObject -Namespace root/WMI -Class WmiMonitorBrightnessMethods -ErrorAction SilentlyContinue; "
+                f"if (-not $m) {{ exit 2 }}; $m | ForEach-Object {{ $_.WmiSetBrightness(1,{level}) }}"
+            )
+            r = subprocess.run(["powershell", "-NoProfile", "-Command", ps], capture_output=True, text=True, timeout=5)
+            if r.returncode == 0:
+                return f"Brightness set to {level}%."
+            if r.returncode == 2:
+                self._open_brightness_settings()
+                return "Opening brightness settings."
+            return "Failed to set brightness."
+        except Exception as e:
+            logging.error("Brightness set failed: %s", e)
+            return "Failed to set brightness."
     
     def send_command(self, command: str) -> str:
         """
@@ -118,6 +148,40 @@ class JAIVoiceClient:
             self._switch_to_text = True
         elif re.search(r"\bactivate\s+voice(?:\s+mode)?\b", cmd_lower):
             self._switch_to_voice = True
+        
+        if ("brightness" in cmd_lower) or ("open brightness settings" in cmd_lower) or ("brightness settings" in cmd_lower):
+            try:
+                if ("open" in cmd_lower and "settings" in cmd_lower) or ("brightness settings" in cmd_lower):
+                    opened = self._open_brightness_settings()
+                    response = "Opening brightness settings." if opened else "Failed to open brightness settings."
+                    print(f"🤖 AJ: {response}\n")
+                    try:
+                        lang = detect_language(response) if response else "en"
+                        speak(response, language=lang)
+                    except Exception as e:
+                        logging.error("TTS failed: %s", e)
+                    return True
+                level_match = re.search(r"(\d{1,3})\s*%?", cmd_lower)
+                if level_match:
+                    level = int(level_match.group(1))
+                    response = self._set_brightness(level)
+                    print(f"🤖 AJ: {response}\n")
+                    try:
+                        lang = detect_language(response) if response else "en"
+                        speak(response, language=lang)
+                    except Exception as e:
+                        logging.error("TTS failed: %s", e)
+                    return True
+            except Exception as e:
+                logging.error("Brightness command handling failed: %s", e)
+                response = "Failed to handle brightness command."
+                print(f"🤖 AJ: {response}\n")
+                try:
+                    lang = detect_language(response) if response else "en"
+                    speak(response, language=lang)
+                except Exception as e2:
+                    logging.error("TTS failed: %s", e2)
+                return True
         
         # Send to JAI server
         response = self.send_command(command)

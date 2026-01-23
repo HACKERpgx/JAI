@@ -1,10 +1,11 @@
-from fastapi import FastAPI, Request, UploadFile, File, Form
+﻿from fastapi import FastAPI, Request, UploadFile, File, Form
 from fastapi.responses import JSONResponse, HTMLResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 from datetime import datetime
 from typing import Optional, List
+import time
 import uuid
 import os
 from dotenv import load_dotenv
@@ -38,6 +39,13 @@ try:
     import muse as muse_module
 except Exception:
     muse_module = None
+
+try:
+    from security.ids.integrations import init_ids, get_ids_instance
+except Exception as e:
+    init_ids = None
+    get_ids_instance = None
+
 
 # Import autonomous system components
 try:
@@ -88,6 +96,15 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+try:
+    if init_ids is not None:
+        _ids = init_ids(app)
+    else:
+        _ids = None
+except Exception:
+    _ids = None
+
 
 class WebTextRequest(BaseModel):
     text: str

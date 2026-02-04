@@ -2107,7 +2107,7 @@ async def web_interface():
             </div>
             <div class="api-config">
                 <label for="apiBase">API Base</label>
-                <input id="apiBase" type="text" placeholder="http://localhost:8080" />
+                <input id="apiBase" type="text" placeholder="https://j-ai.top" />
                 <button id="saveBase">Save</button>
                 <button id="healthBtn" class="secondary">Health</button>
                 <span id="healthStatus" class="status"></span>
@@ -2538,4 +2538,4 @@ def nasa_apod(date: Optional[str] = None, hd: bool = False, request: Request = N
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8080)
+    uvicorn.run(app, host="0.0.0.0", port=80)

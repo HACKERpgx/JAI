@@ -32,9 +32,9 @@
     });
   }
   
-  function getBase(){ return apiBaseInput ? apiBaseInput.value.trim() : 'http://localhost:8080'; }
+  function getBase(){ return apiBaseInput ? apiBaseInput.value.trim() : 'https://j-ai.top'; }
   function setBase(v){ apiBaseInput.value = v; }
-  function loadBase(){ setBase(localStorage.getItem(LS_KEY) || 'http://localhost:8080'); }
+  function loadBase(){ setBase(localStorage.getItem(LS_KEY) || 'https://j-ai.top'); }
   function saveBase(){ localStorage.setItem(LS_KEY, getBase()); }
 
   function addMsg(who, text){

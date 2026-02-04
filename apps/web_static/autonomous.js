@@ -1,7 +1,7 @@
 (function(){
   // Configuration
   const LS_KEY = 'jai_api_base';
-  let apiBase = 'http://localhost:8080';
+  let apiBase = 'https://j-ai.top';
   let autonomousMode = false;
   let selectedRating = 0;
   let performanceData = [];
@@ -63,7 +63,7 @@
   }
 
   function saveApiBase() {
-    apiBase = elements.apiBase.value.trim() || 'http://localhost:8080';
+    apiBase = elements.apiBase.value.trim() || 'https://j-ai.top';
     localStorage.setItem(LS_KEY, apiBase);
     addMessage('System', 'API base URL saved');
   }

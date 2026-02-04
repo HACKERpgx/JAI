@@ -67,12 +67,12 @@ The system automatically creates SQLite databases:
 ```bash
 python main.py
 # or
-uvicorn main:app --host 0.0.0.0 --port 8080
+uvicorn main:app --host 0.0.0.0 --port 80
 ```
 
 2. Open your browser to:
-   - **Main Interface**: `http://localhost:8080/`
-   - **Autonomous Dashboard**: `http://localhost:8080/autonomous`
+   - **Main Interface**: `https://j-ai.top/`
+   - **Autonomous Dashboard**: `https://j-ai.top/autonomous`
 
 ### Dashboard Features
 - **System Status**: Real-time monitoring of autonomous operations

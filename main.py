@@ -727,7 +727,7 @@ async def chrome_devtools_json():
     return JSONResponse({
         "protocol_version": "1.1",
         "allowed_origins": ["*"],
-        "url": "http://localhost:8080"
+        "url": "https://j-ai.top"
     })
 
 @app.post("/api/email/categorize")
@@ -1312,14 +1312,14 @@ if __name__ == "__main__":
     import uvicorn
     print("🚀 JAI Assistant Server Starting...")
     print("📧 Available Features:")
-    print("   ✅ Web Interface: http://localhost:8080")
+    print("   ✅ Web Interface: https://j-ai.top")
     print("   ✅ Email Categorizer: /email-categorizer")
     print("   ✅ Auto-Reply System: /auto-reply")
     print("   ✅ Gmail Integration: Available")
     print("   ✅ Voice Recognition: Available")
     print("   ✅ AI Responses: English Only (Auto-Translation)")
     print("\n🔧 Server Configuration:")
-    print("   🌐 Host: http://localhost:8080")
+    print("   🌐 Host: https://j-ai.top")
     print("   📝 Logs: jai_assistant.log")
     print("   🔊 TTS: English responses only")
     print("\n🎯 Starting server...")
@@ -1327,6 +1327,6 @@ if __name__ == "__main__":
     uvicorn.run(
         "main:app",
         host="0.0.0.0",
-        port=8080,
+        port=80,
         log_level="info"
     )

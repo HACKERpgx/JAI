@@ -62,4 +62,5 @@ google-auth==2.25.2
 google-auth-oauthlib==1.2.0
 google-auth-httplib2==0.2.0
 google-api-python-client==2.108.0
-google-api-core==2.18.0
+# Vercel serverless adapter
+mangum==0.17.0

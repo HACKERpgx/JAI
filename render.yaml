@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: jai-website
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PORT
+        value: 10000
+    healthCheckPath: /
+    healthCheckTimeout: 30
+    autoDeploy: true
+    domains:
+      - j-ai.top

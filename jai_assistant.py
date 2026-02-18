@@ -2538,4 +2538,4 @@ def nasa_apod(date: Optional[str] = None, hd: bool = False, request: Request = N
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=80)
+    uvicorn.run(app, host="0.0.0.0", port=8000)

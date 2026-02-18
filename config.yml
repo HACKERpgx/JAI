@@ -1,0 +1,7 @@
+tunnel: 42b1d509-7500-41db-90f3-deb41914238e
+credentials-file: C:\Users\Abdul Rahman\.cloudflared\42b1d509-7500-41db-90f3-deb41914238e.json
+
+ingress:
+  - hostname: j-ai.top
+    service: http://127.0.0.1:80
+  - service: http_status:404

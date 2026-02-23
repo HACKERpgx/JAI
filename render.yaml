@@ -9,7 +9,7 @@ services:
       - key: PORT
         value: 10000
     healthCheckPath: /
-    healthCheckTimeout: 30
+    healthCheckTimeoutSeconds: 30
     autoDeploy: true
     domains:
       - j-ai.top

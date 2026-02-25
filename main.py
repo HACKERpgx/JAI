@@ -83,11 +83,10 @@ except Exception:
     pass
 templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "templates"))
 app.mount("/static", StaticFiles(directory=os.path.join(BASE_DIR, "static")), name="static")
-app.mount(
-    "/favicon",
-    StaticFiles(directory=os.path.join(BASE_DIR, "apps", "web_static", "favicon")),
-    name="favicon",
-)
+# Favicon directory - mount only if exists and not empty
+favicon_dir = os.path.join(BASE_DIR, "apps", "web_static", "favicon")
+if os.path.isdir(favicon_dir) and os.listdir(favicon_dir):
+    app.mount("/favicon", StaticFiles(directory=favicon_dir), name="favicon")
 
  
 

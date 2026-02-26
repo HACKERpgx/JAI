@@ -4,7 +4,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 from datetime import datetime
-from typing import Optional, List
+from typing import Optional, List, Any
 import time
 import uuid
 import os
@@ -21,8 +21,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from io import BytesIO
 try:
     from PIL import Image
+    PIL_AVAILABLE = True
 except Exception:
     Image = None
+    PIL_AVAILABLE = False
 try:
     from openai import OpenAI
 except Exception:
@@ -325,7 +327,9 @@ def _ensure_lang(text: str, desired_lang: str) -> str:
 
 
 
-def _load_and_convert(img: Image.Image, fmt_label: str) -> bytes:
+def _load_and_convert(img: Any, fmt_label: str) -> bytes:
+    if not PIL_AVAILABLE:
+        raise Exception("PIL not available for image processing")
     bio = BytesIO()
     try:
         # Ensure correct mode for JPEG

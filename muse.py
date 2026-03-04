@@ -6,7 +6,16 @@ from pathlib import Path
 from typing import List, Tuple, Optional
 
 import requests
-from PIL import Image, ImageDraw, ImageFont
+
+# Graceful PIL handling with availability flag
+try:
+    from PIL import Image, ImageDraw, ImageFont
+    PIL_AVAILABLE = True
+except Exception:
+    Image = None
+    ImageDraw = None
+    ImageFont = None
+    PIL_AVAILABLE = False
 
 try:
     import speech_recognition as sr
@@ -34,6 +43,9 @@ def _safe_filename(prefix: str, ext: str) -> Path:
 
 
 def _placeholder_image(prompt: str, size: str = "1024x1024") -> Path:
+    if not PIL_AVAILABLE:
+        # Return a dummy path if PIL not available
+        return _safe_filename("muse_unavailable", "txt")
     try:
         w, h = [int(x) for x in size.lower().split("x", 1)]
     except Exception:
@@ -59,6 +71,8 @@ def _placeholder_image(prompt: str, size: str = "1024x1024") -> Path:
 
 
 def generate_image(prompt: str, size: str = "1024x1024") -> Path:
+    if not PIL_AVAILABLE:
+        return _safe_filename("muse_unavailable", "txt")
     api_key = os.environ.get("OPENAI_API_KEY")
     if api_key:
         try:

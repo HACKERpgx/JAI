@@ -190,6 +190,25 @@ class TaskPlanner:
         
         return plan
     
+    def _plan_email_task(self, intent: Intent) -> List[Dict[str, Any]]:
+        """Plan for email tasks"""
+        plan = []
+        text_lower = intent.text.lower()
+        
+        if 'send' in text_lower:
+            plan.append({
+                'action': 'send_email',
+                'handler': 'gmail',
+                'params': {
+                    'to': intent.entities.get('email', [None])[0],
+                    'subject': self._extract_subject(intent.text),
+                    'body': self._extract_body(intent.text)
+                },
+                'description': 'Send email'
+            })
+        
+        return plan
+    
     def _plan_query_task(self, intent: Intent) -> List[Dict[str, Any]]:
         """Plan for query intents"""
         plan = []

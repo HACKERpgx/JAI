@@ -501,9 +501,6 @@ def _analyze_with_gemini(data: bytes, mime: str, prompt: str, analysis_type: str
             except Exception as fix_e:
                 return f"Image file appears corrupted or truncated. Please upload a valid image file. Error: {str(img_e)}"
         
-        # Get the right model
-        model = genai.GenerativeModel('gemini-1.5-flash')
-        
         user_prompt = (prompt or "").strip()
         if not user_prompt:
             analysis_type_key = (analysis_type or "general").lower()
@@ -512,14 +509,37 @@ def _analyze_with_gemini(data: bytes, mime: str, prompt: str, analysis_type: str
         
         print(f"[DEBUG] Gemini prompt: {user_prompt[:100]}...")
         
-        # Generate content with safety settings
-        response = model.generate_content([user_prompt, image])
+        # Try different model names in order of preference
+        model_names = [
+            'gemini-1.5-flash',
+            'gemini-1.5-pro',
+            'gemini-pro-vision',
+            'gemini-pro'
+        ]
         
-        if response.text:
-            print(f"[DEBUG] Gemini response: {response.text[:100]}...")
-            return response.text
-        else:
-            return "Gemini returned empty response. The image might not be supported."
+        for model_name in model_names:
+            try:
+                print(f"[DEBUG] Trying model: {model_name}")
+                model = genai.GenerativeModel(model_name)
+                
+                # Generate content
+                response = model.generate_content([user_prompt, image])
+                
+                if response.text:
+                    print(f"[DEBUG] Gemini response with {model_name}: {response.text[:100]}...")
+                    return response.text
+                else:
+                    print(f"[DEBUG] {model_name} returned empty response")
+                    continue
+                    
+            except Exception as model_e:
+                print(f"[ERROR] Model {model_name} failed: {model_e}")
+                if "not found" in str(model_e).lower() or "not supported" in str(model_e).lower():
+                    continue  # Try next model
+                else:
+                    raise model_e  # Re-raise if it's not a model not found error
+        
+        return "All Gemini models failed or are unavailable for vision tasks."
             
     except Exception as e:
         error_msg = f"Gemini fallback failed: {str(e)}"

@@ -498,11 +498,30 @@ def _analyze_with_groq(data: bytes, mime: str, prompt: str, analysis_type: str =
         print(f"[DEBUG] Groq prompt: {user_prompt[:100]}...")
         
         # Try Groq vision models
-        models = [
-            "llava-v1.5-7b-4096",
-            "llava-v1.5-13b-4096-preview",
-            "llava-v1.5-34b-4096-preview"
-        ]
+        try:
+            from groq import Groq
+            # Get available models
+            temp_client = Groq(api_key=groq_key)
+            models_list = temp_client.models.list()
+            vision_models = [model.id for model in models_list.data if 'llava' in model.id.lower() or 'vision' in model.id.lower()]
+            print(f"[DEBUG] Available Groq models: {[m.id for m in models_list.data[:10]]}")
+            print(f"[DEBUG] Vision models: {vision_models}")
+            
+            if vision_models:
+                models = vision_models
+            else:
+                models = [
+                    "llava-v1.5-7b",
+                    "llava-v1.5-13b", 
+                    "llava-v1.5-34b"
+                ]
+        except Exception as list_e:
+            print(f"[ERROR] Could not list Groq models: {list_e}")
+            models = [
+                "llava-v1.5-7b",
+                "llava-v1.5-13b", 
+                "llava-v1.5-34b"
+            ]
         
         for model_name in models:
             try:

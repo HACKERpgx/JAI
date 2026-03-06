@@ -603,6 +603,49 @@ def _get_basic_image_info(data: bytes, mime: str) -> str:
             if 'comment' in image.info:
                 info.append(f"• Comment: {image.info['comment'][:100]}...")
         
+        # Add basic analysis based on image properties
+        info.append("\n🔍 Basic Analysis:")
+        
+        # Analyze aspect ratio
+        width, height = image.size
+        aspect_ratio = width / height
+        if 0.9 <= aspect_ratio <= 1.1:
+            info.append("• Shape: Square image")
+        elif aspect_ratio > 1.5:
+            info.append("• Shape: Wide/landscape image")
+        elif aspect_ratio < 0.7:
+            info.append("• Shape: Tall/portrait image")
+        else:
+            info.append("• Shape: Standard rectangle")
+        
+        # Analyze color mode
+        if image.mode == 'RGB':
+            info.append("• Color: Full color image")
+        elif image.mode == 'RGBA':
+            info.append("• Color: Full color with transparency")
+        elif image.mode == 'L':
+            info.append("• Color: Grayscale/monochrome")
+        elif image.mode == 'CMYK':
+            info.append("• Color: CMYK (print format)")
+        else:
+            info.append(f"• Color: {image.mode} format")
+        
+        # Estimate image type based on size and format
+        if image.format == 'JPEG':
+            if width >= 1920 or height >= 1080:
+                info.append("• Likely: High-resolution photograph")
+            elif width >= 800:
+                info.append("• Likely: Standard web image")
+            else:
+                info.append("• Likely: Thumbnail or small image")
+        elif image.format == 'PNG':
+            if image.mode == 'RGBA':
+                info.append("• Likely: Graphic with transparency")
+            else:
+                info.append("• Likely: Web graphic or screenshot")
+        elif image.format == 'GIF':
+            info.append("• Likely: Animated image or simple graphic")
+        
         info.append("\n⚠️ Vision analysis services are currently unavailable due to API quota limits.")
         info.append("Please try again later or upload a different image.")
         

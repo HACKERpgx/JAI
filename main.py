@@ -509,13 +509,31 @@ def _analyze_with_gemini(data: bytes, mime: str, prompt: str, analysis_type: str
         
         print(f"[DEBUG] Gemini prompt: {user_prompt[:100]}...")
         
-        # Try different model names in order of preference
-        model_names = [
-            'gemini-1.5-flash',
-            'gemini-1.5-pro',
-            'gemini-pro-vision',
-            'gemini-pro'
-        ]
+        # First, list available models to find the correct ones
+        try:
+            models = genai.list_models()
+            vision_models = [m.name for m in models if 'vision' in m.name.lower() or 'image' in m.name.lower() or 'gemini' in m.name.lower()]
+            print(f"[DEBUG] Available models: {[m.name for m in models[:10]]}")  # Show first 10
+            print(f"[DEBUG] Vision-capable models: {vision_models}")
+        except Exception as list_e:
+            print(f"[ERROR] Could not list models: {list_e}")
+            vision_models = []
+        
+        # Try different model names based on what's actually available
+        model_names = []
+        
+        # If we found vision models, use them
+        if vision_models:
+            model_names = [name.replace('models/', '') for name in vision_models]
+        else:
+            # Fallback to common model names
+            model_names = [
+                'gemini-1.5-flash-latest',
+                'gemini-1.5-pro-latest',
+                'gemini-1.0-pro-latest',
+                'gemini-pro-latest',
+                'gemini-pro-vision'
+            ]
         
         for model_name in model_names:
             try:

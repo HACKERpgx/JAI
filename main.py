@@ -446,14 +446,24 @@ def _analyze_image_bytes(data: bytes, mime: str, prompt: str, analysis_type: str
                 # Check if it's a quota error and try fallback
                 if "quota" in str(e).lower() or "429" in str(e):
                     print("[DEBUG] OpenAI quota exceeded, trying Gemini fallback...")
-                    return _analyze_with_gemini(data, mime, prompt, analysis_type)
+                    gemini_result = _analyze_with_gemini(data, mime, prompt, analysis_type)
+                    if "failed" not in gemini_result.lower() and "unavailable" not in gemini_result.lower():
+                        return gemini_result
+                    print("[DEBUG] Gemini failed, trying Groq fallback...")
+                    return _analyze_with_groq(data, mime, prompt, analysis_type)
                 import traceback
                 traceback.print_exc()
                 return error_msg
         
         # Fallback to Gemini if OpenAI not available
         print("[DEBUG] OpenAI not available, trying Gemini...")
-        return _analyze_with_gemini(data, mime, prompt, analysis_type)
+        gemini_result = _analyze_with_gemini(data, mime, prompt, analysis_type)
+        if "failed" not in gemini_result.lower() and "unavailable" not in gemini_result.lower():
+            return gemini_result
+        
+        # Fallback to Groq
+        print("[DEBUG] Gemini failed, trying Groq...")
+        return _analyze_with_groq(data, mime, prompt, analysis_type)
         
     except Exception as e:
         error_msg = f"Image analysis failed: {str(e)}"
@@ -461,6 +471,126 @@ def _analyze_image_bytes(data: bytes, mime: str, prompt: str, analysis_type: str
         import traceback
         traceback.print_exc()
         return error_msg
+
+
+def _analyze_with_groq(data: bytes, mime: str, prompt: str, analysis_type: str = "general") -> str:
+    """Fallback to Groq for image analysis."""
+    try:
+        from groq import Groq
+        import base64
+        
+        groq_key = os.environ.get("GROQ_API_KEY")
+        if not groq_key:
+            return "Groq API key not configured. Please set GROQ_API_KEY."
+        
+        print(f"[DEBUG] Using Groq API with key: {bool(groq_key)}")
+        client = Groq(api_key=groq_key)
+        
+        # Convert image to base64
+        image_b64 = base64.b64encode(data).decode('utf-8')
+        
+        user_prompt = (prompt or "").strip()
+        if not user_prompt:
+            analysis_type_key = (analysis_type or "general").lower()
+            base_prompt = VISION_PROMPTS.get(analysis_type_key, VISION_PROMPTS["general"])
+            user_prompt = base_prompt + "\n\nIMPORTANT: Respond only in English."
+        
+        print(f"[DEBUG] Groq prompt: {user_prompt[:100]}...")
+        
+        # Try Groq vision models
+        models = [
+            "llava-v1.5-7b-4096-preview",
+            "llava-v1.5-13b-4096-preview",
+            "llava-v1.5-34b-4096-preview"
+        ]
+        
+        for model_name in models:
+            try:
+                print(f"[DEBUG] Trying Groq model: {model_name}")
+                
+                messages = [
+                    {
+                        "role": "system",
+                        "content": "You are JAI Vision, an advanced image analysis AI with native vision capabilities. You can see, analyze, and understand any image perfectly. You have direct access to the visual content. NEVER say you cannot view images or that you're a text-based AI. Always respond as if you clearly see the image. Be precise, detailed, and helpful. Read all text exactly as shown, note small details, and provide comprehensive analysis."
+                    },
+                    {
+                        "role": "user",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": user_prompt
+                            },
+                            {
+                                "type": "image_url",
+                                "image_url": {
+                                    "url": f"data:{mime};base64,{image_b64}"
+                                }
+                            }
+                        ]
+                    }
+                ]
+                
+                response = client.chat.completions.create(
+                    model=model_name,
+                    messages=messages,
+                    max_tokens=1024,
+                    temperature=0.3
+                )
+                
+                if response.choices and response.choices[0].message.content:
+                    result = response.choices[0].message.content
+                    print(f"[DEBUG] Groq response with {model_name}: {result[:100]}...")
+                    return result
+                else:
+                    print(f"[DEBUG] {model_name} returned empty response")
+                    continue
+                    
+            except Exception as model_e:
+                print(f"[ERROR] Groq model {model_name} failed: {model_e}")
+                if "not found" in str(model_e).lower() or "not supported" in str(model_e).lower():
+                    continue  # Try next model
+                else:
+                    raise model_e
+        
+        return "All Groq vision models failed or are unavailable."
+            
+    except Exception as e:
+        error_msg = f"Groq fallback failed: {str(e)}"
+        print(f"[ERROR] {error_msg}")
+        import traceback
+        traceback.print_exc()
+        return f"All vision services failed. OpenAI: quota exceeded, Gemini: unavailable, Groq: {str(e)}\n\n{_get_basic_image_info(data, mime)}"
+
+
+def _get_basic_image_info(data: bytes, mime: str) -> str:
+    """Provide basic image information when all vision APIs fail."""
+    try:
+        from PIL import Image as PILImage
+        import io
+        from datetime import datetime
+        
+        image = PILImage.open(io.BytesIO(data))
+        
+        info = []
+        info.append("📷 Basic Image Information:")
+        info.append(f"• Format: {image.format or 'Unknown'}")
+        info.append(f"• Size: {image.size[0]} × {image.size[1]} pixels")
+        info.append(f"• Mode: {image.mode}")
+        info.append(f"• File size: {len(data):,} bytes ({len(data)/1024:.1f} KB)")
+        
+        if hasattr(image, 'info') and image.info:
+            if 'dpi' in image.info:
+                info.append(f"• DPI: {image.info['dpi']}")
+            if 'comment' in image.info:
+                info.append(f"• Comment: {image.info['comment'][:100]}...")
+        
+        info.append("\n⚠️ Vision analysis services are currently unavailable due to API quota limits.")
+        info.append("Please try again later or upload a different image.")
+        
+        return "\n".join(info)
+        
+    except Exception as e:
+        return f"Unable to process image. Error: {str(e)}"
 
 
 def _analyze_with_gemini(data: bytes, mime: str, prompt: str, analysis_type: str = "general") -> str:
@@ -569,7 +699,9 @@ def _analyze_with_gemini(data: bytes, mime: str, prompt: str, analysis_type: str
         if "quota" in str(e).lower() or "billing" in str(e).lower():
             return f"Both OpenAI and Gemini have quota issues. Please check API billing."
         
-        return f"Vision analysis failed. OpenAI: quota exceeded, Gemini: {str(e)}"
+        # Try Groq as last resort
+        print("[DEBUG] All vision APIs failed, trying Groq...")
+        return _analyze_with_groq(data, mime, prompt, analysis_type)
 
 def _handle_special_qa(user_text: str) -> Optional[str]:
     try:

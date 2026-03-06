@@ -378,7 +378,7 @@ def _analyze_image_bytes(data: bytes, mime: str, prompt: str, analysis_type: str
     
     Args:
         data: Raw image bytes
-        mime: MIME type of the image
+        mime: MIME type of image
         prompt: Custom user prompt (optional)
         analysis_type: Type of analysis (general, ocr, diagram, code, ui, math, object, document, photo, screenshot)
     
@@ -395,6 +395,7 @@ def _analyze_image_bytes(data: bytes, mime: str, prompt: str, analysis_type: str
         
         print(f"[DEBUG] Data URL created: {data_url[:100]}...")
         
+        # Try OpenAI first
         api_key = os.environ.get("OPENAI_API_KEY")
         print(f"[DEBUG] API key available: {bool(api_key)}")
         print(f"[DEBUG] OpenAI client available: {OpenAI is not None}")
@@ -440,24 +441,71 @@ def _analyze_image_bytes(data: bytes, mime: str, prompt: str, analysis_type: str
                 print(f"[DEBUG] Got response: {text[:100]}...")
                 return (text or "").strip() or "No description generated."
             except Exception as e:
-                error_msg = f"Vision analysis error: {str(e)}"
+                error_msg = f"OpenAI error: {str(e)}"
                 print(f"[ERROR] {error_msg}")
+                # Check if it's a quota error and try fallback
+                if "quota" in str(e).lower() or "429" in str(e):
+                    print("[DEBUG] OpenAI quota exceeded, trying Gemini fallback...")
+                    return _analyze_with_gemini(data, mime, prompt, analysis_type)
                 import traceback
                 traceback.print_exc()
                 return error_msg
         
-        missing = []
-        if not OpenAI:
-            missing.append("OpenAI module not available")
-        if not api_key:
-            missing.append("OPENAI_API_KEY not set")
-        return f"Image analysis is not available on this server. Missing: {', '.join(missing)}"
+        # Fallback to Gemini if OpenAI not available
+        print("[DEBUG] OpenAI not available, trying Gemini...")
+        return _analyze_with_gemini(data, mime, prompt, analysis_type)
+        
     except Exception as e:
         error_msg = f"Image analysis failed: {str(e)}"
         print(f"[ERROR] {error_msg}")
         import traceback
         traceback.print_exc()
         return error_msg
+
+
+def _analyze_with_gemini(data: bytes, mime: str, prompt: str, analysis_type: str = "general") -> str:
+    """Fallback to Google Gemini Vision for image analysis."""
+    try:
+        import google.generativeai as genai
+        from PIL import Image as PILImage
+        import io
+        
+        gemini_key = os.environ.get("GEMINI_API_KEY")
+        if not gemini_key:
+            return "Gemini API key not configured. Please set GEMINI_API_KEY."
+        
+        print(f"[DEBUG] Using Gemini API with key: {bool(gemini_key)}")
+        genai.configure(api_key=gemini_key)
+        
+        # Convert bytes to PIL Image
+        image = PILImage.open(io.BytesIO(data))
+        
+        # Get the right model
+        model = genai.GenerativeModel('gemini-1.5-flash')
+        
+        user_prompt = (prompt or "").strip()
+        if not user_prompt:
+            analysis_type_key = (analysis_type or "general").lower()
+            base_prompt = VISION_PROMPTS.get(analysis_type_key, VISION_PROMPTS["general"])
+            user_prompt = base_prompt + "\n\nIMPORTANT: Respond only in English."
+        
+        print(f"[DEBUG] Gemini prompt: {user_prompt[:100]}...")
+        
+        # Generate content
+        response = model.generate_content([user_prompt, image])
+        
+        if response.text:
+            print(f"[DEBUG] Gemini response: {response.text[:100]}...")
+            return response.text
+        else:
+            return "Gemini returned empty response."
+            
+    except Exception as e:
+        error_msg = f"Gemini fallback failed: {str(e)}"
+        print(f"[ERROR] {error_msg}")
+        import traceback
+        traceback.print_exc()
+        return f"Both OpenAI and Gemini vision services are unavailable. OpenAI error: quota exceeded, Gemini error: {str(e)}"
 
 def _handle_special_qa(user_text: str) -> Optional[str]:
     try:

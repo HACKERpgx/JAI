@@ -499,7 +499,7 @@ def _analyze_with_groq(data: bytes, mime: str, prompt: str, analysis_type: str =
         
         # Try Groq vision models
         models = [
-            "llava-v1.5-7b-4096-preview",
+            "llava-v1.5-7b-4096",
             "llava-v1.5-13b-4096-preview",
             "llava-v1.5-34b-4096-preview"
         ]

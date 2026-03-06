@@ -1,7 +1,7 @@
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { 
+import {
   MessageSquare, 
   Apple, 
   Smartphone, 
@@ -18,8 +18,109 @@ import {
 import { SiX } from "react-icons/si";
 import iphoneMockup from "@assets/generated_images/iPhone_mockup_with_JAI_app_a4b2e58a.png";
 import androidMockup from "@assets/generated_images/Android_phone_mockup_with_JAI_app_01e4b32e.png";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
+import React, { useState } from "react";
+import { useToast } from "@/hooks/use-toast";
 
 export default function Home() {
+  const [askOpen, setAskOpen] = useState(false);
+  const [prompt, setPrompt] = useState("");
+  const [answer, setAnswer] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [visionOpen, setVisionOpen] = useState(false);
+  const [visionPrompt, setVisionPrompt] = useState("");
+  const [visionAnswer, setVisionAnswer] = useState<string | null>(null);
+  const [visionImageDataUrl, setVisionImageDataUrl] = useState<string | null>(null);
+  const [visionPreviewUrl, setVisionPreviewUrl] = useState<string | null>(null);
+  const [visionLoading, setVisionLoading] = useState(false);
+  const { toast } = useToast();
+
+  async function submitPrompt() {
+    if (!prompt.trim()) return;
+    setLoading(true);
+    setAnswer(null);
+    try {
+      const res = await fetch("/api/jai/text", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: prompt.trim() }),
+      });
+      if (!res.ok) {
+        const txt = await res.text();
+        throw new Error(txt || res.statusText);
+      }
+      const data = (await res.json()) as { response?: string };
+      setAnswer(data?.response ?? "");
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : String(e);
+      toast({ title: "Request failed", description: message });
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function onVisionFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      toast({ title: "Invalid file", description: "Please select an image file." });
+      return;
+    }
+
+    const preview = URL.createObjectURL(file);
+    setVisionPreviewUrl(preview);
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result;
+      if (typeof result === "string") {
+        setVisionImageDataUrl(result);
+      }
+    };
+    reader.readAsDataURL(file);
+  }
+
+  async function submitVision() {
+    if (!visionImageDataUrl) {
+      toast({ title: "Image required", description: "Please upload an image first." });
+      return;
+    }
+    setVisionLoading(true);
+    setVisionAnswer(null);
+    try {
+      const res = await fetch("/api/jai/vision", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          image: visionImageDataUrl,
+          prompt: visionPrompt.trim() || undefined,
+        }),
+      });
+      if (!res.ok) {
+        const txt = await res.text();
+        throw new Error(txt || res.statusText);
+      }
+      const data = (await res.json()) as { response?: string };
+      setVisionAnswer(data?.response ?? "");
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : String(e);
+      toast({ title: "Vision request failed", description: message });
+    } finally {
+      setVisionLoading(false);
+    }
+  }
+
+  function resetVisionState() {
+    setVisionPrompt("");
+    setVisionAnswer(null);
+    setVisionImageDataUrl(null);
+    if (visionPreviewUrl) {
+      URL.revokeObjectURL(visionPreviewUrl);
+    }
+    setVisionPreviewUrl(null);
+  }
   return (
     <div className="min-h-screen bg-[#0f0f0f] text-foreground overflow-x-hidden pb-32">
       {/* Animated gradient background */}
@@ -88,6 +189,7 @@ export default function Home() {
                 text="Ask JAI anything"
                 primary
                 testId="button-ask-jai"
+                onClick={() => setAskOpen(true)}
               />
               <GrokButton
                 icon={<Apple className="w-5 h-5" />}
@@ -116,8 +218,12 @@ export default function Home() {
               />
               <GrokButton
                 icon={<ImageIcon className="w-5 h-5" />}
-                text="Image Generation"
+                text="Image Understanding"
                 testId="button-image"
+                onClick={() => {
+                  resetVisionState();
+                  setVisionOpen(true);
+                }}
               />
               <GrokButton
                 icon={<Sparkles className="w-5 h-5" />}
@@ -253,6 +359,111 @@ export default function Home() {
           </div>
         </footer>
       </div>
+
+      {/* Ask JAI Dialog */}
+      <Dialog open={askOpen} onOpenChange={setAskOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Ask JAI</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <Textarea
+              value={prompt}
+              onChange={(e) => setPrompt(e.target.value)}
+              placeholder="Type your question or command..."
+              rows={4}
+            />
+            <div className="flex items-center gap-3">
+              <Button onClick={submitPrompt} disabled={loading || !prompt.trim()}>
+                {loading ? "Thinking…" : "Send"}
+              </Button>
+              <Button variant="secondary" onClick={() => { setPrompt(""); setAnswer(null); }}>
+                Clear
+              </Button>
+            </div>
+            {answer !== null && (
+              <Card className="p-4 whitespace-pre-wrap text-sm">
+                {answer || "(no response)"}
+              </Card>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Vision Dialog */}
+      <Dialog
+        open={visionOpen}
+        onOpenChange={(open) => {
+          setVisionOpen(open);
+          if (!open) {
+            resetVisionState();
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Image Understanding</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-foreground">
+                Upload an image
+              </label>
+              <div className="flex flex-col gap-3">
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={onVisionFileChange}
+                  className="text-sm text-muted-foreground file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary/10 file:text-primary-foreground hover:file:bg-primary/20"
+                />
+                {visionPreviewUrl && (
+                  <div className="rounded-lg border border-border/60 overflow-hidden max-h-64">
+                    <img
+                      src={visionPreviewUrl}
+                      alt="Selected for analysis"
+                      className="w-full h-full object-contain bg-background"
+                    />
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-foreground">
+                Optional instruction
+              </label>
+              <Textarea
+                value={visionPrompt}
+                onChange={(e) => setVisionPrompt(e.target.value)}
+                placeholder="Describe what you want JAI to focus on (e.g. “summarize this document”, “read the handwritten text”, “explain this chart”)…"
+                rows={3}
+              />
+            </div>
+
+            <div className="flex items-center gap-3">
+              <Button
+                onClick={submitVision}
+                disabled={visionLoading || !visionImageDataUrl}
+              >
+                {visionLoading ? "Analyzing…" : "Analyze image"}
+              </Button>
+              <Button
+                variant="secondary"
+                onClick={resetVisionState}
+                disabled={visionLoading}
+              >
+                Clear
+              </Button>
+            </div>
+
+            {visionAnswer !== null && (
+              <Card className="p-4 whitespace-pre-wrap text-sm max-h-72 overflow-auto">
+                {visionAnswer || "(no response)"}
+              </Card>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -262,9 +473,10 @@ interface GrokButtonProps {
   text: string;
   primary?: boolean;
   testId?: string;
+  onClick?: () => void;
 }
 
-function GrokButton({ icon, text, primary = false, testId }: GrokButtonProps) {
+function GrokButton({ icon, text, primary = false, testId, onClick }: GrokButtonProps) {
   return (
     <Button
       variant="outline"
@@ -279,6 +491,7 @@ function GrokButton({ icon, text, primary = false, testId }: GrokButtonProps) {
         overflow-visible hover-elevate active-elevate-2
       `}
       data-testid={testId}
+      onClick={onClick}
     >
       {primary && (
         <div className="absolute inset-0 rounded-full bg-cyan-500/20 blur-xl group-hover:bg-cyan-500/30 transition-all duration-300" />

@@ -477,8 +477,29 @@ def _analyze_with_gemini(data: bytes, mime: str, prompt: str, analysis_type: str
         print(f"[DEBUG] Using Gemini API with key: {bool(gemini_key)}")
         genai.configure(api_key=gemini_key)
         
-        # Convert bytes to PIL Image
-        image = PILImage.open(io.BytesIO(data))
+        # Validate and fix image data
+        try:
+            image = PILImage.open(io.BytesIO(data))
+            # Verify image can be loaded
+            image.verify()
+            # Reload after verify (verify() closes the image)
+            image = PILImage.open(io.BytesIO(data))
+            
+            # Convert to RGB if needed (Gemini works best with RGB)
+            if image.mode not in ['RGB', 'L']:
+                image = image.convert('RGB')
+            
+            print(f"[DEBUG] Image loaded successfully: {image.size}, mode={image.mode}")
+        except Exception as img_e:
+            print(f"[ERROR] Image validation failed: {img_e}")
+            # Try to fix common image issues
+            try:
+                # Try with PIL's error handling
+                image = PILImage.open(io.BytesIO(data))
+                image = image.convert('RGB')
+                print(f"[DEBUG] Image converted to RGB successfully")
+            except Exception as fix_e:
+                return f"Image file appears corrupted or truncated. Please upload a valid image file. Error: {str(img_e)}"
         
         # Get the right model
         model = genai.GenerativeModel('gemini-1.5-flash')
@@ -491,21 +512,26 @@ def _analyze_with_gemini(data: bytes, mime: str, prompt: str, analysis_type: str
         
         print(f"[DEBUG] Gemini prompt: {user_prompt[:100]}...")
         
-        # Generate content
+        # Generate content with safety settings
         response = model.generate_content([user_prompt, image])
         
         if response.text:
             print(f"[DEBUG] Gemini response: {response.text[:100]}...")
             return response.text
         else:
-            return "Gemini returned empty response."
+            return "Gemini returned empty response. The image might not be supported."
             
     except Exception as e:
         error_msg = f"Gemini fallback failed: {str(e)}"
         print(f"[ERROR] {error_msg}")
         import traceback
         traceback.print_exc()
-        return f"Both OpenAI and Gemini vision services are unavailable. OpenAI error: quota exceeded, Gemini error: {str(e)}"
+        
+        # Check if it's still a quota issue
+        if "quota" in str(e).lower() or "billing" in str(e).lower():
+            return f"Both OpenAI and Gemini have quota issues. Please check API billing."
+        
+        return f"Vision analysis failed. OpenAI: quota exceeded, Gemini: {str(e)}"
 
 def _handle_special_qa(user_text: str) -> Optional[str]:
     try:
@@ -540,6 +566,24 @@ async def api_image(request: Request, file: UploadFile = File(...), prompt: str 
             mime = "application/octet-stream"
         if not mime.startswith("image/"):
             return JSONResponse({"error": "Unsupported file type. Please upload an image."}, status_code=400)
+        
+        # Validate image data before processing
+        if len(data) < 100:  # Images should be at least 100 bytes
+            return JSONResponse({"error": "Image file is too small or corrupted. Please upload a valid image."}, status_code=400)
+        
+        if len(data) > 20 * 1024 * 1024:  # 20MB limit
+            return JSONResponse({"error": "Image file is too large. Please upload an image smaller than 20MB."}, status_code=400)
+        
+        # Quick validation with PIL
+        try:
+            from PIL import Image as PILImage
+            import io
+            test_img = PILImage.open(io.BytesIO(data))
+            test_img.verify()  # Just verify, don't load fully
+            print(f"[DEBUG] Image validation passed: {file.filename}, size={len(data)} bytes")
+        except Exception as img_e:
+            print(f"[ERROR] Image validation failed: {img_e}")
+            return JSONResponse({"error": f"Image file appears corrupted or invalid: {str(img_e)}"}, status_code=400)
 
         analysis = _analyze_image_bytes(data, mime, prompt, analysis_type)
         analysis = _ensure_lang(analysis, "en")

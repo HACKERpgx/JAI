@@ -42,6 +42,36 @@
     .nav-item.active{ background: rgba(57,255,20,0.18); box-shadow: 0 0 14px rgba(57,255,20,0.15) inset; }
     .voice-dashboard{ position:relative; z-index:2; margin-left:220px; width:min(1100px, 92vw); }
     .image-dashboard{ position:relative; z-index:2; margin-left:220px; width:min(1100px, 92vw); }
+    .image-panel{ border:1px solid rgba(57,255,20,0.25); border-radius:14px; background: linear-gradient(180deg, rgba(6,20,14,0.7), rgba(2,10,6,0.85)); box-shadow: 0 0 24px rgba(57,255,20,0.15), inset 0 0 24px rgba(57,255,20,0.05); backdrop-filter: blur(6px); padding:14px; }
+    .image-head{ display:flex; align-items:center; justify-content:space-between; gap:10px; padding:4px 6px 10px 6px; border-bottom:1px solid rgba(57,255,20,0.2); margin-bottom:12px; }
+    .image-title{ font-weight:800; color:#b6ffd1; text-shadow: 0 0 6px rgba(57,255,20,0.35); letter-spacing:0.6px; }
+    .drop-zone{ border:2px dashed rgba(57,255,20,0.4); border-radius:12px; padding:30px; text-align:center; cursor:pointer; transition: all .2s ease; min-height:150px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px; }
+    .drop-zone:hover{ border-color:rgba(57,255,20,0.7); background:rgba(57,255,20,0.05); }
+    .drop-zone.dragover{ border-color:#39ff14; background:rgba(57,255,20,0.12); }
+    .drop-zone-icon{ font-size:48px; color:#39ff14; }
+    .drop-zone-text{ color:#caffea; font-weight:600; }
+    .drop-zone-hint{ color:#8bc9a7; font-size:13px; }
+    .preview-grid{ display:grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap:12px; margin-top:14px; }
+    .preview-item{ position:relative; border:1px solid rgba(57,255,20,0.3); border-radius:8px; overflow:hidden; aspect-ratio:1; }
+    .preview-item img{ width:100%; height:100%; object-fit:cover; }
+    .preview-remove{ position:absolute; top:4px; right:4px; width:24px; height:24px; border-radius:50%; background:rgba(255,80,80,0.8); color:#fff; border:none; cursor:pointer; font-size:14px; display:flex; align-items:center; justify-content:center; }
+    .analysis-types{ display:flex; flex-wrap:wrap; gap:8px; margin-top:14px; }
+    .type-btn{ padding:8px 14px; border:1px solid rgba(57,255,20,0.35); border-radius:20px; background:rgba(57,255,20,0.08); color:#caffea; cursor:pointer; font-weight:600; font-size:13px; transition: all .2s ease; }
+    .type-btn:hover{ background:rgba(57,255,20,0.15); }
+    .type-btn.active{ background:rgba(57,255,20,0.2); border-color:#39ff14; box-shadow: 0 0 10px rgba(57,255,20,0.3); }
+    .prompt-input{ width:100%; background:transparent; border:1px solid rgba(57,255,20,0.35); border-radius:8px; padding:10px 12px; color:#d9ffe8; font-size:14px; margin-top:12px; resize:vertical; min-height:60px; }
+    .prompt-input::placeholder{ color:rgba(165,255,208,0.4); }
+    .analyze-btn{ margin-top:14px; padding:12px 24px; background:rgba(57,255,20,0.15); border:1px solid rgba(57,255,20,0.4); color:#caffea; border-radius:10px; cursor:pointer; font-weight:800; font-size:15px; transition: all .2s ease; }
+    .analyze-btn:hover{ background:rgba(57,255,20,0.25); }
+    .analyze-btn:disabled{ opacity:0.5; cursor:not-allowed; }
+    .analysis-result{ margin-top:16px; padding:14px; border:1px solid rgba(57,255,20,0.25); border-radius:10px; background:rgba(0,0,0,0.3); }
+    .result-header{ display:flex; align-items:center; gap:8px; margin-bottom:10px; padding-bottom:8px; border-bottom:1px solid rgba(57,255,20,0.2); }
+    .result-title{ font-weight:800; color:#b6ffd1; }
+    .result-text{ color:#caffea; white-space:pre-wrap; line-height:1.6; }
+    .loading-spinner{ display:inline-block; width:20px; height:20px; border:2px solid rgba(57,255,20,0.3); border-top-color:#39ff14; border-radius:50%; animation: spin 0.8s linear infinite; margin-right:8px; }
+    .image-log{ margin-top:12px; max-height:300px; overflow:auto; }
+    .img-line{ color:#b6ffd1; padding:8px 10px; border-bottom:1px solid rgba(57,255,20,0.1); }
+    .img-line:last-child{ border-bottom:none; }
     .voice-panel{ border:1px solid rgba(57,255,20,0.25); border-radius:14px; background: linear-gradient(180deg, rgba(6,20,14,0.7), rgba(2,10,6,0.85)); box-shadow: 0 0 24px rgba(57,255,20,0.15), inset 0 0 24px rgba(57,255,20,0.05); backdrop-filter: blur(6px); padding:14px; }
     .voice-head{ display:flex; align-items:center; justify-content:space-between; gap:10px; padding:4px 6px 10px 6px; border-bottom:1px solid rgba(57,255,20,0.2); margin-bottom:12px; }
     .voice-title{ font-weight:800; color:#b6ffd1; text-shadow: 0 0 6px rgba(57,255,20,0.35); letter-spacing:0.6px; }
@@ -90,7 +120,7 @@
     <div class="brand">JAI</div>
     <button id="navChat" class="nav-item active">Chat</button>
     <button id="navVoice" class="nav-item">Voice Mode</button>
-    <button id="navImage" class="nav-item">Image Generator</button>
+    <button id="navImage" class="nav-item">Image Analyzer</button>
       </nav>
   <div class="stacker">
     <div class="terminal">
@@ -212,15 +242,70 @@
       <div id="voiceLog" class="voice-log"></div>
     </div>
   </div>
-  <div id="imageDash" class="image-dashboard" style="display:none"></div>
+  <div id="imageDash" class="image-dashboard" style="display:none">
+    <div class="image-panel">
+      <div class="image-head">
+        <div class="image-title">🖼️ Image Analyzer</div>
+        <div class="tooltip">
+          <div class="tip-icon">?</div>
+          <div class="tip-bubble">Upload images for AI-powered analysis. Supports photos, screenshots, documents, diagrams, code, and more. Select an analysis type or enter a custom prompt.</div>
+        </div>
+      </div>
+      
+      <div id="dropZone" class="drop-zone">
+        <div class="drop-zone-icon">📷</div>
+        <div class="drop-zone-text">Drop images here or click to upload</div>
+        <div class="drop-zone-hint">Supports JPG, PNG, GIF, WebP • Multiple images allowed</div>
+      </div>
+      <input id="imageInput" type="file" accept="image/*" multiple style="display:none" />
+      
+      <div id="previewGrid" class="preview-grid" style="display:none"></div>
+      
+      <div class="analysis-types">
+        <button class="type-btn active" data-type="general">🔍 General</button>
+        <button class="type-btn" data-type="ocr">📝 OCR / Text</button>
+        <button class="type-btn" data-type="diagram">📊 Diagram</button>
+        <button class="type-btn" data-type="code">💻 Code</button>
+        <button class="type-btn" data-type="ui">🎨 UI/UX</button>
+        <button class="type-btn" data-type="math">🔢 Math</button>
+        <button class="type-btn" data-type="object">🎯 Objects</button>
+        <button class="type-btn" data-type="document">📄 Document</button>
+        <button class="type-btn" data-type="photo">📷 Photo</button>
+        <button class="type-btn" data-type="screenshot">🖥️ Screenshot</button>
+      </div>
+      
+      <textarea id="customPrompt" class="prompt-input" placeholder="Enter a custom question or prompt about the image(s)... (optional)"></textarea>
+      
+      <button id="analyzeBtn" class="analyze-btn" disabled>Analyze Image</button>
+      
+      <div id="analysisResult" class="analysis-result" style="display:none">
+        <div class="result-header">
+          <span class="result-title">📋 Analysis Result</span>
+        </div>
+        <div id="resultText" class="result-text"></div>
+      </div>
+      
+      <div id="imageLog" class="image-log"></div>
+    </div>
+  </div>
   
 <script>
   function rid(){ return ([1e7]+-1e3+-4e3+-8e3+-1e11).replace(/[018]/g,c=>(c^crypto.getRandomValues(new Uint8Array(1))[0]&15>>c/4).toString(16)); }
   const log = document.getElementById('log');
-  function push(role, text){
+  function push(role, text, imgSrc){
     const div = document.createElement('div');
     div.className = 'line ' + (role === 'me' ? 'me' : 'bot');
-    div.textContent = text;
+    if(imgSrc){
+      const img = document.createElement('img');
+      img.src = imgSrc;
+      img.style.cssText = 'max-width:200px;max-height:150px;border-radius:8px;margin:4px 0;display:block;';
+      div.appendChild(img);
+    }
+    if(text){
+      const span = document.createElement('span');
+      span.textContent = text;
+      div.appendChild(span);
+    }
     log.appendChild(div);
     log.scrollTop = log.scrollHeight;
   }
@@ -232,7 +317,16 @@
     const cameraInput = document.getElementById('fileCamera');
     const imgFile = (photoInput && photoInput.files && photoInput.files[0]) || (cameraInput && cameraInput.files && cameraInput.files[0]) || null;
     if(!text && !imgFile) return;
-    if(text) push('me', '> ' + text);
+    if(imgFile){
+      // Show image preview in chat
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        push('me', text ? '> ' + text : '', e.target.result);
+      };
+      reader.readAsDataURL(imgFile);
+    } else if(text) {
+      push('me', '> ' + text);
+    }
     input.value = '';
     try {
       if(imgFile){
@@ -257,6 +351,7 @@
       const form = new FormData();
       form.append('file', file);
       form.append('prompt', prompt || '');
+      form.append('analysis_type', 'general');
       const res = await fetch('/api/image', { method:'POST', headers: { 'X-Request-Id': rid() }, body: form });
       const data = await res.json();
       push('bot', (data && data.response) ? data.response : JSON.stringify(data));
@@ -370,7 +465,7 @@
   }
   navChat.addEventListener('click', ()=> setView('chat'));
   navVoice.addEventListener('click', ()=> { window.location.href = 'https://grok.com/'; });
-  navImage.addEventListener('click', ()=> { window.location.href = 'https://app.leonardo.ai/'; });
+  navImage.addEventListener('click', ()=> setView('image'));
 
   const cards = Array.from(document.querySelectorAll('.mode-card'));
   function highlightCard(id){
@@ -450,6 +545,205 @@
       speechSynthesis.speak(u);
     }catch(_){ /* no-op */ }
   }
+
+  // ==================== IMAGE ANALYZER ====================
+  const dropZone = document.getElementById('dropZone');
+  const imageInput = document.getElementById('imageInput');
+  const previewGrid = document.getElementById('previewGrid');
+  const analyzeBtn = document.getElementById('analyzeBtn');
+  const analysisResult = document.getElementById('analysisResult');
+  const resultText = document.getElementById('resultText');
+  const customPrompt = document.getElementById('customPrompt');
+  const imageLog = document.getElementById('imageLog');
+  const typeBtns = document.querySelectorAll('.type-btn');
+  
+  let uploadedFiles = [];
+  let currentAnalysisType = 'general';
+  let isAnalyzing = false;
+
+  // Analysis type selection
+  typeBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      typeBtns.forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      currentAnalysisType = btn.dataset.type;
+    });
+  });
+
+  // Drop zone click handler
+  dropZone.addEventListener('click', () => imageInput.click());
+
+  // Drag and drop handlers
+  dropZone.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    dropZone.classList.add('dragover');
+  });
+
+  dropZone.addEventListener('dragleave', () => {
+    dropZone.classList.remove('dragover');
+  });
+
+  dropZone.addEventListener('drop', (e) => {
+    e.preventDefault();
+    dropZone.classList.remove('dragover');
+    const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/'));
+    if (files.length > 0) {
+      addFiles(files);
+    }
+  });
+
+  // File input change handler
+  imageInput.addEventListener('change', (e) => {
+    const files = Array.from(e.target.files);
+    if (files.length > 0) {
+      addFiles(files);
+    }
+  });
+
+  function addFiles(files) {
+    files.forEach(file => {
+      if (uploadedFiles.length < 10) { // Max 10 images
+        uploadedFiles.push(file);
+        addPreview(file);
+      }
+    });
+    updateAnalyzeBtn();
+  }
+
+  function addPreview(file) {
+    previewGrid.style.display = '';
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const item = document.createElement('div');
+      item.className = 'preview-item';
+      item.innerHTML = `
+        <img src="${e.target.result}" alt="${file.name}" />
+        <button class="preview-remove" data-name="${file.name}">×</button>
+      `;
+      item.querySelector('.preview-remove').addEventListener('click', () => {
+        uploadedFiles = uploadedFiles.filter(f => f.name !== file.name);
+        item.remove();
+        if (uploadedFiles.length === 0) {
+          previewGrid.style.display = 'none';
+        }
+        updateAnalyzeBtn();
+      });
+      previewGrid.appendChild(item);
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function updateAnalyzeBtn() {
+    analyzeBtn.disabled = uploadedFiles.length === 0 || isAnalyzing;
+    analyzeBtn.textContent = isAnalyzing ? 'Analyzing...' : `Analyze ${uploadedFiles.length > 1 ? uploadedFiles.length + ' Images' : 'Image'}`;
+  }
+
+  // Analyze button handler
+  analyzeBtn.addEventListener('click', async () => {
+    if (uploadedFiles.length === 0 || isAnalyzing) return;
+    
+    isAnalyzing = true;
+    updateAnalyzeBtn();
+    
+    const prompt = customPrompt.value.trim();
+    
+    try {
+      if (uploadedFiles.length === 1) {
+        // Single image analysis
+        const formData = new FormData();
+        formData.append('file', uploadedFiles[0]);
+        formData.append('prompt', prompt);
+        formData.append('analysis_type', currentAnalysisType);
+        
+        analyzeBtn.innerHTML = '<span class="loading-spinner"></span>Analyzing...';
+        
+        const res = await fetch('/api/image', {
+          method: 'POST',
+          headers: { 'X-Request-Id': rid() },
+          body: formData
+        });
+        
+        const data = await res.json();
+        
+        if (data.response) {
+          resultText.textContent = data.response;
+          analysisResult.style.display = '';
+          imgLog('bot', `✅ Analysis complete (${currentAnalysisType})`);
+        } else if (data.error) {
+          resultText.textContent = 'Error: ' + data.error;
+          analysisResult.style.display = '';
+          imgLog('bot', '❌ ' + data.error);
+        }
+      } else {
+        // Multi-image analysis
+        const formData = new FormData();
+        uploadedFiles.forEach(file => {
+          formData.append('files', file);
+        });
+        formData.append('prompt', prompt);
+        formData.append('analysis_type', currentAnalysisType);
+        
+        analyzeBtn.innerHTML = '<span class="loading-spinner"></span>Analyzing ' + uploadedFiles.length + ' images...';
+        
+        const res = await fetch('/api/image/analyze-multi', {
+          method: 'POST',
+          headers: { 'X-Request-Id': rid() },
+          body: formData
+        });
+        
+        const data = await res.json();
+        
+        if (data.results) {
+          let combinedResult = '';
+          data.results.forEach((r, i) => {
+            combinedResult += `--- Image ${i + 1}: ${r.filename} ---\n${r.analysis || r.error}\n\n`;
+          });
+          resultText.textContent = combinedResult;
+          analysisResult.style.display = '';
+          imgLog('bot', `✅ Analyzed ${data.results.length} images`);
+        }
+      }
+    } catch (e) {
+      resultText.textContent = 'Network error: ' + e.message;
+      analysisResult.style.display = '';
+      imgLog('bot', '❌ Network error');
+    }
+    
+    isAnalyzing = false;
+    updateAnalyzeBtn();
+    analyzeBtn.innerHTML = 'Analyze Image';
+  });
+
+  function imgLog(role, text) {
+    const div = document.createElement('div');
+    div.className = 'img-line';
+    div.textContent = text;
+    imageLog.appendChild(div);
+    imageLog.scrollTop = imageLog.scrollHeight;
+  }
+
+  // Clear button for custom prompt
+  customPrompt.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && e.ctrlKey) {
+      analyzeBtn.click();
+    }
+  });
+
+  // Paste image from clipboard
+  document.addEventListener('paste', (e) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+    
+    for (const item of items) {
+      if (item.type.startsWith('image/')) {
+        const file = item.getAsFile();
+        if (file) {
+          addFiles([file]);
+          imgLog('bot', '📷 Image pasted from clipboard');
+        }
+      }
+    }
+  });
 </script>
 </body>
 </html>

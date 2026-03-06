@@ -344,42 +344,120 @@ def _load_and_convert(img: Any, fmt_label: str) -> bytes:
             pass
 
 
-def _analyze_image_bytes(data: bytes, mime: str, prompt: str) -> str:
+def _image_to_data_url(mime: str, data: bytes) -> str:
+    """Convert image bytes to base64 data URL for vision API."""
     try:
+        import base64
+        b64 = base64.b64encode(data).decode("utf-8")
+        # Ensure mime type is valid for images
+        if not mime or not mime.startswith("image/"):
+            mime = "image/jpeg"
+        return f"data:{mime};base64,{b64}"
+    except Exception as e:
+        print(f"[ERROR] _image_to_data_url failed: {e}")
+        return ""
+
+
+# Vision analysis prompt templates for different analysis types
+VISION_PROMPTS = {
+    "general": "Analyze this image thoroughly. Describe what you see in detail: the main subject, objects, people, setting, colors, layout, style, quality, and any visible text. Provide a comprehensive analysis.",
+    "ocr": "Extract and transcribe ALL visible text from this image. Quote text exactly as shown. Note any handwriting, printed text, signs, labels, or documents. Preserve formatting where possible.",
+    "diagram": "Analyze this diagram, chart, or technical drawing. Explain the structure, components, relationships, data presented, and any technical details. Describe what information it conveys.",
+    "code": "Analyze this code screenshot or code image. Identify the programming language, explain what the code does, note any issues or improvements, and transcribe the code if readable.",
+    "ui": "Analyze this UI/UX screenshot. Describe the interface elements, layout, design patterns, user flow, and any usability observations. Identify the app or website if recognizable.",
+    "math": "Analyze this mathematical content. Identify equations, formulas, or problems. Explain the mathematical concepts and solve or interpret if applicable.",
+    "object": "Identify and describe all objects in this image. For each object, note its type, approximate size relative to surroundings, color, condition, and any notable features.",
+    "document": "Analyze this document image. Extract all text, identify the document type, note any forms, tables, or structured data. Summarize the document's purpose and key information.",
+    "photo": "Analyze this photograph professionally. Describe the composition, lighting, subject matter, artistic elements, camera angle, and any notable photography techniques used.",
+    "screenshot": "Analyze this screenshot. Describe what application or website it shows, the current state, any visible data or content, and explain what action might have been captured.",
+}
+
+
+def _analyze_image_bytes(data: bytes, mime: str, prompt: str, analysis_type: str = "general") -> str:
+    """Analyze image using vision-capable AI model.
+    
+    Args:
+        data: Raw image bytes
+        mime: MIME type of the image
+        prompt: Custom user prompt (optional)
+        analysis_type: Type of analysis (general, ocr, diagram, code, ui, math, object, document, photo, screenshot)
+    
+    Returns:
+        Analysis text response
+    """
+    try:
+        # Log debug info
+        print(f"[DEBUG] Analyzing image: mime={mime}, size={len(data)} bytes, type={analysis_type}")
+        
         data_url = _image_to_data_url(mime, data)
         if not data_url:
             return "Could not read image data."
+        
+        print(f"[DEBUG] Data URL created: {data_url[:100]}...")
+        
         api_key = os.environ.get("OPENAI_API_KEY")
+        print(f"[DEBUG] API key available: {bool(api_key)}")
+        print(f"[DEBUG] OpenAI client available: {OpenAI is not None}")
+        
         if OpenAI and api_key:
             try:
                 client = OpenAI(api_key=api_key)
                 user_prompt = (prompt or "").strip()
+                
+                # Use analysis type prompt if no custom prompt provided
                 if not user_prompt:
-                    user_prompt = "Describe this image in detail and answer any implicit questions. Respond only in English."
+                    analysis_type_key = (analysis_type or "general").lower()
+                    base_prompt = VISION_PROMPTS.get(analysis_type_key, VISION_PROMPTS["general"])
+                    user_prompt = base_prompt + "\n\nIMPORTANT: Respond only in English."
                 else:
                     user_prompt = user_prompt + "\n\nIMPORTANT: Respond only in English."
+                
+                print(f"[DEBUG] Using prompt: {user_prompt[:100]}...")
+                
                 messages = [
+                    {
+                        "role": "system",
+                        "content": "You are JAI Vision, an advanced image analysis AI with native vision capabilities. You can see, analyze, and understand any image perfectly. You have direct access to the visual content. NEVER say you cannot view images or that you're a text-based AI. Always respond as if you clearly see the image. Be precise, detailed, and helpful. Read all text exactly as shown, note small details, and provide comprehensive analysis."
+                    },
                     {
                         "role": "user",
                         "content": [
                             {"type": "text", "text": user_prompt},
-                            {"type": "image_url", "image_url": {"url": data_url}},
+                            {"type": "image_url", "image_url": {"url": data_url, "detail": "high"}},
                         ],
                     }
                 ]
+                
+                print(f"[DEBUG] Calling OpenAI API with model: {os.environ.get('JAI_VISION_MODEL', 'gpt-4o-mini')}")
+                
                 resp = client.chat.completions.create(
                     model=os.environ.get("JAI_VISION_MODEL", "gpt-4o-mini"),
                     messages=messages,
-                    max_tokens=800,
-                    temperature=0.2,
+                    max_tokens=1500,
+                    temperature=0.3,
                 )
                 text = resp.choices[0].message.content
+                print(f"[DEBUG] Got response: {text[:100]}...")
                 return (text or "").strip() or "No description generated."
-            except Exception:
-                pass
-        return "Image analysis is not available on this server. Set OPENAI_API_KEY to enable vision analysis."
-    except Exception:
-        return "Image analysis failed."
+            except Exception as e:
+                error_msg = f"Vision analysis error: {str(e)}"
+                print(f"[ERROR] {error_msg}")
+                import traceback
+                traceback.print_exc()
+                return error_msg
+        
+        missing = []
+        if not OpenAI:
+            missing.append("OpenAI module not available")
+        if not api_key:
+            missing.append("OPENAI_API_KEY not set")
+        return f"Image analysis is not available on this server. Missing: {', '.join(missing)}"
+    except Exception as e:
+        error_msg = f"Image analysis failed: {str(e)}"
+        print(f"[ERROR] {error_msg}")
+        import traceback
+        traceback.print_exc()
+        return error_msg
 
 def _handle_special_qa(user_text: str) -> Optional[str]:
     try:
@@ -391,7 +469,7 @@ def _handle_special_qa(user_text: str) -> Optional[str]:
         return None
 
 @app.post("/api/image")
-async def api_image(request: Request, file: UploadFile = File(...), prompt: str = Form("")):
+async def api_image(request: Request, file: UploadFile = File(...), prompt: str = Form(""), analysis_type: str = Form("general")):
     rid = request.headers.get("x-request-id") or str(uuid.uuid4())
     token = request_id_ctx_var.set(rid)
     try:
@@ -415,14 +493,67 @@ async def api_image(request: Request, file: UploadFile = File(...), prompt: str 
         if not mime.startswith("image/"):
             return JSONResponse({"error": "Unsupported file type. Please upload an image."}, status_code=400)
 
-        analysis = _analyze_image_bytes(data, mime, prompt)
+        analysis = _analyze_image_bytes(data, mime, prompt, analysis_type)
         analysis = _ensure_lang(analysis, "en")
-        return {"response": analysis, "requestId": rid}
+        return {"response": analysis, "requestId": rid, "analysis_type": analysis_type}
     finally:
         try:
             request_id_ctx_var.reset(token)
         except Exception:
             pass
+
+
+class MultiImageRequest(BaseModel):
+    prompt: str = ""
+    analysis_type: str = "general"
+
+
+@app.post("/api/image/analyze-multi")
+async def api_image_multi(request: Request, files: List[UploadFile] = File(...), prompt: str = Form(""), analysis_type: str = Form("general")):
+    """Analyze multiple images in a single request."""
+    rid = request.headers.get("x-request-id") or str(uuid.uuid4())
+    token = request_id_ctx_var.set(rid)
+    try:
+        web_id = request.cookies.get("jai_web_id") or "anon"
+        username = f"web:{web_id}"
+        if username not in ja_sessions:
+            ja_sessions[username] = JAUserSession(username)
+        
+        if not files or len(files) == 0:
+            return JSONResponse({"error": "No images provided."}, status_code=400)
+        
+        results = []
+        for i, file in enumerate(files):
+            data = await file.read()
+            mime = (getattr(file, "content_type", None) or mimetypes.guess_type(file.filename or "")[0] or "application/octet-stream")
+            if not isinstance(mime, str):
+                mime = "application/octet-stream"
+            if not mime.startswith("image/"):
+                results.append({"index": i, "filename": file.filename, "error": "Unsupported file type"})
+                continue
+            
+            analysis = _analyze_image_bytes(data, mime, prompt, analysis_type)
+            results.append({
+                "index": i,
+                "filename": file.filename,
+                "analysis": analysis
+            })
+        
+        return {"results": results, "requestId": rid, "total_images": len(files)}
+    finally:
+        try:
+            request_id_ctx_var.reset(token)
+        except Exception:
+            pass
+
+
+@app.get("/api/image/types")
+async def get_analysis_types():
+    """Get available analysis types for image analysis."""
+    return {
+        "types": list(VISION_PROMPTS.keys()),
+        "descriptions": VISION_PROMPTS
+    }
 
 @app.post("/api/voice")
 async def api_voice(request: Request, file: UploadFile = File(...), lang: str = Form("en-US")):

@@ -145,6 +145,21 @@ async def service_worker():
     path = os.path.join(BASE_DIR, "static", "service-worker.js")
     return FileResponse(path, media_type="application/javascript")
 
+@app.get("/static/icon-192.png")
+async def icon_192():
+    path = os.path.join(BASE_DIR, "static", "icon-192.png")
+    return FileResponse(path, media_type="image/png")
+
+@app.get("/static/icon-512.png")
+async def icon_512():
+    path = os.path.join(BASE_DIR, "static", "icon-512.png")
+    return FileResponse(path, media_type="image/png")
+
+@app.get("/static/favicon.ico")
+async def favicon():
+    path = os.path.join(BASE_DIR, "static", "favicon.ico")
+    return FileResponse(path, media_type="image/x-icon")
+
 @app.post("/api/text")
 async def api_text(req: WebTextRequest, request: Request):
     rid = request.headers.get("x-request-id") or str(uuid.uuid4())

@@ -64,3 +64,7 @@ google-auth-httplib2==0.2.0
 google-api-python-client==2.108.0
 # Vercel serverless adapter
 mangum==0.17.0
+
+# Supabase Auth
+supabase==2.13.0
+pyjwt==2.10.1

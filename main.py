@@ -1787,6 +1787,7 @@ except Exception:
 
 
 # Auth endpoints for Supabase integration
+from fastapi import Depends
 from jai_auth import (
     get_current_user, require_auth, User, 
     AuthResponse, LoginRequest, SignupRequest,

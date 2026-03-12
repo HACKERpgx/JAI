@@ -1786,6 +1786,37 @@ except Exception:
     SECURITY_AVAILABLE = False
 
 
+# Auth endpoints for Supabase integration
+from jai_auth import (
+    get_current_user, require_auth, User, 
+    AuthResponse, LoginRequest, SignupRequest,
+    SUPABASE_URL, SUPABASE_ANON_KEY
+)
+
+@app.get("/api/auth/session")
+async def get_session(user: Optional[User] = Depends(get_current_user)):
+    """Get current user session info"""
+    if user:
+        return {
+            "authenticated": True,
+            "user": {
+                "id": user.id,
+                "email": user.email,
+                "user_metadata": user.user_metadata
+            }
+        }
+    return {"authenticated": False, "user": None}
+
+@app.get("/api/auth/config")
+async def get_auth_config():
+    """Get Supabase configuration for frontend"""
+    return {
+        "supabase_url": SUPABASE_URL,
+        "supabase_anon_key": SUPABASE_ANON_KEY,
+        "enabled": bool(SUPABASE_URL and SUPABASE_ANON_KEY)
+    }
+
+
 if __name__ == "__main__":
     import uvicorn
     print("🚀 JAI Assistant Server Starting...")
@@ -1796,6 +1827,7 @@ if __name__ == "__main__":
     print("   ✅ Gmail Integration: Available")
     print("   ✅ Voice Recognition: Available")
     print("   ✅ AI Responses: English Only (Auto-Translation)")
+    print("   ✅ User Authentication: Supabase Auth")
     print("\n🔧 Server Configuration:")
     print("   🌐 Host: https://j-ai.top")
     print("   📝 Logs: jai_assistant.log")

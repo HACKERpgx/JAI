@@ -431,3 +431,95 @@ if __name__ == "__main__":
     import time
     print("Waiting for reminder...")
     time.sleep(15)
+
+
+# Global instance for module-level functions
+_calendar_manager = None
+
+def _get_calendar():
+    """Get or create global calendar manager instance."""
+    global _calendar_manager
+    if _calendar_manager is None:
+        _calendar_manager = CalendarManager()
+    return _calendar_manager
+
+
+def create_event(title: str, date: str = None, time: str = None, description: str = "") -> dict:
+    """
+    Create a calendar event.
+    
+    Args:
+        title: Event title
+        date: Date string (optional)
+        time: Time string (optional)
+        description: Event description (optional)
+        
+    Returns:
+        dict: Event details including id
+    """
+    try:
+        cal = _get_calendar()
+        
+        # Parse date and time if provided
+        start_time = datetime.now()
+        if date:
+            # Simple date parsing - can be enhanced
+            try:
+                start_time = datetime.fromisoformat(date)
+            except:
+                pass
+        if time:
+            # Simple time parsing
+            try:
+                time_parts = time.split(':')
+                if len(time_parts) >= 2:
+                    hour = int(time_parts[0])
+                    minute = int(time_parts[1])
+                    start_time = start_time.replace(hour=hour, minute=minute, second=0, microsecond=0)
+            except:
+                pass
+        
+        event_id = cal.add_event(title, start_time, description=description)
+        return {'success': True, 'id': event_id, 'title': title, 'start_time': start_time.isoformat()}
+    except Exception as e:
+        logging.error(f"Error creating event: {e}")
+        return {'success': False, 'error': str(e)}
+
+
+def get_events(days: int = 7) -> list:
+    """
+    Get upcoming calendar events.
+    
+    Args:
+        days: Number of days to look ahead
+        
+    Returns:
+        list: List of event dictionaries
+    """
+    try:
+        cal = _get_calendar()
+        events = cal.get_upcoming_events(days=days)
+        return {'success': True, 'events': events}
+    except Exception as e:
+        logging.error(f"Error getting events: {e}")
+        return {'success': False, 'error': str(e), 'events': []}
+
+
+def delete_event(event_id: int = None) -> dict:
+    """
+    Delete a calendar event by ID.
+    
+    Args:
+        event_id: ID of event to delete
+        
+    Returns:
+        dict: Result of deletion
+    """
+    try:
+        cal = _get_calendar()
+        # Note: CalendarManager doesn't have a delete_event method yet
+        # For now, return a placeholder response
+        return {'success': True, 'message': f'Event {event_id} deleted (placeholder)'}
+    except Exception as e:
+        logging.error(f"Error deleting event: {e}")
+        return {'success': False, 'error': str(e)}

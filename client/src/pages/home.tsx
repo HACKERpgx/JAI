@@ -122,7 +122,7 @@ export default function Home() {
     setVisionPreviewUrl(null);
   }
   return (
-    <div className="min-h-screen bg-[#0f0f0f] text-foreground overflow-x-hidden pb-32">
+    <div className="min-h-dvh bg-[#0f0f0f] text-foreground overflow-x-clip pb-24 md:pb-32">
       {/* Animated gradient background */}
       <div className="fixed inset-0 z-0 overflow-hidden">
         <div className="absolute inset-0 bg-[#0f0f0f]" />
@@ -151,10 +151,10 @@ export default function Home() {
       {/* Content */}
       <div className="relative z-10">
         {/* Hero Section */}
-        <section className="pt-20 md:pt-32 pb-12 md:pb-20 px-4">
+        <section className="px-4 pt-16 pb-12 md:pt-28 md:pb-20">
           <div className="max-w-6xl mx-auto text-center">
             <motion.h1 
-              className="text-7xl sm:text-8xl md:text-9xl lg:text-[10rem] font-bold tracking-tight mb-6 bg-gradient-to-br from-white via-white to-white/60 bg-clip-text text-transparent"
+              className="mb-6 text-[clamp(4.5rem,18vw,10rem)] font-bold tracking-[-0.04em] bg-gradient-to-br from-white via-white to-white/60 bg-clip-text text-transparent"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6 }}
@@ -164,7 +164,7 @@ export default function Home() {
             </motion.h1>
             
             <motion.p 
-              className="text-xl md:text-2xl lg:text-3xl text-foreground/80 font-light max-w-3xl mx-auto leading-relaxed"
+              className="mx-auto max-w-3xl text-balance text-lg leading-relaxed text-foreground/80 sm:text-xl md:text-2xl lg:text-3xl font-light"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6, delay: 0.1 }}
@@ -179,7 +179,7 @@ export default function Home() {
         <section className="pb-16 md:pb-24 px-4">
           <div className="max-w-7xl mx-auto">
             <motion.div 
-              className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4"
+              className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:gap-4 lg:grid-cols-4"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ duration: 0.6, delay: 0.2 }}
@@ -238,7 +238,7 @@ export default function Home() {
         <section className="pb-16 md:pb-24 px-4">
           <div className="max-w-6xl mx-auto">
             <motion.div 
-              className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8"
+              className="grid grid-cols-1 gap-6 md:grid-cols-3 md:gap-8"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6, delay: 0.4 }}
@@ -269,26 +269,30 @@ export default function Home() {
         <section className="pb-16 md:pb-24 px-4">
           <div className="max-w-6xl mx-auto">
             <motion.div 
-              className="flex flex-col sm:flex-row items-center justify-center gap-8 md:gap-12"
+              className="grid grid-cols-1 place-items-center gap-8 sm:grid-cols-2 md:gap-12"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6, delay: 0.6 }}
             >
-              <div className="relative group" data-testid="mockup-iphone">
+              <div className="relative group w-full max-w-[16rem] sm:max-w-[18rem] md:max-w-[20rem]" data-testid="mockup-iphone">
                 <div className="absolute inset-0 bg-cyan-500/20 blur-3xl rounded-full opacity-50 group-hover:opacity-100 transition-opacity duration-500" />
-                <img 
-                  src={iphoneMockup} 
-                  alt="JAI app on iPhone" 
-                  className="relative w-64 md:w-80 h-auto drop-shadow-2xl"
-                />
+                <div className="relative aspect-[7/10]">
+                  <img 
+                    src={iphoneMockup} 
+                    alt="JAI app on iPhone" 
+                    className="h-full w-full object-contain drop-shadow-2xl"
+                  />
+                </div>
               </div>
-              <div className="relative group" data-testid="mockup-android">
+              <div className="relative group w-full max-w-[16rem] sm:max-w-[18rem] md:max-w-[20rem]" data-testid="mockup-android">
                 <div className="absolute inset-0 bg-purple-500/20 blur-3xl rounded-full opacity-50 group-hover:opacity-100 transition-opacity duration-500" />
-                <img 
-                  src={androidMockup} 
-                  alt="JAI app on Android" 
-                  className="relative w-64 md:w-80 h-auto drop-shadow-2xl"
-                />
+                <div className="relative aspect-[7/10]">
+                  <img 
+                    src={androidMockup} 
+                    alt="JAI app on Android" 
+                    className="h-full w-full object-contain drop-shadow-2xl"
+                  />
+                </div>
               </div>
             </motion.div>
           </div>
@@ -482,7 +486,7 @@ function GrokButton({ icon, text, primary = false, testId, onClick }: GrokButton
       variant="outline"
       size="lg"
       className={`
-        relative group rounded-full border-2 
+        relative group min-h-14 w-full justify-start rounded-full border-2 px-5 text-left
         ${primary 
           ? 'border-primary/60 bg-primary/10 text-primary-foreground' 
           : 'border-border/40 bg-card/30'
@@ -516,7 +520,7 @@ interface FeatureCardProps {
 function FeatureCard({ icon, title, description, testId }: FeatureCardProps) {
   return (
     <Card 
-      className="group p-8 bg-card/40 hover:bg-card/50 backdrop-blur-sm border-border/40 hover:border-border/60 transition-all duration-300"
+      className="group h-full p-6 md:p-8 bg-card/40 hover:bg-card/50 backdrop-blur-sm border-border/40 hover:border-border/60 transition-all duration-300"
       data-testid={testId}
     >
       <div className="mb-4 text-primary inline-block">

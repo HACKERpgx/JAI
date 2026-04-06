@@ -2,6 +2,13 @@ import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import {
+  Menubar,
+  MenubarMenu,
+  MenubarTrigger,
+  MenubarContent,
+  MenubarItem,
+} from "@/components/ui/menubar";
+import {
   MessageSquare, 
   Apple, 
   Smartphone, 
@@ -150,6 +157,28 @@ export default function Home() {
 
       {/* Content */}
       <div className="relative z-10">
+        {/* Header with Help Menu */}
+        <header className="flex items-center justify-between px-4 py-4 md:px-6">
+          <div className="text-xl font-bold tracking-tight">JAI</div>
+          <Menubar className="border-none bg-transparent">
+            <MenubarMenu>
+              <MenubarTrigger className="cursor-pointer">Help</MenubarTrigger>
+              <MenubarContent>
+                <MenubarItem asChild>
+                  <a
+                    href="https://github.com/HACKERpgx/JAI"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="cursor-pointer"
+                  >
+                    About JAI
+                  </a>
+                </MenubarItem>
+              </MenubarContent>
+            </MenubarMenu>
+          </Menubar>
+        </header>
+
         {/* Hero Section */}
         <section className="px-4 pt-16 pb-12 md:pt-28 md:pb-20">
           <div className="max-w-6xl mx-auto text-center">

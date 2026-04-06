@@ -342,11 +342,13 @@ export default function Home() {
             <div className="flex flex-col md:flex-row items-center justify-between gap-6">
               <div className="flex flex-wrap items-center justify-center gap-6 md:gap-8 text-sm text-muted-foreground">
                 <a 
-                  href="#about" 
+                  href="https://github.com/HACKERpgx/JAI" 
+                  target="_blank" 
+                  rel="noopener noreferrer"
                   className="hover:text-foreground transition-colors"
-                  data-testid="link-about"
+                  data-testid="link-about-jai"
                 >
-                  About
+                  About JAI
                 </a>
                 <a 
                   href="#careers" 

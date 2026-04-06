@@ -164,6 +164,15 @@ export default function Home() {
             <MenubarMenu>
               <MenubarTrigger className="cursor-pointer">Help</MenubarTrigger>
               <MenubarContent>
+                <MenubarItem className="cursor-pointer">
+                  FAQ
+                </MenubarItem>
+                <MenubarItem className="cursor-pointer">
+                  Support
+                </MenubarItem>
+                <MenubarItem className="cursor-pointer">
+                  Documentation
+                </MenubarItem>
                 <MenubarItem asChild>
                   <a
                     href="https://github.com/HACKERpgx/JAI"

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -47,6 +47,12 @@ export default function Chat() {
     { label: "Documentation", icon: FileText, href: "#documentation" },
     { label: "About JAI", icon: ExternalLink, href: "https://github.com/HACKERpgx/JAI", external: true },
   ];
+
+  const handleHelpItemClick = (item: typeof helpItems[0]) => {
+    if (item.external) {
+      window.open(item.href, "_blank", "noopener noreferrer");
+    }
+  };
 
   return (
     <SidebarProvider>
@@ -98,17 +104,13 @@ export default function Chat() {
                     <SidebarMenuSubItem key={item.label}>
                       <SidebarMenuSubButton
                         asChild
-                        onClick={() => {
-                          if (item.external) {
-                            window.open(item.href, "_blank", "noopener noreferrer");
-                          }
-                        }}
+                        onClick={() => handleHelpItemClick(item)}
                       >
                         <a
                           href={item.external ? undefined : item.href}
                           target={item.external ? "_blank" : undefined}
                           rel={item.external ? "noopener noreferrer" : undefined}
-                          className="flex items-center gap-2"
+                          className="flex items-center gap-2 cursor-pointer"
                         >
                           <item.icon className="w-4 h-4" />
                           <span>{item.label}</span>
@@ -125,14 +127,12 @@ export default function Chat() {
 
       <SidebarInset>
         <div className="flex flex-col h-screen bg-[#0f0f0f]">
-          {/* Header */}
           <header className="flex items-center justify-between px-4 py-3 border-b border-border/50">
             <SidebarTrigger />
             <h1 className="text-lg font-semibold">JAI Chat</h1>
             <div className="w-8" />
           </header>
 
-          {/* Chat Area */}
           <div className="flex-1 overflow-y-auto p-4">
             <div className="max-w-3xl mx-auto space-y-4">
               <motion.div
@@ -147,7 +147,6 @@ export default function Chat() {
             </div>
           </div>
 
-          {/* Input Area */}
           <div className="p-4 border-t border-border/50">
             <div className="max-w-3xl mx-auto flex gap-2">
               <Input
@@ -157,7 +156,6 @@ export default function Chat() {
                 className="flex-1"
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && message.trim()) {
-                    // Handle send message
                     setMessage("");
                   }
                 }}

@@ -1,8 +1,9 @@
 import axios from "axios";
 import * as cheerio from "cheerio";
 
-// Get SerpAPI key from environment
+// Get API keys from environment
 const SERPAPI_KEY = process.env.SERPAPI_KEY;
+const NEWSAPI_KEY = process.env.NEWSAPI_KEY;
 
 // Keywords that indicate real-time data is needed
 const REAL_TIME_KEYWORDS = [
@@ -66,6 +67,45 @@ export function extractQueryIntent(query: string): string | null {
   }
   
   return null;
+}
+
+/**
+ * NewsAPI Search - Fetch top headlines using NewsAPI
+ */
+async function newsApiSearch(query?: string): Promise<ScrapingResult | null> {
+  if (!NEWSAPI_KEY) {
+    console.log("NewsAPI key not configured");
+    return null;
+  }
+
+  try {
+    const endpoint = query 
+      ? `https://newsapi.org/v2/everything?q=${encodeURIComponent(query)}&apiKey=${NEWSAPI_KEY}&pageSize=5&sortBy=publishedAt`
+      : `https://newsapi.org/v2/top-headlines?country=us&apiKey=${NEWSAPI_KEY}&pageSize=5`;
+
+    const response = await axios.get(endpoint, { timeout: 15000 });
+    const data = response.data;
+
+    if (data.status !== "ok" || !data.articles || data.articles.length === 0) {
+      return null;
+    }
+
+    const articles = data.articles.slice(0, 5);
+    const formatted = articles.map((article: any, index: number) => {
+      const source = article.source?.name || "Unknown";
+      return `${index + 1}. ${article.title}\n   📰 ${source} | ${new Date(article.publishedAt).toLocaleDateString()}\n   🔗 ${article.url}`;
+    });
+
+    return {
+      source: "newsapi",
+      data: `📰 Latest News${query ? ` for "${query}"` : ""}:\n\n${formatted.join("\n\n")}`,
+      isLive: true,
+      url: "https://newsapi.org"
+    };
+  } catch (error) {
+    console.error("NewsAPI error:", error);
+    return null;
+  }
 }
 
 /**
@@ -216,17 +256,23 @@ async function scrapeBitcoinPrice(): Promise<ScrapingResult> {
 /**
  * Scrape news headlines
  */
-async function scrapeNewsHeadlines(): Promise<ScrapingResult> {
-  try {
-    // Try SerpAPI first for better news results
-    if (SERPAPI_KEY) {
-      const serpResult = await serpApiSearch("latest news headlines today");
-      if (serpResult) {
-        return { ...serpResult, source: "news (via SerpAPI)" };
-      }
-    }
+async function scrapeNewsHeadlines(query?: string): Promise<ScrapingResult> {
+  // Try NewsAPI first (primary source)
+  const newsApiResult = await newsApiSearch(query);
+  if (newsApiResult) {
+    return newsApiResult;
+  }
 
-    // Fallback to RSS feeds
+  // Try SerpAPI second
+  if (SERPAPI_KEY) {
+    const serpResult = await serpApiSearch(query || "latest news headlines today");
+    if (serpResult) {
+      return { ...serpResult, source: "news (via SerpAPI)" };
+    }
+  }
+
+  // Fallback to RSS feeds
+  try {
     const response = await axios.get("https://feeds.bbci.co.uk/news/rss.xml", {
       headers: {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
@@ -261,12 +307,6 @@ async function scrapeNewsHeadlines(): Promise<ScrapingResult> {
     };
   } catch (error) {
     console.error("News scraping error:", error);
-    
-    // Try SerpAPI fallback
-    const serpResult = await serpApiSearch("latest news headlines today");
-    if (serpResult) {
-      return { ...serpResult, source: "news (via SerpAPI)" };
-    }
     
     return {
       source: "news",
@@ -359,7 +399,7 @@ export async function scrapeRealTimeData(query: string): Promise<ScrapingResult 
     case "bitcoin":
       return await scrapeBitcoinPrice();
     case "news":
-      return await scrapeNewsHeadlines();
+      return await scrapeNewsHeadlines(query);
     case "weather":
       // Extract location from query (simple approach)
       const locationMatch = query.match(/in\s+([a-zA-Z\s]+)/i);

@@ -2,6 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { randomUUID } from "crypto";
+import { scrapeRealTimeData, requiresRealTimeData, extractQueryIntent } from "./webScraper";
 
 const JAI_API_BASE = process.env.JAI_API_BASE || "http://127.0.0.1:8080";
 
@@ -19,6 +20,56 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(j);
     } catch (e: any) {
       next(e);
+    }
+  });
+
+  // Web scraping endpoint
+  app.post("/api/scrape", async (req, res, next) => {
+    try {
+      const { query } = req.body || {};
+      if (!query || typeof query !== "string") {
+        res.status(400).json({ message: "query is required" });
+        return;
+      }
+
+      // Check if query requires real-time data
+      const needsScraping = requiresRealTimeData(query);
+      const intent = extractQueryIntent(query);
+
+      if (!needsScraping || !intent) {
+        res.json({ 
+          needsScraping: false, 
+          response: null,
+          message: "Query does not require real-time data" 
+        });
+        return;
+      }
+
+      // Perform scraping
+      const scrapingResult = await scrapeRealTimeData(query);
+      
+      if (scrapingResult) {
+        res.json({
+          needsScraping: true,
+          response: scrapingResult.data,
+          source: scrapingResult.source,
+          isLive: scrapingResult.isLive,
+          url: scrapingResult.url,
+          success: true
+        });
+      } else {
+        res.json({
+          needsScraping: true,
+          response: "I couldn't fetch live data right now. Please try again.",
+          success: false
+        });
+      }
+    } catch (e: any) {
+      console.error("Scraping error:", e);
+      res.status(500).json({ 
+        message: "I couldn't fetch live data right now. Please try again.",
+        success: false 
+      });
     }
   });
 

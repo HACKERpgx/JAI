@@ -1,11 +1,15 @@
 import axios from "axios";
 import * as cheerio from "cheerio";
 
+// Get SerpAPI key from environment
+const SERPAPI_KEY = process.env.SERPAPI_KEY;
+
 // Keywords that indicate real-time data is needed
 const REAL_TIME_KEYWORDS = [
   "live", "score", "today", "now", "latest", "current", "price",
   "weather", "news", "headline", "bitcoin", "crypto", "stock",
-  "market", "update", "cricket", "football", "sports"
+  "market", "update", "cricket", "football", "sports", "search",
+  "find", "lookup", "info", "information"
 ];
 
 // Scraping sources
@@ -65,6 +69,54 @@ export function extractQueryIntent(query: string): string | null {
 }
 
 /**
+ * SerpAPI Search - Enhanced search results using Google via SerpAPI
+ */
+async function serpApiSearch(query: string): Promise<ScrapingResult | null> {
+  if (!SERPAPI_KEY) {
+    console.log("SerpAPI key not configured");
+    return null;
+  }
+
+  try {
+    const params = new URLSearchParams({
+      engine: "google",
+      q: query,
+      api_key: SERPAPI_KEY,
+      num: "5"
+    });
+
+    const response = await axios.get(
+      `https://serpapi.com/search?${params.toString()}`,
+      { timeout: 15000 }
+    );
+
+    const data = response.data;
+    
+    // Extract organic results
+    const results = data.organic_results || [];
+    
+    if (results.length === 0) {
+      return null;
+    }
+
+    // Format results
+    const formatted = results.slice(0, 3).map((result: any, index: number) => {
+      return `${index + 1}. ${result.title}\n   ${result.snippet || "No description available"}\n   🔗 ${result.link}`;
+    });
+
+    return {
+      source: "serpapi",
+      data: `🔍 Search Results for "${query}":\n\n${formatted.join("\n\n")}`,
+      isLive: true,
+      url: data.search_metadata?.google_url || "https://www.google.com"
+    };
+  } catch (error) {
+    console.error("SerpAPI error:", error);
+    return null;
+  }
+}
+
+/**
  * Scrape cricket scores
  */
 async function scrapeCricketScores(): Promise<ScrapingResult> {
@@ -85,6 +137,12 @@ async function scrapeCricketScores(): Promise<ScrapingResult> {
     });
     
     if (matches.length === 0) {
+      // Try SerpAPI fallback
+      const serpResult = await serpApiSearch("live cricket scores today");
+      if (serpResult) {
+        return { ...serpResult, source: "cricket (via SerpAPI)" };
+      }
+      
       return {
         source: "cricket",
         data: "No live cricket matches found at the moment.",
@@ -101,6 +159,13 @@ async function scrapeCricketScores(): Promise<ScrapingResult> {
     };
   } catch (error) {
     console.error("Cricket scraping error:", error);
+    
+    // Try SerpAPI fallback
+    const serpResult = await serpApiSearch("live cricket scores today");
+    if (serpResult) {
+      return { ...serpResult, source: "cricket (via SerpAPI)" };
+    }
+    
     return {
       source: "cricket",
       data: "I couldn't fetch live cricket scores right now. Please try again.",
@@ -133,6 +198,13 @@ async function scrapeBitcoinPrice(): Promise<ScrapingResult> {
     };
   } catch (error) {
     console.error("Bitcoin scraping error:", error);
+    
+    // Try SerpAPI fallback
+    const serpResult = await serpApiSearch("bitcoin price usd today");
+    if (serpResult) {
+      return { ...serpResult, source: "bitcoin (via SerpAPI)" };
+    }
+    
     return {
       source: "bitcoin",
       data: "I couldn't fetch the current Bitcoin price right now. Please try again.",
@@ -146,7 +218,15 @@ async function scrapeBitcoinPrice(): Promise<ScrapingResult> {
  */
 async function scrapeNewsHeadlines(): Promise<ScrapingResult> {
   try {
-    // Using NewsAPI alternative - RSS feeds
+    // Try SerpAPI first for better news results
+    if (SERPAPI_KEY) {
+      const serpResult = await serpApiSearch("latest news headlines today");
+      if (serpResult) {
+        return { ...serpResult, source: "news (via SerpAPI)" };
+      }
+    }
+
+    // Fallback to RSS feeds
     const response = await axios.get("https://feeds.bbci.co.uk/news/rss.xml", {
       headers: {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
@@ -181,6 +261,13 @@ async function scrapeNewsHeadlines(): Promise<ScrapingResult> {
     };
   } catch (error) {
     console.error("News scraping error:", error);
+    
+    // Try SerpAPI fallback
+    const serpResult = await serpApiSearch("latest news headlines today");
+    if (serpResult) {
+      return { ...serpResult, source: "news (via SerpAPI)" };
+    }
+    
     return {
       source: "news",
       data: "I couldn't fetch the latest news right now. Please try again.",
@@ -193,14 +280,49 @@ async function scrapeNewsHeadlines(): Promise<ScrapingResult> {
  * Get weather (using a simple API approach)
  */
 async function getWeather(location: string): Promise<ScrapingResult> {
+  const openWeatherKey = process.env.OPENWEATHER_API_KEY;
+  
   try {
-    // For weather, we'll return a message suggesting to use a weather API
+    if (openWeatherKey) {
+      // Use OpenWeatherMap API
+      const response = await axios.get(
+        `https://api.openweathermap.org/data/2.5/weather?q=${encodeURIComponent(location)}&appid=${openWeatherKey}&units=metric`,
+        { timeout: 10000 }
+      );
+      
+      const data = response.data;
+      const temp = data.main.temp;
+      const condition = data.weather[0].description;
+      const humidity = data.main.humidity;
+      
+      return {
+        source: "weather",
+        data: `🌤️ Weather in ${data.name}:\nTemperature: ${temp}°C\nCondition: ${condition}\nHumidity: ${humidity}%`,
+        isLive: true,
+        url: `https://openweathermap.org/city/${data.id}`
+      };
+    }
+    
+    // Try SerpAPI fallback
+    const serpResult = await serpApiSearch(`weather ${location} today`);
+    if (serpResult) {
+      return { ...serpResult, source: "weather (via SerpAPI)" };
+    }
+    
     return {
       source: "weather",
-      data: `🌤️ Weather for ${location}:\nTo get accurate weather data, please use a dedicated weather API like OpenWeatherMap.`,
+      data: `🌤️ Weather for ${location}:\nPlease add OPENWEATHER_API_KEY to .env.local for accurate weather data.`,
       isLive: true
     };
   } catch (error) {
+    console.error("Weather API error:", error);
+    
+    // Try SerpAPI fallback
+    const serpResult = await serpApiSearch(`weather ${location} today`);
+    if (serpResult) {
+      return { ...serpResult, source: "weather (via SerpAPI)" };
+    }
+    
     return {
       source: "weather",
       data: "I couldn't fetch weather data right now. Please try again.",
@@ -219,6 +341,14 @@ export async function scrapeRealTimeData(query: string): Promise<ScrapingResult 
   
   const intent = extractQueryIntent(query);
   
+  // If no specific intent but SerpAPI is available, do a general search
+  if (!intent && SERPAPI_KEY) {
+    const serpResult = await serpApiSearch(query);
+    if (serpResult) {
+      return serpResult;
+    }
+  }
+  
   if (!intent) {
     return null;
   }
@@ -233,9 +363,13 @@ export async function scrapeRealTimeData(query: string): Promise<ScrapingResult 
     case "weather":
       // Extract location from query (simple approach)
       const locationMatch = query.match(/in\s+([a-zA-Z\s]+)/i);
-      const location = locationMatch ? locationMatch[1].trim() : "your location";
+      const location = locationMatch ? locationMatch[1].trim() : "London";
       return await getWeather(location);
     default:
+      // For any other query, try SerpAPI if available
+      if (SERPAPI_KEY) {
+        return await serpApiSearch(query);
+      }
       return null;
   }
 }

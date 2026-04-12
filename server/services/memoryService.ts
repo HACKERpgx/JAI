@@ -1,4 +1,4 @@
-import { db } from "../db";
+import { db } from "../../server/db";
 import { 
   personas, lorebooks, lorebookEntries, chatSessions, chatMessages,
   type Persona, type Lorebook, type LorebookEntry, type ChatSession, type ChatMessage 

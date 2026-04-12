@@ -1,5 +1,10 @@
 {
   "devDependencies": {
     "vercel": "^50.18.2"
+  },
+  "dependencies": {
+    "@ai-sdk/openai": "^3.0.52",
+    "ai": "^6.0.158",
+    "drizzle-orm": "^0.45.2"
   }
 }

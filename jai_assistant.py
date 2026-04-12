@@ -994,16 +994,21 @@ def is_memory_intent(intent: str) -> bool:
 # JAI Reply (Enhanced for Smarter Responses)
 # -----------------------------
 def jai_reply(prompt: str, session: UserSession) -> str:
+     # Check if Groq client is available
+     if client is None:
+         logging.error("Groq client is not initialized - GROQ_API_KEY may be missing", extra={'user': session.username})
+         return "I apologize, sir. My AI systems are not configured. Please set the GROQ_API_KEY environment variable."
+
      # Check for time-related queries first
      time_queries = [
          "what time is it", "current time", "what's the time", "tell me the time",
          "what is the time", "time now", "current hour"
      ]
-     
+
      if any(query in prompt.lower() for query in time_queries):
          current_time = datetime.now().strftime("%I:%M %p")
          return f"The current time is {current_time}."
-     
+
      user_name = session.memory.recall_long_term("user_name") or session.user_name
      context = session.memory.get_short_term(limit=10)
      

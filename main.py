@@ -185,6 +185,9 @@ async def api_text(req: WebTextRequest, request: Request):
             result = execute_command(req.text, session, suppress_tts=True)
         result = _ensure_lang(result, desired_lang)
         return {"response": result, "requestId": rid}
+    except Exception as e:
+        logging.error(f"Error in api_text: {e}", exc_info=True)
+        return {"response": f"I apologize, but I encountered an error processing your request. Please try again.", "requestId": rid, "error": str(e)}
     finally:
         try:
             request_id_ctx_var.reset(token)

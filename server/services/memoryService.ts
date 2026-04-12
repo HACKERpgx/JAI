@@ -204,7 +204,13 @@ export class MemoryService {
     const { text } = await generateText({
       model: openai("gpt-4o"),
       system: assembly.systemPrompt,
-      messages: [...chatHistory, { role: "user", content: userMessage }],
+      messages: [
+        ...chatHistory.map(msg => ({
+          role: msg.role as "user" | "assistant",
+          content: msg.content
+        })),
+        { role: "user" as const, content: userMessage }
+      ],
     });
 
     // Store messages

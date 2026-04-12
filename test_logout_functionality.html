@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Logout Functionality Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .test-container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .status {
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        .success { background-color: #d4edda; color: #155724; }
+        .error { background-color: #f8d7da; color: #721c24; }
+        .info { background-color: #d1ecf1; color: #0c5460; }
+        .warning { background-color: #fff3cd; color: #856404; }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover { background-color: #0056b3; }
+        button.danger { background-color: #dc3545; }
+        button.danger:hover { background-color: #c82333; }
+        #messages {
+            border: 1px solid #ddd;
+            height: 200px;
+            overflow-y: auto;
+            padding: 10px;
+            margin: 10px 0;
+            background-color: #fafafa;
+        }
+        .message {
+            margin: 5px 0;
+            padding: 5px;
+            border-radius: 3px;
+        }
+        .user { background-color: #e3f2fd; text-align: right; }
+        .assistant { background-color: #f3e5f5; }
+        .system { background-color: #fff3e0; font-style: italic; }
+        input[type="text"] {
+            width: 70%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .test-step {
+            border-left: 4px solid #007bff;
+            padding-left: 15px;
+            margin: 10px 0;
+        }
+        .test-step.completed { border-left-color: #28a745; }
+        .test-step.failed { border-left-color: #dc3545; }
+    </style>
+</head>
+<body>
+    <h1>🚪 Logout Functionality Test</h1>
+    
+    <div class="test-container">
+        <h2>Test Instructions</h2>
+        <div class="test-step" id="step1">
+            <strong>Step 1:</strong> Send a test message to verify session is active
+        </div>
+        <div class="test-step" id="step2">
+            <strong>Step 2:</strong> Click the "Test Logout" button to clear session
+        </div>
+        <div class="test-step" id="step3">
+            <strong>Step 3:</strong> Verify messages are cleared and new session starts
+        </div>
+        <div class="test-step" id="step4">
+            <strong>Step 4:</strong> Open this page in another tab and test cross-tab logout sync
+        </div>
+        <p class="status info">
+            💡 <strong>Tip:</strong> Open browser developer tools to see console logs for debugging.
+        </p>
+    </div>
+
+    <div class="test-container">
+        <h2>Session Status</h2>
+        <div id="sessionStatus" class="status info">Initializing...</div>
+        <button onclick="testLogout()">Test Logout</button>
+        <button onclick="testCrossTabLogout()">Test Cross-Tab Logout</button>
+        <button onclick="checkSession()">Check Session</button>
+    </div>
+
+    <div class="test-container">
+        <h2>Message Test</h2>
+        <div id="messages"></div>
+        <div>
+            <input type="text" id="testInput" placeholder="Type a test message..." />
+            <button onclick="sendTestMessage()">Send Message</button>
+        </div>
+    </div>
+
+    <div class="test-container">
+        <h2>LocalStorage Status</h2>
+        <div id="storageStatus" class="status info">Checking...</div>
+        <button onclick="clearStorage()">Clear Storage</button>
+        <button onclick="showStorage()">Show Storage</button>
+    </div>
+
+    <div class="test-container">
+        <h2>Test Log</h2>
+        <div id="testLog" style="height: 150px; overflow-y: auto; border: 1px solid #ddd; padding: 10px; background-color: #fafafa;"></div>
+        <button onclick="clearLog()">Clear Log</button>
+    </div>
+
+    <script>
+        // Test variables
+        let sessionId = null;
+        let messageCount = 0;
+        const LS_KEY = 'jai_api_base';
+        const SESSION_KEY = 'jai_session_id';
+        const MESSAGES_KEY = 'jai_messages';
+        const SYNC_CHANNEL = 'jai_sync_channel';
+
+        // Initialize test
+        function initializeTest() {
+            logTest('Initializing logout functionality test...');
+            checkSession();
+            showStorage();
+            updateStepStatus('step1', 'pending');
+            updateStepStatus('step2', 'pending');
+            updateStepStatus('step3', 'pending');
+            updateStepStatus('step4', 'pending');
+            logTest('Test initialized - ready to begin');
+        }
+
+        function logTest(message) {
+            const log = document.getElementById('testLog');
+            const timestamp = new Date().toLocaleTimeString();
+            log.innerHTML += `<div>[${timestamp}] ${message}</div>`;
+            log.scrollTop = log.scrollHeight;
+            console.log('[Logout Test]', message);
+        }
+
+        function updateStepStatus(stepId, status) {
+            const step = document.getElementById(stepId);
+            step.className = 'test-step';
+            if (status === 'completed') {
+                step.classList.add('completed');
+            } else if (status === 'failed') {
+                step.classList.add('failed');
+            }
+        }
+
+        function updateStatus(elementId, message, type = 'info') {
+            const status = document.getElementById(elementId);
+            status.textContent = message;
+            status.className = `status ${type}`;
+        }
+
+        function addMessage(role, content) {
+            const messages = document.getElementById('messages');
+            const div = document.createElement('div');
+            div.className = `message ${role}`;
+            div.textContent = `${role}: ${content}`;
+            messages.appendChild(div);
+            messages.scrollTop = messages.scrollHeight;
+            messageCount++;
+        }
+
+        async function testLogout() {
+            logTest('Testing logout functionality...');
+            updateStepStatus('step2', 'completed');
+            
+            try {
+                // Clear UI messages
+                document.getElementById('messages').innerHTML = '';
+                logTest('Cleared UI messages');
+                
+                // Clear localStorage
+                localStorage.removeItem(SESSION_KEY);
+                localStorage.removeItem(MESSAGES_KEY);
+                logTest('Cleared localStorage');
+                
+                // Call logout endpoint
+                const response = await fetch((localStorage.getItem(LS_KEY) || 'https://j-ai.top') + '/api/logout', {
+                    method: 'POST',
+                    credentials: 'include'
+                });
+                
+                if (response.ok) {
+                    logTest('Server logout successful');
+                    updateStatus('sessionStatus', '✅ Logout successful - session cleared', 'success');
+                    updateStepStatus('step3', 'completed');
+                } else {
+                    logTest(`Server logout failed: ${response.status}`);
+                    updateStatus('sessionStatus', '⚠️ Local logout completed, server may still have session', 'warning');
+                }
+                
+                // Reset session
+                sessionId = null;
+                messageCount = 0;
+                
+                // Start new session after delay
+                setTimeout(() => {
+                    sessionId = 'test_' + Date.now();
+                    localStorage.setItem(SESSION_KEY, sessionId);
+                    logTest('New session started');
+                    addMessage('system', 'New session started after logout');
+                    updateStatus('sessionStatus', '🆕 New session created', 'success');
+                }, 1500);
+                
+            } catch (e) {
+                logTest(`Logout error: ${e.message}`);
+                updateStatus('sessionStatus', '❌ Logout failed', 'error');
+                updateStepStatus('step3', 'failed');
+            }
+        }
+
+        function testCrossTabLogout() {
+            logTest('Testing cross-tab logout synchronization...');
+            
+            const logoutData = {
+                type: 'logout',
+                sessionId: sessionId,
+                timestamp: Date.now()
+            };
+            
+            localStorage.setItem(SYNC_CHANNEL, JSON.stringify(logoutData));
+            localStorage.removeItem(SYNC_CHANNEL);
+            
+            logTest('Cross-tab logout event triggered');
+            updateStepStatus('step4', 'completed');
+        }
+
+        function checkSession() {
+            sessionId = localStorage.getItem(SESSION_KEY);
+            const messages = localStorage.getItem(MESSAGES_KEY);
+            
+            if (sessionId) {
+                updateStatus('sessionStatus', `✅ Active session: ${sessionId}`, 'success');
+                logTest(`Found existing session: ${sessionId}`);
+            } else {
+                updateStatus('sessionStatus', '⚠️ No active session', 'warning');
+                logTest('No existing session found');
+            }
+            
+            if (messages) {
+                logTest(`Found ${messages.length} characters of stored messages`);
+            } else {
+                logTest('No stored messages found');
+            }
+        }
+
+        function showStorage() {
+            const storage = {};
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                storage[key] = localStorage.getItem(key);
+            }
+            
+            const storageText = JSON.stringify(storage, null, 2);
+            updateStatus('storageStatus', `Storage keys: ${Object.keys(storage).join(', ')}`, 'info');
+            logTest(`Storage contains ${Object.keys(storage).length} items`);
+        }
+
+        function clearStorage() {
+            localStorage.removeItem(SESSION_KEY);
+            localStorage.removeItem(MESSAGES_KEY);
+            updateStatus('storageStatus', '✅ Storage cleared', 'success');
+            logTest('Storage cleared manually');
+            checkSession();
+        }
+
+        async function sendTestMessage() {
+            const input = document.getElementById('testInput');
+            const text = input.value.trim();
+            if (!text) return;
+            
+            input.value = '';
+            addMessage('user', text);
+            updateStepStatus('step1', 'completed');
+            
+            try {
+                const response = await fetch((localStorage.getItem(LS_KEY) || 'https://j-ai.top') + '/api/text', {
+                    method: 'POST',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'X-Session-ID': sessionId || 'test_session'
+                    },
+                    body: JSON.stringify({ text })
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    addMessage('assistant', data.response || 'No response');
+                    logTest('Test message sent successfully');
+                } else {
+                    logTest(`Failed to send message: ${response.status}`);
+                }
+            } catch (e) {
+                logTest(`Error sending message: ${e.message}`);
+            }
+        }
+
+        function clearLog() {
+            document.getElementById('testLog').innerHTML = '';
+            logTest('Log cleared');
+        }
+
+        // Listen for storage events (cross-tab sync)
+        window.addEventListener('storage', function(event) {
+            if (event.key === SYNC_CHANNEL && event.newValue) {
+                try {
+                    const syncData = JSON.parse(event.newValue);
+                    if (syncData.type === 'logout') {
+                        logTest('Received logout sync event from another tab');
+                        document.getElementById('messages').innerHTML = '';
+                        localStorage.removeItem(SESSION_KEY);
+                        localStorage.removeItem(MESSAGES_KEY);
+                        sessionId = null;
+                        updateStatus('sessionStatus', '🔄 Session synchronized from another tab', 'info');
+                        addMessage('system', 'Session cleared by logout from another tab');
+                    }
+                } catch (e) {
+                    logTest(`Failed to parse sync data: ${e.message}`);
+                }
+            }
+        });
+
+        // Initialize when page loads
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initializeTest);
+        } else {
+            initializeTest();
+        }
+
+        // Add keyboard shortcut
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') {
+                sendTestMessage();
+            }
+        });
+    </script>
+</body>
+</html>

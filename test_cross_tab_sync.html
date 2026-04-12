@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cross-Tab Sync Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .test-container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .status {
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        .success { background-color: #d4edda; color: #155724; }
+        .error { background-color: #f8d7da; color: #721c24; }
+        .info { background-color: #d1ecf1; color: #0c5460; }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover { background-color: #0056b3; }
+        #messages {
+            border: 1px solid #ddd;
+            height: 200px;
+            overflow-y: auto;
+            padding: 10px;
+            margin: 10px 0;
+            background-color: #fafafa;
+        }
+        .message {
+            margin: 5px 0;
+            padding: 5px;
+            border-radius: 3px;
+        }
+        .user { background-color: #e3f2fd; text-align: right; }
+        .assistant { background-color: #f3e5f5; }
+        .system { background-color: #fff3e0; font-style: italic; }
+        input[type="text"] {
+            width: 70%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔄 Cross-Tab Synchronization Test</h1>
+    
+    <div class="test-container">
+        <h2>Test Instructions</h2>
+        <ol>
+            <li>Open this page in multiple browser tabs</li>
+            <li>Send a message in one tab</li>
+            <li>Check if the message appears in other tabs automatically</li>
+            <li>Test both text and voice functionality</li>
+        </ol>
+        <p class="status info">
+            💡 <strong>Tip:</strong> Open browser developer tools to see console logs for debugging.
+        </p>
+    </div>
+
+    <div class="test-container">
+        <h2>Connection Status</h2>
+        <div id="connectionStatus" class="status info">Checking connection...</div>
+        <button onclick="testHealth()">Test Health</button>
+        <button onclick="testSync()">Test Sync Event</button>
+    </div>
+
+    <div class="test-container">
+        <h2>Message Test</h2>
+        <div id="messages"></div>
+        <div>
+            <input type="text" id="testInput" placeholder="Type a test message..." />
+            <button onclick="sendTestMessage()">Send Message</button>
+        </div>
+    </div>
+
+    <div class="test-container">
+        <h2>Sync Events Log</h2>
+        <div id="syncLog" style="height: 150px; overflow-y: auto; border: 1px solid #ddd; padding: 10px; background-color: #fafafa;"></div>
+        <button onclick="clearLog()">Clear Log</button>
+    </div>
+
+    <script>
+        // Test variables
+        let sessionId = null;
+        const LS_KEY = 'jai_api_base';
+        const SESSION_KEY = 'jai_session_id';
+        const SYNC_CHANNEL = 'jai_sync_channel';
+        let messageCount = 0;
+
+        // Initialize test
+        function initializeTest() {
+            logSync('Initializing cross-tab sync test...');
+            
+            // Initialize session
+            sessionId = localStorage.getItem(SESSION_KEY) || generateSessionId();
+            localStorage.setItem(SESSION_KEY, sessionId);
+            
+            // Set up storage event listener
+            window.addEventListener('storage', handleStorageEvent);
+            
+            // Test health
+            testHealth();
+            
+            logSync(`Test initialized with session: ${sessionId}`);
+            updateStatus('Test ready - open another tab to test sync', 'success');
+        }
+
+        function generateSessionId() {
+            return 'test_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+        }
+
+        function logSync(message) {
+            const log = document.getElementById('syncLog');
+            const timestamp = new Date().toLocaleTimeString();
+            log.innerHTML += `<div>[${timestamp}] ${message}</div>`;
+            log.scrollTop = log.scrollHeight;
+            console.log('[CrossTab Test]', message);
+        }
+
+        function updateStatus(message, type = 'info') {
+            const status = document.getElementById('connectionStatus');
+            status.textContent = message;
+            status.className = `status ${type}`;
+        }
+
+        function addMessage(role, content) {
+            const messages = document.getElementById('messages');
+            const div = document.createElement('div');
+            div.className = `message ${role}`;
+            div.textContent = `${role}: ${content}`;
+            messages.appendChild(div);
+            messages.scrollTop = messages.scrollHeight;
+            messageCount++;
+        }
+
+        async function testHealth() {
+            try {
+                const response = await fetch((localStorage.getItem(LS_KEY) || 'https://j-ai.top') + '/api/health');
+                const data = await response.json();
+                if (data.ok) {
+                    updateStatus(`✅ Server OK - ${data.time}`, 'success');
+                    logSync('Health check passed');
+                } else {
+                    updateStatus('❌ Server error', 'error');
+                    logSync('Health check failed');
+                }
+            } catch (e) {
+                updateStatus('❌ Connection failed', 'error');
+                logSync(`Health check error: ${e.message}`);
+            }
+        }
+
+        function testSync() {
+            const testData = {
+                type: 'test_sync',
+                sessionId: sessionId,
+                message: `Test sync event ${Date.now()}`,
+                timestamp: Date.now()
+            };
+            
+            localStorage.setItem(SYNC_CHANNEL, JSON.stringify(testData));
+            localStorage.removeItem(SYNC_CHANNEL);
+            
+            logSync('Test sync event sent');
+        }
+
+        function handleStorageEvent(event) {
+            if (event.key === SYNC_CHANNEL && event.newValue) {
+                try {
+                    const syncData = JSON.parse(event.newValue);
+                    logSync(`Received sync event: ${syncData.type}`);
+                    
+                    if (syncData.type === 'message_added' && syncData.sessionId === sessionId) {
+                        addMessage(syncData.message.role, syncData.message.content);
+                        logSync(`Synced message: ${syncData.message.role} - ${syncData.message.content.substring(0, 50)}...`);
+                    } else if (syncData.type === 'test_sync') {
+                        logSync('Test sync event received in this tab!');
+                    }
+                } catch (e) {
+                    logSync(`Failed to parse sync data: ${e.message}`);
+                }
+            }
+        }
+
+        async function sendTestMessage() {
+            const input = document.getElementById('testInput');
+            const text = input.value.trim();
+            if (!text) return;
+            
+            input.value = '';
+            addMessage('user', text);
+            
+            try {
+                const response = await fetch((localStorage.getItem(LS_KEY) || 'https://j-ai.top') + '/api/text', {
+                    method: 'POST',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'X-Session-ID': sessionId
+                    },
+                    body: JSON.stringify({ text })
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    addMessage('assistant', data.response || 'No response');
+                    
+                    // Trigger sync event
+                    const syncData = {
+                        type: 'message_added',
+                        sessionId: sessionId,
+                        message: { role: 'user', content: text, timestamp: Date.now() }
+                    };
+                    
+                    localStorage.setItem(SYNC_CHANNEL, JSON.stringify(syncData));
+                    localStorage.removeItem(SYNC_CHANNEL);
+                    
+                    setTimeout(() => {
+                        const assistantSync = {
+                            type: 'message_added',
+                            sessionId: sessionId,
+                            message: { role: 'assistant', content: data.response || '', timestamp: Date.now() }
+                        };
+                        localStorage.setItem(SYNC_CHANNEL, JSON.stringify(assistantSync));
+                        localStorage.removeItem(SYNC_CHANNEL);
+                    }, 100);
+                    
+                    logSync('Test message sent and sync triggered');
+                } else {
+                    logSync(`Failed to send message: ${response.status}`);
+                }
+            } catch (e) {
+                logSync(`Error sending message: ${e.message}`);
+            }
+        }
+
+        function clearLog() {
+            document.getElementById('syncLog').innerHTML = '';
+            logSync('Log cleared');
+        }
+
+        // Initialize when page loads
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initializeTest);
+        } else {
+            initializeTest();
+        }
+
+        // Add keyboard shortcut
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') {
+                sendTestMessage();
+            }
+        });
+    </script>
+</body>
+</html>

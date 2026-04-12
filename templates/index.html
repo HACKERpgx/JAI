@@ -715,6 +715,12 @@
     document.getElementById('authModal').classList.remove('active');
     document.getElementById('authForm').reset();
     document.getElementById('authError').style.display = 'none';
+    
+    // Reset button state
+    const submit = document.getElementById('authSubmit');
+    submit.disabled = false;
+    const isSignup = document.getElementById('tabSignup').classList.contains('active');
+    submit.textContent = isSignup ? 'Sign Up' : 'Sign In';
   }
   
   function switchAuthTab(tab) {

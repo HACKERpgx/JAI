@@ -126,6 +126,22 @@ async def health_check():
         "time": datetime.utcnow().isoformat() + "Z"
     }
 
+@app.post("/api/logout")
+async def logout(request: Request):
+    """Clear user session and message history"""
+    web_id = request.cookies.get("jai_web_id") or "anon"
+    username = f"web:{web_id}"
+    
+    # Clear session from memory
+    if username in ja_sessions:
+        del ja_sessions[username]
+    
+    # Create response with cleared cookie
+    response = JSONResponse({"message": "Logged out successfully"})
+    response.delete_cookie("jai_web_id")
+    
+    return response
+
 
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):

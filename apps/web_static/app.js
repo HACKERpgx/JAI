@@ -1,7 +1,7 @@
 (function(){
   // Global variables for elements
   let apiBaseInput, saveBaseBtn, healthBtn, healthStatus, messages, textInput, sendBtn;
-  let startRecBtn, stopRecBtn, voiceLang, voiceStatus;
+  let startRecBtn, stopRecBtn, voiceLang, voiceStatus, logoutBtn;
   let isRecording = false;
 
   const LS_KEY = 'jai_api_base';
@@ -20,6 +20,7 @@
     saveBaseBtn = document.getElementById('saveBase');
     healthBtn = document.getElementById('healthBtn');
     healthStatus = document.getElementById('healthStatus');
+    logoutBtn = document.getElementById('logoutBtn');
     messages = document.getElementById('messages');
     textInput = document.getElementById('textInput');
     sendBtn = document.getElementById('sendBtn');
@@ -33,6 +34,7 @@
       apiBaseInput: !!apiBaseInput,
       saveBaseBtn: !!saveBaseBtn,
       healthBtn: !!healthBtn,
+      logoutBtn: !!logoutBtn,
       startRecBtn: !!startRecBtn,
       stopRecBtn: !!stopRecBtn,
       voiceLang: !!voiceLang,
@@ -104,6 +106,9 @@
         if (syncData.type === 'message_added' && syncData.sessionId === currentSessionId) {
           // Another tab added a message, fetch latest from server
           fetchLatestMessages();
+        } else if (syncData.type === 'logout') {
+          // Another tab logged out, sync the logout
+          handleLogoutSync();
         }
       } catch (e) {
         console.error('Failed to parse sync data:', e);
@@ -157,6 +162,90 @@
       clearInterval(syncPollingInterval);
       syncPollingInterval = null;
     }
+  }
+
+  // Logout and session cleanup functions
+  async function logout() {
+    try {
+      // Stop sync polling
+      stopSyncPolling();
+      
+      // Clear UI messages
+      if (messages) {
+        messages.innerHTML = '';
+      }
+      
+      // Clear localStorage
+      localStorage.removeItem(SESSION_KEY);
+      localStorage.removeItem(MESSAGES_KEY);
+      
+      // Reset session variables
+      currentSessionId = null;
+      lastMessageTimestamp = null;
+      
+      // Notify server
+      const response = await fetch(getBase() + '/api/logout', {
+        method: 'POST',
+        credentials: 'include'
+      });
+      
+      if (response.ok) {
+        addMsg('System', '👋 You have been logged out. Session cleared successfully.');
+        
+        // Trigger logout sync event for other tabs
+        triggerLogoutSync();
+        
+        // Generate new session ID for fresh start
+        setTimeout(() => {
+          initializeSession();
+          startSyncPolling();
+          addMsg('System', '🆕 New session started. You can begin chatting again.');
+        }, 1500);
+      } else {
+        addMsg('System', '⚠️ Logout completed locally. Server session may still be active.');
+      }
+    } catch (e) {
+      console.error('Logout error:', e);
+      addMsg('System', '⚠️ Logout completed with some errors. Local data cleared.');
+    }
+  }
+
+  function triggerLogoutSync() {
+    // Use localStorage event to notify other tabs of logout
+    const logoutData = {
+      type: 'logout',
+      sessionId: currentSessionId,
+      timestamp: Date.now()
+    };
+    
+    localStorage.setItem(SYNC_CHANNEL, JSON.stringify(logoutData));
+    localStorage.removeItem(SYNC_CHANNEL);
+  }
+
+  function handleLogoutSync() {
+    // Handle logout event from other tabs
+    stopSyncPolling();
+    
+    // Clear UI
+    if (messages) {
+      messages.innerHTML = '';
+    }
+    
+    // Clear localStorage
+    localStorage.removeItem(SESSION_KEY);
+    localStorage.removeItem(MESSAGES_KEY);
+    
+    // Reset variables
+    currentSessionId = null;
+    lastMessageTimestamp = null;
+    
+    addMsg('System', '🔄 Session synchronized from another tab. Starting fresh session...');
+    
+    // Reinitialize after delay
+    setTimeout(() => {
+      initializeSession();
+      startSyncPolling();
+    }, 1500);
   }
 
   function addMsg(who, text){
@@ -511,6 +600,7 @@
     // Basic event listeners
     if(saveBaseBtn) saveBaseBtn.addEventListener('click', function(){ saveBase(); checkHealth(); });
     if(healthBtn) healthBtn.addEventListener('click', checkHealth);
+    if(logoutBtn) logoutBtn.addEventListener('click', logout);
     if(sendBtn) sendBtn.addEventListener('click', sendText);
     if(textInput) textInput.addEventListener('keydown', function(e){ if(e.key === 'Enter') sendText(); });
     
@@ -627,7 +717,7 @@
     initializeElements();
     
     // Check if all required elements exist
-    const requiredElements = ['apiBase', 'saveBase', 'healthBtn', 'healthStatus', 'messages', 'textInput', 'sendBtn', 'startRecBtn', 'stopRecBtn', 'voiceLang', 'voiceStatus'];
+    const requiredElements = ['apiBase', 'saveBase', 'healthBtn', 'logoutBtn', 'healthStatus', 'messages', 'textInput', 'sendBtn', 'startRecBtn', 'stopRecBtn', 'voiceLang', 'voiceStatus'];
     const missingElements = requiredElements.filter(id => !document.getElementById(id));
     
     if(missingElements.length > 0) {

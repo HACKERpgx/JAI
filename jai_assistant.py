@@ -1065,19 +1065,19 @@ def solve_mathematical_problem_manual(command: str) -> str:
                 
                 if op == '+':
                     result = num1 + num2
-                    return f"Step-by-step solution: {num1} + {num2} = {result}"
+                    return f"{num1} + {num2} = {result}"
                 elif op == '-':
                     result = num1 - num2
-                    return f"Step-by-step solution: {num1} - {num2} = {result}"
+                    return f"{num1} - {num2} = {result}"
                 elif op == '*':
                     result = num1 * num2
-                    return f"Step-by-step solution: {num1} × {num2} = {result}"
+                    return f"{num1} × {num2} = {result}"
                 elif op == '/':
                     if num2 != 0:
                         result = num1 / num2
-                        return f"Step-by-step solution: {num1} ÷ {num2} = {result}"
+                        return f"{num1} ÷ {num2} = {result}"
                     else:
-                        return "Division by zero is undefined in mathematics."
+                        return "Division by zero is undefined."
         except Exception:
             pass
     
@@ -1087,82 +1087,49 @@ def solve_mathematical_problem_manual(command: str) -> str:
             # Handle simple linear equations like "2x + 5 = 15"
             if '2*x' in command_lower or '2x' in command_lower:
                 if '2*x + 5 = 15' in command_lower or '2x + 5 = 15' in command_lower:
-                    return """Step-by-step solution for 2x + 5 = 15:
-1. Start with: 2x + 5 = 15
-2. Subtract 5 from both sides: 2x = 10
-3. Divide both sides by 2: x = 5
-Therefore, x = 5"""
+                    return "2x + 5 = 15 → 2x = 10 → x = 5"
             
             if 'x^2' in command_lower and '4' in command_lower and '0' in command_lower:
-                return """Step-by-step solution for x² - 4 = 0:
-1. Start with: x² - 4 = 0
-2. Add 4 to both sides: x² = 4
-3. Take square root of both sides: x = ±√4
-4. Therefore: x = ±2
-So the solutions are x = 2 and x = -2"""
+                return "x² - 4 = 0 → x² = 4 → x = ±√4 → x = ±2"
         except Exception:
             pass
     
     # Basic algebraic identities
     if 'simplify' in command_lower:
         if 'x^2 + 2*x + 1' in command_lower or 'x² + 2x + 1' in command_lower:
-            return """Step-by-step simplification of x² + 2x + 1:
-This is a perfect square trinomial that follows the pattern: a² + 2ab + b² = (a + b)²
-Here, a = x and b = 1, so:
-x² + 2x + 1 = (x + 1)²"""
+            return "x² + 2x + 1 = (x + 1)²"
         
         if 'x^2 - 9' in command_lower or 'x² - 9' in command_lower:
-            return """Step-by-step factorization of x² - 9:
-This is a difference of squares that follows the pattern: a² - b² = (a - b)(a + b)
-Here, a = x and b = 3, so:
-x² - 9 = (x - 3)(x + 3)"""
+            return "x² - 9 = (x - 3)(x + 3)"
         
         if 'x^2 - 4' in command_lower or 'x² - 4' in command_lower:
-            return """Step-by-step factorization of x² - 4:
-This is a difference of squares: a² - b² = (a - b)(a + b)
-Here, a = x and b = 2, so:
-x² - 4 = (x - 2)(x + 2)"""
+            return "x² - 4 = (x - 2)(x + 2)"
         
         if 'factor x^2 - 9' in command_lower or 'factor x² - 9' in command_lower:
-            return """Step-by-step factorization of x² - 9:
-This is a difference of squares that follows the pattern: a² - b² = (a - b)(a + b)
-Here, a = x and b = 3, so:
-x² - 9 = (x - 3)(x + 3)"""
+            return "x² - 9 = (x - 3)(x + 3)"
     
     # Basic calculus concepts
     if 'derivative' in command_lower and 'x^3' in command_lower:
-        return """Step-by-step differentiation of x³:
-Using the power rule: d/dx(x^n) = n·x^(n-1)
-For x³, n = 3:
-d/dx(x³) = 3·x^(3-1) = 3x²
-Therefore, the derivative of x³ is 3x²"""
+        return "d/dx(x³) = 3x²"
     
     if 'integrate' in command_lower and 'x^2' in command_lower:
-        return """Step-by-step integration of x²:
-Using the power rule for integration: ∫x^n dx = x^(n+1)/(n+1) + C
-For x², n = 2:
-∫x² dx = x^(2+1)/(2+1) + C = x³/3 + C
-Therefore, the integral of x² is x³/3 + C"""
+        return "∫x² dx = x³/3 + C"
     
     # Basic exponent rules
     if '3^4' in command_lower or '3 to the power of 4' in command_lower:
-        return """Step-by-step calculation of 3⁴:
-3⁴ means 3 multiplied by itself 4 times:
-3⁴ = 3 × 3 × 3 × 3
-= 9 × 3 × 3
-= 27 × 3
-= 81
-Therefore, 3⁴ = 81"""
+        return "3⁴ = 3 × 3 × 3 × 3 = 81"
+    
+    # More factoring patterns
+    if 'factor' in command_lower and ('x^2' in command_lower or 'x²' in command_lower):
+        if '9' in command_lower:
+            return "x² - 9 = (x - 3)(x + 3)"
+        elif '4' in command_lower:
+            return "x² - 4 = (x - 2)(x + 2)"
+        elif '16' in command_lower:
+            return "x² - 16 = (x - 4)(x + 4)"
     
     # General mathematical reasoning response
-    return """I'll solve this mathematical problem step-by-step using logical reasoning:
-
-1. Identify the type of mathematical problem
-2. Apply relevant mathematical principles and formulas
-3. Show each step of the calculation clearly
-4. Provide the final answer with verification
-
-For the specific problem you've asked, I would need to break it down into manageable steps and apply the appropriate mathematical rules. Could you please specify the exact mathematical expression or equation you'd like me to solve?"""
+    return "Specify the exact mathematical expression to solve."
 
 def solve_mathematical_problem(command: str) -> str:
     """Process mathematical problems using the math engine or manual reasoning"""

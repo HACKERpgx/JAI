@@ -1131,11 +1131,62 @@ def solve_mathematical_problem_manual(command: str) -> str:
     # General mathematical reasoning response
     return "Specify the exact mathematical expression to solve."
 
-def solve_mathematical_problem(command: str) -> str:
-    """Process mathematical problems using the math engine or manual reasoning"""
-    if not MATH_ENGINE_AVAILABLE:
-        return solve_mathematical_problem_manual(command)
+def split_multiple_questions(command: str) -> list[str]:
+    """Split a command into multiple separate questions"""
+    questions = []
     
+    # Check for numbered questions (1. 2. 3. etc.) - improved pattern
+    numbered_pattern = re.compile(r'\d+\.\s+', re.MULTILINE)
+    if numbered_pattern.search(command):
+        # Split by numbered prefixes and filter empty strings
+        parts = numbered_pattern.split(command)
+        questions = [part.strip() for part in parts if part.strip()]
+        if len(questions) > 1:
+            return questions
+    
+    # Check for line breaks as separators
+    if '\n' in command and len(command.split('\n')) > 1:
+        line_questions = [line.strip() for line in command.split('\n') if line.strip()]
+        # Only treat as separate questions if they look like math problems
+        math_lines = [line for line in line_questions if is_mathematical_query(line)]
+        if len(math_lines) > 1:
+            return math_lines
+    
+    # Check for separator keywords - improved order and patterns with punctuation
+    separators = [' additionally, ', ' also, ', ' and what is, ', ' and calculate, ', ' and, ', ' plus, ', ' furthermore, ',
+                  ' additionally ', ' also ', ' and what is ', ' and calculate ', ' and ', ' plus ', ' furthermore ']
+    for sep in separators:
+        if sep.lower() in command.lower():
+            parts = re.split(sep, command, flags=re.IGNORECASE)
+            if len(parts) > 1:
+                # Clean up each part and verify it's a math problem
+                math_parts = []
+                for part in parts:
+                    cleaned = part.strip()
+                    # Remove any remaining separator words from anywhere in the string
+                    for s in ['additionally', 'also', 'plus', 'furthermore']:
+                        cleaned = re.sub(r'\b' + s + r'\b', '', cleaned, flags=re.IGNORECASE)
+                    # Remove trailing separators like ','
+                    cleaned = re.sub(r'[,\s]+$', '', cleaned).strip()
+                    if cleaned and is_mathematical_query(cleaned):
+                        math_parts.append(cleaned)
+                if len(math_parts) > 1:
+                    return math_parts
+    
+    # Check for repeated "What is" patterns without numbers
+    what_is_pattern = re.compile(r'what is', re.IGNORECASE)
+    if len(what_is_pattern.findall(command)) > 1:
+        # Split by "what is" and reconstruct
+        parts = what_is_pattern.split(command)
+        questions = [f"what is {part.strip()}" for part in parts if part.strip() and is_mathematical_query(f"what is {part.strip()}")]
+        if len(questions) > 1:
+            return questions
+    
+    # If no clear separators found, treat as single question
+    return [command]
+
+def solve_mathematical_problem_with_engine(command: str) -> str:
+    """Process mathematical problems using the math engine"""
     try:
         command_lower = command.lower().strip()
         
@@ -1145,47 +1196,45 @@ def solve_mathematical_problem(command: str) -> str:
             if expr:
                 result = math_engine.simplify_expression(expr)
                 if 'error' not in result:
-                    return f"Simplified result: {result.get('simplified', result.get('original', 'Unable to simplify'))}"
+                    return f"{result.get('simplified', result.get('original', 'Unable to simplify'))}"
                 else:
-                    return f"Error simplifying expression: {result['error']}"
+                    return f"Error: {result['error']}"
         
         elif 'factor' in command_lower:
             expr = extract_math_expression(command, 'factor')
             if expr:
                 result = math_engine.factor_expression(expr)
                 if 'error' not in result:
-                    return f"Factored result: {result.get('factored', result.get('original', 'Unable to factor'))}"
+                    return f"{result.get('factored', result.get('original', 'Unable to factor'))}"
                 else:
-                    return f"Error factoring expression: {result['error']}"
+                    return f"Error: {result['error']}"
         
         elif 'expand' in command_lower:
             expr = extract_math_expression(command, 'expand')
             if expr:
                 result = math_engine.expand_expression(expr)
                 if 'error' not in result:
-                    return f"Expanded result: {result.get('expanded', result.get('original', 'Unable to expand'))}"
+                    return f"{result.get('expanded', result.get('original', 'Unable to expand'))}"
                 else:
-                    return f"Error expanding expression: {result['error']}"
+                    return f"Error: {result['error']}"
         
         # Equation solving
         elif 'solve' in command_lower or '=' in command:
-            # Try to extract equation
             if '=' in command:
                 equation = extract_math_expression(command, 'solve')
                 if not equation:
-                    # If no 'solve' keyword, try to extract the equation directly
                     equation = command
-                variable = 'x'  # Default variable
+                variable = 'x'
                 result = math_engine.solve_equation(equation, variable)
                 if 'error' not in result:
                     solutions = result.get('solutions', [])
                     if solutions:
                         solution_str = ', '.join([f"{s:.6f}" if isinstance(s, float) else str(s) for s in solutions])
-                        return f"Solution(s): {solution_str}"
+                        return f"{solution_str}"
                     else:
                         return f"No solutions found for {equation}"
                 else:
-                    return f"Error solving equation: {result['error']}"
+                    return f"Error: {result['error']}"
         
         # Calculus operations
         elif 'derivative' in command_lower or 'differentiate' in command_lower:
@@ -1195,30 +1244,29 @@ def solve_mathematical_problem(command: str) -> str:
             if expr:
                 result = math_engine.derivative(expr, 'x')
                 if 'error' not in result:
-                    return f"Derivative: {result.get('derivative', 'Unable to compute derivative')}"
+                    return f"{result.get('derivative', 'Unable to compute derivative')}"
                 else:
-                    return f"Error computing derivative: {result['error']}"
+                    return f"Error: {result['error']}"
         
         elif 'integrate' in command_lower:
             expr = extract_math_expression(command, 'integrate')
             if expr:
                 result = math_engine.integral(expr, 'x')
                 if 'error' not in result:
-                    return f"Integral: {result.get('integral', 'Unable to compute integral')}"
+                    return f"{result.get('integral', 'Unable to compute integral')}"
                 else:
-                    return f"Error computing integral: {result['error']}"
+                    return f"Error: {result['error']}"
         
         # Matrix operations
         elif 'matrix' in command_lower or 'determinant' in command_lower:
-            return "For matrix operations, please specify the matrix in format [[1,2],[3,4]] and the operation (determinant, inverse, transpose)"
+            return "For matrix operations, specify matrix in format [[1,2],[3,4]] and operation"
         
         # Statistics
         elif any(word in command_lower for word in ['mean', 'median', 'average', 'statistics']):
-            return "For statistical calculations, please provide the data as a list of numbers"
+            return "For statistical calculations, provide data as a list of numbers"
         
         # Default: Try to evaluate as a mathematical expression
         try:
-            # Clean up the expression
             expr = extract_math_expression(command, 'calculate')
             if not expr:
                 expr = extract_math_expression(command, 'compute')
@@ -1229,19 +1277,47 @@ def solve_mathematical_problem(command: str) -> str:
                 result = math_engine.simplify_expression(expr)
                 if 'error' not in result:
                     if result.get('evaluated') is not None:
-                        return f"Result: {result['evaluated']:.6f}"
+                        return f"{result['evaluated']:.6f}"
                     else:
-                        return f"Simplified: {result.get('simplified', result.get('original', expr))}"
+                        return f"{result.get('simplified', result.get('original', expr))}"
                 else:
-                    return f"Error evaluating expression: {result['error']}"
+                    return f"Error: {result['error']}"
         except Exception:
             pass
         
-        # If math engine fails, fall back to manual reasoning
         return solve_mathematical_problem_manual(command)
         
     except Exception as e:
-        # If math engine encounters an error, try manual reasoning
+        return solve_mathematical_problem_manual(command)
+
+def solve_mathematical_problem(command: str) -> str:
+    """Process mathematical problems using the math engine or manual reasoning"""
+    # Check for multiple questions
+    questions = split_multiple_questions(command)
+    
+    if len(questions) > 1:
+        # Solve each question separately
+        results = []
+        for i, question in enumerate(questions, 1):
+            if MATH_ENGINE_AVAILABLE:
+                try:
+                    result = solve_mathematical_problem_with_engine(question)
+                    results.append(f"{i}. {result}")
+                except Exception:
+                    result = solve_mathematical_problem_manual(question)
+                    results.append(f"{i}. {result}")
+            else:
+                result = solve_mathematical_problem_manual(question)
+                results.append(f"{i}. {result}")
+        return "\n".join(results)
+    
+    # Single question - proceed normally
+    if not MATH_ENGINE_AVAILABLE:
+        return solve_mathematical_problem_manual(command)
+    
+    try:
+        return solve_mathematical_problem_with_engine(command)
+    except Exception as e:
         return solve_mathematical_problem_manual(command)
 
 # -----------------------------

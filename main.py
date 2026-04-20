@@ -48,6 +48,14 @@ except Exception as e:
     init_ids = None
     get_ids_instance = None
 
+# Import math engine
+try:
+    from jai_math_engine import math_engine
+    MATH_ENGINE_AVAILABLE = True
+except Exception as e:
+    math_engine = None
+    MATH_ENGINE_AVAILABLE = False
+
 
 # Import autonomous system components
 try:
@@ -114,6 +122,57 @@ except Exception:
 
 class WebTextRequest(BaseModel):
     text: str
+    persona: str
+
+class MathSimplifyRequest(BaseModel):
+    expression: str
+
+class MathExpandRequest(BaseModel):
+    expression: str
+
+class MathFactorRequest(BaseModel):
+    expression: str
+
+class MathSolveRequest(BaseModel):
+    equation: str
+    variable: str = "x"
+
+class MathSystemRequest(BaseModel):
+    equations: List[str]
+    variables: List[str]
+
+class MathDerivativeRequest(BaseModel):
+    expression: str
+    variable: str = "x"
+    order: int = 1
+
+class MathIntegralRequest(BaseModel):
+    expression: str
+    variable: str = "x"
+
+class MathDefiniteIntegralRequest(BaseModel):
+    expression: str
+    variable: str
+    lower: Union[str, float]
+    upper: Union[str, float]
+
+class MathLimitRequest(BaseModel):
+    expression: str
+    variable: str
+    point: Union[str, float]
+    direction: str = "+"
+
+class MathMatrixRequest(BaseModel):
+    matrix: str  # JSON string representation
+    operation: str  # determinant, inverse, eigenvalues, transpose
+
+class MathNumericalRequest(BaseModel):
+    expression: str
+    variable: str = "x"
+    initial_guess: float = 0.0
+
+class MathStatisticsRequest(BaseModel):
+    data: List[float]
 
 class WebPersonaRequest(BaseModel):
     persona: str
@@ -1804,6 +1863,139 @@ try:
 except Exception:
     SECURITY_AVAILABLE = False
 
+
+# Mathematical Computation API Endpoints
+@app.post("/api/math/simplify")
+async def math_simplify(req: MathSimplifyRequest):
+    """Simplify algebraic expression"""
+    if not MATH_ENGINE_AVAILABLE:
+        return {"error": "Math engine not available"}
+    try:
+        result = math_engine.simplify_expression(req.expression)
+        return result
+    except Exception as e:
+        return {"error": str(e)}
+
+@app.post("/api/math/expand")
+async def math_expand(req: MathExpandRequest):
+    """Expand algebraic expression"""
+    if not MATH_ENGINE_AVAILABLE:
+        return {"error": "Math engine not available"}
+    try:
+        result = math_engine.expand_expression(req.expression)
+        return result
+    except Exception as e:
+        return {"error": str(e)}
+
+@app.post("/api/math/factor")
+async def math_factor(req: MathFactorRequest):
+    """Factor algebraic expression"""
+    if not MATH_ENGINE_AVAILABLE:
+        return {"error": "Math engine not available"}
+    try:
+        result = math_engine.factor_expression(req.expression)
+        return result
+    except Exception as e:
+        return {"error": str(e)}
+
+@app.post("/api/math/solve")
+async def math_solve(req: MathSolveRequest):
+    """Solve equation for variable"""
+    if not MATH_ENGINE_AVAILABLE:
+        return {"error": "Math engine not available"}
+    try:
+        result = math_engine.solve_equation(req.equation, req.variable)
+        return result
+    except Exception as e:
+        return {"error": str(e)}
+
+@app.post("/api/math/system")
+async def math_system(req: MathSystemRequest):
+    """Solve system of equations"""
+    if not MATH_ENGINE_AVAILABLE:
+        return {"error": "Math engine not available"}
+    try:
+        result = math_engine.solve_system(req.equations, req.variables)
+        return result
+    except Exception as e:
+        return {"error": str(e)}
+
+@app.post("/api/math/derivative")
+async def math_derivative(req: MathDerivativeRequest):
+    """Calculate derivative"""
+    if not MATH_ENGINE_AVAILABLE:
+        return {"error": "Math engine not available"}
+    try:
+        result = math_engine.derivative(req.expression, req.variable, req.order)
+        return result
+    except Exception as e:
+        return {"error": str(e)}
+
+@app.post("/api/math/integral")
+async def math_integral(req: MathIntegralRequest):
+    """Calculate indefinite integral"""
+    if not MATH_ENGINE_AVAILABLE:
+        return {"error": "Math engine not available"}
+    try:
+        result = math_engine.integral(req.expression, req.variable)
+        return result
+    except Exception as e:
+        return {"error": str(e)}
+
+@app.post("/api/math/definite-integral")
+async def math_definite_integral(req: MathDefiniteIntegralRequest):
+    """Calculate definite integral"""
+    if not MATH_ENGINE_AVAILABLE:
+        return {"error": "Math engine not available"}
+    try:
+        result = math_engine.definite_integral(req.expression, req.variable, req.lower, req.upper)
+        return result
+    except Exception as e:
+        return {"error": str(e)}
+
+@app.post("/api/math/limit")
+async def math_limit(req: MathLimitRequest):
+    """Calculate limit"""
+    if not MATH_ENGINE_AVAILABLE:
+        return {"error": "Math engine not available"}
+    try:
+        result = math_engine.limit(req.expression, req.variable, req.point, req.direction)
+        return result
+    except Exception as e:
+        return {"error": str(e)}
+
+@app.post("/api/math/matrix")
+async def math_matrix(req: MathMatrixRequest):
+    """Perform matrix operations"""
+    if not MATH_ENGINE_AVAILABLE:
+        return {"error": "Math engine not available"}
+    try:
+        result = math_engine.matrix_operations(req.matrix, req.operation)
+        return result
+    except Exception as e:
+        return {"error": str(e)}
+
+@app.post("/api/math/numerical")
+async def math_numerical(req: MathNumericalRequest):
+    """Numerical root finding"""
+    if not MATH_ENGINE_AVAILABLE:
+        return {"error": "Math engine not available"}
+    try:
+        result = math_engine.numerical_solve(req.expression, req.variable, req.initial_guess)
+        return result
+    except Exception as e:
+        return {"error": str(e)}
+
+@app.post("/api/math/statistics")
+async def math_statistics(req: MathStatisticsRequest):
+    """Calculate statistics"""
+    if not MATH_ENGINE_AVAILABLE:
+        return {"error": "Math engine not available"}
+    try:
+        result = math_engine.statistics(req.data)
+        return result
+    except Exception as e:
+        return {"error": str(e)}
 
 # Auth endpoints for Supabase integration
 from fastapi import Depends

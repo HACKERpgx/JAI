@@ -41,6 +41,14 @@ except Exception:
     standard_transformations = None
     implicit_multiplication_application = None
 
+# Import math engine for direct integration
+try:
+    from jai_math_engine import math_engine
+    MATH_ENGINE_AVAILABLE = True
+except Exception:
+    math_engine = None
+    MATH_ENGINE_AVAILABLE = False
+
 try:
     import speech_recognition as sr
 except ImportError:
@@ -990,6 +998,168 @@ def is_memory_intent(intent: str) -> bool:
         "show long term memory",
     }
 
+def is_mathematical_query(command: str) -> bool:
+    """Detect if the user is asking a mathematical question"""
+    math_keywords = [
+        'solve', 'calculate', 'simplify', 'factor', 'expand', 'integrate', 
+        'differentiate', 'derivative', 'integral', 'limit', 'matrix',
+        'determinant', 'inverse', 'eigenvalue', 'statistics', 'mean',
+        'median', 'standard deviation', 'variance', 'equation', 'roots',
+        'polynomial', 'algebra', 'calculus', 'geometry', 'trigonometry'
+    ]
+    
+    # Check for mathematical symbols and patterns
+    math_patterns = [
+        r'[=+\-*/^]',  # Mathematical operators
+        r'\b\d+\b',    # Numbers
+        r'[xy]',       # Variables
+        r'\b(sin|cos|tan|log|ln|sqrt|pi|e)\b',  # Math functions
+        r'\([^\)]+\)',  # Parentheses
+        r'\b\d+/\d+\b', # Fractions
+    ]
+    
+    command_lower = command.lower()
+    
+    # Check for math keywords
+    if any(keyword in command_lower for keyword in math_keywords):
+        return True
+    
+    # Check for math patterns
+    if any(re.search(pattern, command) for pattern in math_patterns):
+        return True
+    
+    # Check for equation-like structures
+    if '=' in command and any(char in command for char in 'xy1234567890'):
+        return True
+    
+    return False
+
+def extract_math_expression(command: str, keyword: str) -> str:
+    """Extract mathematical expression from natural language command"""
+    # Remove the keyword and clean up
+    expr = command.lower().replace(keyword, '').strip()
+    
+    # Remove common question words
+    question_words = ['what is', 'what are', 'calculate', 'compute', 'find', 'determine', 'the', 'of', 'for', 'me', 'please']
+    for word in question_words:
+        expr = expr.replace(word, '').strip()
+    
+    # Remove question marks and other punctuation
+    expr = expr.replace('?', '').replace('!', '').strip()
+    
+    return expr
+
+def solve_mathematical_problem(command: str) -> str:
+    """Process mathematical problems using the math engine"""
+    if not MATH_ENGINE_AVAILABLE:
+        return "I apologize, but my mathematical computation engine is not currently available."
+    
+    try:
+        command_lower = command.lower().strip()
+        
+        # Algebraic operations
+        if 'simplify' in command_lower:
+            expr = extract_math_expression(command, 'simplify')
+            if expr:
+                result = math_engine.simplify_expression(expr)
+                if 'error' not in result:
+                    return f"Simplified result: {result.get('simplified', result.get('original', 'Unable to simplify'))}"
+                else:
+                    return f"Error simplifying expression: {result['error']}"
+        
+        elif 'factor' in command_lower:
+            expr = extract_math_expression(command, 'factor')
+            if expr:
+                result = math_engine.factor_expression(expr)
+                if 'error' not in result:
+                    return f"Factored result: {result.get('factored', result.get('original', 'Unable to factor'))}"
+                else:
+                    return f"Error factoring expression: {result['error']}"
+        
+        elif 'expand' in command_lower:
+            expr = extract_math_expression(command, 'expand')
+            if expr:
+                result = math_engine.expand_expression(expr)
+                if 'error' not in result:
+                    return f"Expanded result: {result.get('expanded', result.get('original', 'Unable to expand'))}"
+                else:
+                    return f"Error expanding expression: {result['error']}"
+        
+        # Equation solving
+        elif 'solve' in command_lower or '=' in command:
+            # Try to extract equation
+            if '=' in command:
+                equation = extract_math_expression(command, 'solve')
+                if not equation:
+                    # If no 'solve' keyword, try to extract the equation directly
+                    equation = command
+                variable = 'x'  # Default variable
+                result = math_engine.solve_equation(equation, variable)
+                if 'error' not in result:
+                    solutions = result.get('solutions', [])
+                    if solutions:
+                        solution_str = ', '.join([f"{s:.6f}" if isinstance(s, float) else str(s) for s in solutions])
+                        return f"Solution(s): {solution_str}"
+                    else:
+                        return f"No solutions found for {equation}"
+                else:
+                    return f"Error solving equation: {result['error']}"
+        
+        # Calculus operations
+        elif 'derivative' in command_lower or 'differentiate' in command_lower:
+            expr = extract_math_expression(command, 'derivative')
+            if not expr:
+                expr = extract_math_expression(command, 'differentiate')
+            if expr:
+                result = math_engine.derivative(expr, 'x')
+                if 'error' not in result:
+                    return f"Derivative: {result.get('derivative', 'Unable to compute derivative')}"
+                else:
+                    return f"Error computing derivative: {result['error']}"
+        
+        elif 'integrate' in command_lower:
+            expr = extract_math_expression(command, 'integrate')
+            if expr:
+                result = math_engine.integral(expr, 'x')
+                if 'error' not in result:
+                    return f"Integral: {result.get('integral', 'Unable to compute integral')}"
+                else:
+                    return f"Error computing integral: {result['error']}"
+        
+        # Matrix operations
+        elif 'matrix' in command_lower or 'determinant' in command_lower:
+            return "For matrix operations, please specify the matrix in format [[1,2],[3,4]] and the operation (determinant, inverse, transpose)"
+        
+        # Statistics
+        elif any(word in command_lower for word in ['mean', 'median', 'average', 'statistics']):
+            return "For statistical calculations, please provide the data as a list of numbers"
+        
+        # Default: Try to evaluate as a mathematical expression
+        try:
+            # Clean up the expression
+            expr = extract_math_expression(command, 'calculate')
+            if not expr:
+                expr = extract_math_expression(command, 'compute')
+            if not expr:
+                expr = extract_math_expression(command, 'what is')
+            
+            if expr and any(char in expr for char in '0123456789+-*/^()xy.'):
+                result = math_engine.simplify_expression(expr)
+                if 'error' not in result:
+                    if result.get('evaluated') is not None:
+                        return f"Result: {result['evaluated']:.6f}"
+                    else:
+                        return f"Simplified: {result.get('simplified', result.get('original', expr))}"
+                else:
+                    return f"Error evaluating expression: {result['error']}"
+        except Exception:
+            pass
+        
+        return "I can help with mathematical problems! Try asking me to solve equations, simplify expressions, calculate derivatives, or compute integrals."
+        
+    except Exception as e:
+        return f"I encountered an error while processing your mathematical problem: {str(e)}"
+
 # -----------------------------
 # JAI Reply (Enhanced for Smarter Responses)
 # -----------------------------
@@ -1476,6 +1646,16 @@ def execute_command(command: str, session: UserSession, suppress_tts: bool = Fal
 
     # JAI ALWAYS responds in English
     speak_lang = "en"  # Force English responses
+    
+    # Check for mathematical problems first
+    if is_mathematical_query(translated_command):
+        math_response = solve_mathematical_problem(translated_command)
+        try:
+            if getattr(session, "tts_enabled", False):
+                speak_async_text(math_response, logging_extra, speak_lang)
+        except Exception:
+            pass
+        return math_response
     
     # Quick greetings - instant response like JARVIS
     if intent == "greeting":

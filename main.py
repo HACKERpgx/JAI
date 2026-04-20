@@ -122,7 +122,7 @@ except Exception:
 
 class WebTextRequest(BaseModel):
     text: str
-    persona: str
+    persona: Optional[str] = "assistant"
 
 class MathSimplifyRequest(BaseModel):
     expression: str

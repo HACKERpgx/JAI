@@ -4,7 +4,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 from datetime import datetime
-from typing import Optional, List, Any
+from typing import Optional, List, Any, Union
 import time
 import uuid
 import os

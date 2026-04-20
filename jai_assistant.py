@@ -1034,8 +1034,103 @@ def is_mathematical_query(command: str) -> bool:
     
     return False
 
+def normalize_math_notation(command: str) -> str:
+    """Normalize informal mathematical notation to proper mathematical symbols"""
+    normalized = command
+    
+    # Logarithm notation: log2 → log₂ (for display), but keep computable form
+    normalized = re.sub(r'\blog2\b', 'log₂', normalized, flags=re.IGNORECASE)
+    normalized = re.sub(r'\blog10\b', 'log₁₀', normalized, flags=re.IGNORECASE)
+    normalized = re.sub(r'\blog3\b', 'log₃', normalized, flags=re.IGNORECASE)
+    normalized = re.sub(r'\blog5\b', 'log₅', normalized, flags=re.IGNORECASE)
+    
+    # Superscript notation: x2 → x², x3 → x³, etc.
+    normalized = re.sub(r'([a-zA-Z])2\b', r'\1²', normalized)
+    normalized = re.sub(r'([a-zA-Z])3\b', r'\1³', normalized)
+    normalized = re.sub(r'([a-zA-Z])4\b', r'\1⁴', normalized)
+    normalized = re.sub(r'([a-zA-Z])5\b', r'\1⁵', normalized)
+    normalized = re.sub(r'([a-zA-Z])6\b', r'\1⁶', normalized)
+    normalized = re.sub(r'([a-zA-Z])7\b', r'\1⁷', normalized)
+    normalized = re.sub(r'([a-zA-Z])8\b', r'\1⁸', normalized)
+    normalized = re.sub(r'([a-zA-Z])9\b', r'\1⁹', normalized)
+    
+    # Greek letters: alpha → α, beta → β, gamma → γ, etc.
+    greek_letters = {
+        'alpha': 'α', 'beta': 'β', 'gamma': 'γ', 'delta': 'δ',
+        'epsilon': 'ε', 'zeta': 'ζ', 'eta': 'η', 'theta': 'θ',
+        'iota': 'ι', 'kappa': 'κ', 'lambda': 'λ', 'mu': 'μ',
+        'nu': 'ν', 'xi': 'ξ', 'omicron': 'ο', 'pi': 'π',
+        'rho': 'ρ', 'sigma': 'σ', 'tau': 'τ', 'upsilon': 'υ',
+        'phi': 'φ', 'chi': 'χ', 'psi': 'ψ', 'omega': 'ω'
+    }
+    
+    for name, symbol in greek_letters.items():
+        normalized = re.sub(r'\b' + name + r'\b', symbol, normalized, flags=re.IGNORECASE)
+    
+    # Common math notation: sqrt → √, sum → Σ, integral → ∫
+    normalized = re.sub(r'\bsqrt\b', '√', normalized, flags=re.IGNORECASE)
+    normalized = re.sub(r'\bsum\b', 'Σ', normalized, flags=re.IGNORECASE)
+    normalized = re.sub(r'\bintegral\b', '∫', normalized, flags=re.IGNORECASE)
+    
+    # Infinity: inf → ∞, infinity → ∞
+    normalized = re.sub(r'\binf\b', '∞', normalized, flags=re.IGNORECASE)
+    normalized = re.sub(r'\binfinity\b', '∞', normalized, flags=re.IGNORECASE)
+    
+    # Approximation: approx → ≈
+    normalized = re.sub(r'\bapprox\b', '≈', normalized, flags=re.IGNORECASE)
+    
+    # Not equal: != → ≠
+    normalized = re.sub(r'!=', '≠', normalized)
+    
+    # Less than or equal: <= → ≤
+    normalized = re.sub(r'<=', '≤', normalized)
+    
+    # Greater than or equal: >= → ≥
+    normalized = re.sub(r'>=', '≥', normalized)
+    
+    # Plus minus: +- → ±
+    normalized = re.sub(r'\+\-', '±', normalized)
+    
+    return normalized
+
+def to_computable_form(normalized: str) -> str:
+    """Convert normalized notation to SymPy-compatible syntax"""
+    computable = normalized
+    
+    # Convert superscripts back to standard form for computation
+    superscript_map = {'²': '**2', '³': '**3', '⁴': '**4', '⁵': '**5', '⁶': '**6', '⁷': '**7', '⁸': '**8', '⁹': '**9'}
+    for unicode_sup, standard in superscript_map.items():
+        computable = computable.replace(unicode_sup, standard)
+    
+    # Convert log notation to SymPy form
+    computable = re.sub(r'log₂', 'log(2, ', computable)
+    computable = re.sub(r'log₁₀', 'log(10, ', computable)
+    computable = re.sub(r'log₃', 'log(3, ', computable)
+    computable = re.sub(r'log₅', 'log(5, ', computable)
+    
+    # Convert sqrt to SymPy form
+    computable = re.sub(r'√', 'sqrt', computable)
+    
+    # Convert Greek letters back to English for variable names (SymPy works better with standard letters)
+    greek_to_english = {
+        'α': 'alpha', 'β': 'beta', 'γ': 'gamma', 'δ': 'delta',
+        'ε': 'epsilon', 'ζ': 'zeta', 'η': 'eta', 'θ': 'theta',
+        'ι': 'iota', 'κ': 'kappa', 'λ': 'lambda', 'μ': 'mu',
+        'ν': 'nu', 'ξ': 'xi', 'π': 'pi', 'ρ': 'rho',
+        'σ': 'sigma', 'τ': 'tau', 'φ': 'phi', 'χ': 'chi',
+        'ψ': 'psi', 'ω': 'omega'
+    }
+    
+    for greek, english in greek_to_english.items():
+        computable = computable.replace(greek, english)
+    
+    return computable
+
 def extract_math_expression(command: str, keyword: str) -> str:
     """Extract mathematical expression from natural language command"""
+    # First normalize the notation
+    command = normalize_math_notation(command)
+    
     # Remove the keyword and clean up
     expr = command.lower().replace(keyword, '').strip()
     
@@ -1051,6 +1146,8 @@ def extract_math_expression(command: str, keyword: str) -> str:
 
 def solve_mathematical_problem_manual(command: str) -> str:
     """Solve mathematical problems using logical reasoning when math engine is unavailable"""
+    # Normalize notation first
+    command = normalize_math_notation(command)
     command_lower = command.lower().strip()
     
     # Basic arithmetic operations - only if it's a pure arithmetic question
@@ -1133,6 +1230,8 @@ def solve_mathematical_problem_manual(command: str) -> str:
 
 def split_multiple_questions(command: str) -> list[str]:
     """Split a command into multiple separate questions"""
+    # Normalize notation before splitting
+    command = normalize_math_notation(command)
     questions = []
     
     # Check for numbered questions (1. 2. 3. etc.) - improved pattern
@@ -1187,6 +1286,8 @@ def split_multiple_questions(command: str) -> list[str]:
 
 def solve_mathematical_problem_with_engine(command: str) -> str:
     """Process mathematical problems using the math engine"""
+    # Normalize notation first
+    command = normalize_math_notation(command)
     try:
         command_lower = command.lower().strip()
         
@@ -1194,7 +1295,8 @@ def solve_mathematical_problem_with_engine(command: str) -> str:
         if 'simplify' in command_lower:
             expr = extract_math_expression(command, 'simplify')
             if expr:
-                result = math_engine.simplify_expression(expr)
+                computable_expr = to_computable_form(expr)
+                result = math_engine.simplify_expression(computable_expr)
                 if 'error' not in result:
                     return f"{result.get('simplified', result.get('original', 'Unable to simplify'))}"
                 else:
@@ -1203,7 +1305,8 @@ def solve_mathematical_problem_with_engine(command: str) -> str:
         elif 'factor' in command_lower:
             expr = extract_math_expression(command, 'factor')
             if expr:
-                result = math_engine.factor_expression(expr)
+                computable_expr = to_computable_form(expr)
+                result = math_engine.factor_expression(computable_expr)
                 if 'error' not in result:
                     return f"{result.get('factored', result.get('original', 'Unable to factor'))}"
                 else:
@@ -1212,7 +1315,8 @@ def solve_mathematical_problem_with_engine(command: str) -> str:
         elif 'expand' in command_lower:
             expr = extract_math_expression(command, 'expand')
             if expr:
-                result = math_engine.expand_expression(expr)
+                computable_expr = to_computable_form(expr)
+                result = math_engine.expand_expression(computable_expr)
                 if 'error' not in result:
                     return f"{result.get('expanded', result.get('original', 'Unable to expand'))}"
                 else:
@@ -1224,8 +1328,9 @@ def solve_mathematical_problem_with_engine(command: str) -> str:
                 equation = extract_math_expression(command, 'solve')
                 if not equation:
                     equation = command
+                computable_equation = to_computable_form(equation)
                 variable = 'x'
-                result = math_engine.solve_equation(equation, variable)
+                result = math_engine.solve_equation(computable_equation, variable)
                 if 'error' not in result:
                     solutions = result.get('solutions', [])
                     if solutions:
@@ -1274,7 +1379,8 @@ def solve_mathematical_problem_with_engine(command: str) -> str:
                 expr = extract_math_expression(command, 'what is')
             
             if expr and any(char in expr for char in '0123456789+-*/^()xy.'):
-                result = math_engine.simplify_expression(expr)
+                computable_expr = to_computable_form(expr)
+                result = math_engine.simplify_expression(computable_expr)
                 if 'error' not in result:
                     if result.get('evaluated') is not None:
                         return f"{result['evaluated']:.6f}"

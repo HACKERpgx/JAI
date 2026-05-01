@@ -277,15 +277,7 @@
           </svg>
         </div>
         <div class="help-dropdown">
-          <div class="help-item" onclick="showHelp('faq')">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <circle cx="12" cy="12" r="10"></circle>
-              <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
-              <line x1="12" y1="17" x2="12.01" y2="17"></line>
-            </svg>
-            FAQ
-          </div>
-          <div class="help-item" onclick="showHelp('support')">
+          <div class="help-item" onclick="window.open('https://heskill-articles.blogspot.com/p/contact-us_18.html', '_blank')">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
             </svg>
@@ -540,7 +532,6 @@
   // Handle help item clicks
   function showHelp(type) {
     const messages = {
-      faq: 'FAQ: Find answers to commonly asked questions about JAI.',
       support: 'Support: Contact our support team for assistance.',
       docs: 'Documentation: Browse the full JAI documentation.',
       about: 'About JAI: Learn more about the JAI Assistant platform.'

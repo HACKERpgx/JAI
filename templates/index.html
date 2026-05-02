@@ -17,10 +17,19 @@
     .term-head { display:flex; align-items:center; gap:10px; padding:10px 14px; border-bottom:1px solid rgba(57,255,20,0.2); color: var(--fg); letter-spacing:0.5px; text-shadow: 0 0 6px rgba(57,255,20,0.35); }
     .led { width:10px; height:10px; border-radius:50%; background: radial-gradient(circle at 30% 30%, #b6ffd1, #39ff14 40%, #0c3 60%, #062); box-shadow: 0 0 10px #39ff14, 0 0 20px rgba(57,255,20,0.6); }
     .title { font-weight:700; color:#b6ffd1; }
-    .log { flex:1; padding:16px; overflow:auto; display:flex; flex-direction:column; gap:6px; scrollbar-width: thin; }
+    .log { flex:1; padding:16px; overflow:auto; display:flex; flex-direction:column; gap:6px; scrollbar-width: thin; position: relative; }
     .line { color:#b6ffd1; text-shadow: 0 0 8px rgba(57,255,20,0.25); white-space: pre-wrap; }
     .line.me { color:#8fffc9; }
     .line.bot { color:#caffea; }
+    .welcome-state { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 20px; animation: fadeIn 0.6s ease-out; }
+    .welcome-state.hidden { display: none; }
+    .welcome-headline { font-size: 32px; font-weight: 800; color: #b6ffd1; text-shadow: 0 0 16px rgba(57,255,20,0.4); letter-spacing: 0.5px; margin-bottom: 12px; }
+    .welcome-subtext { font-size: 16px; color: #8bc9a7; margin-bottom: 24px; font-weight: 500; }
+    .welcome-chips { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; max-width: 400px; }
+    .welcome-chip { background: rgba(57,255,20,0.08); border: 1px solid rgba(57,255,20,0.3); color: #caffea; padding: 10px 18px; border-radius: 10px; font-weight: 600; font-size: 14px; cursor: pointer; transition: all 0.2s ease; }
+    .welcome-chip:hover { background: rgba(57,255,20,0.16); border-color: rgba(57,255,20,0.5); transform: translateY(-1px); box-shadow: 0 4px 12px rgba(57,255,20,0.15); }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    @media (max-width: 640px) { .welcome-headline { font-size: 24px; } .welcome-subtext { font-size: 14px; } .welcome-chips { flex-direction: column; width: 100%; max-width: none; } .welcome-chip { width: 100%; } }
     .prompt { display:flex; align-items:center; gap:10px; padding:14px; border-top:1px solid rgba(57,255,20,0.2); background: linear-gradient(180deg, rgba(0,0,0,0.0), rgba(0,0,0,0.25)); }
     .caret { color:#39ff14; text-shadow:0 0 8px #39ff14; font-weight:700; }
     #txt { flex:1; background: transparent; color:#d9ffe8; border:none; outline:none; font: 16px/1.3 ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; caret-color:#39ff14; }
@@ -325,7 +334,18 @@
       <div class="led"></div>
       <div class="title">JAI WEBSITE</div>
     </div>
-    <div id="log" class="log"></div>
+    <div id="log" class="log">
+      <div id="welcomeState" class="welcome-state">
+        <div class="welcome-headline">Hi, I'm JAI</div>
+        <div class="welcome-subtext">Ask JAI anything</div>
+        <div class="welcome-chips">
+          <div class="welcome-chip" onclick="prefillInput('Ask a question')">Ask a question</div>
+          <div class="welcome-chip" onclick="prefillInput('Try HoloMotion')">Try HoloMotion</div>
+          <div class="welcome-chip" onclick="prefillInput('Help me with math')">Help me with math</div>
+          <div class="welcome-chip" onclick="prefillInput('Tell me a joke')">Tell me a joke</div>
+        </div>
+      </div>
+    </div>
     <div class="prompt">
       <span class="caret">&gt;</span>
       <input id="txt" type="text" placeholder="Type a command..." autocomplete="off" spellcheck="false" />
@@ -403,6 +423,8 @@
 <script>
   function rid(){ return ([1e7]+-1e3+-4e3+-8e3+-1e11).replace(/[018]/g,c=>(c^crypto.getRandomValues(new Uint8Array(1))[0]&15>>c/4).toString(16)); }
   const log = document.getElementById('log');
+  const welcomeState = document.getElementById('welcomeState');
+  
   function push(role, text, imgSrc){
     const div = document.createElement('div');
     div.className = 'line ' + (role === 'me' ? 'me' : 'bot');
@@ -419,6 +441,32 @@
     }
     log.appendChild(div);
     log.scrollTop = log.scrollHeight;
+    hideWelcomeState();
+  }
+  
+  function hideWelcomeState() {
+    if (welcomeState) {
+      welcomeState.classList.add('hidden');
+    }
+  }
+  
+  function showWelcomeState() {
+    if (welcomeState && log.children.length <= 1) {
+      welcomeState.classList.remove('hidden');
+    }
+  }
+  
+  function prefillInput(text) {
+    const input = document.getElementById('txt');
+    input.value = text;
+    input.focus();
+  }
+  
+  function checkWelcomeState() {
+    const hasMessages = log.querySelectorAll('.line').length > 0;
+    if (hasMessages) {
+      hideWelcomeState();
+    }
   }
 
     async function sendText(){
@@ -441,7 +489,10 @@
   }
   document.getElementById('send').addEventListener('click', sendText);
   document.getElementById('txt').addEventListener('keydown', e=>{ if(e.key==='Enter') sendText(); });
-  window.addEventListener('load', ()=>{ document.getElementById('txt').focus(); });
+  window.addEventListener('load', ()=>{ 
+    document.getElementById('txt').focus(); 
+    checkWelcomeState();
+  });
 
   const canvas = document.getElementById('rain');
   const ctx = canvas.getContext('2d');

@@ -70,8 +70,10 @@
     .nav-item.active { background: rgba(57,255,20,0.18); border-color: rgba(57,255,20,0.5); box-shadow: 0 0 16px rgba(57,255,20,0.2) inset, 0 0 12px rgba(57,255,20,0.1); }
     .nav-item svg { width:20px; height:20px; flex-shrink:0; opacity:0.9; }
     .nav-item span { opacity:1; transition: opacity 0.2s ease; }
+    .nav-external .external-icon { width:14px; height:14px; opacity:0.6; margin-left:auto; }
     .sidebar.collapsed .nav-item { padding:12px; justify-content:center; }
     .sidebar.collapsed .nav-item span { opacity:0; width:0; position:absolute; }
+    .sidebar.collapsed .nav-external .external-icon { display:none; }
     .sidebar.collapsed .nav-item:hover { background: rgba(57,255,20,0.15); }
 
     /* Tooltip for collapsed sidebar */
@@ -106,58 +108,6 @@
     .voice-panel{ border:1px solid rgba(57,255,20,0.25); border-radius:14px; background: linear-gradient(180deg, rgba(6,20,14,0.7), rgba(2,10,6,0.85)); box-shadow: 0 0 24px rgba(57,255,20,0.15), inset 0 0 24px rgba(57,255,20,0.05); backdrop-filter: blur(6px); padding:14px; }
     .voice-head{ display:flex; align-items:center; justify-content:space-between; gap:10px; padding:4px 6px 10px 6px; border-bottom:1px solid rgba(57,255,20,0.2); margin-bottom:12px; }
     .voice-title{ font-weight:800; color:#b6ffd1; text-shadow: 0 0 6px rgba(57,255,20,0.35); letter-spacing:0.6px; }
-    
-    /* File Converter Panel */
-    .converter-dashboard{ position:relative; z-index:2; margin-left: calc(var(--sidebar-width) + 20px); transition: margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s ease; }
-    .converter-dashboard.sidebar-collapsed { margin-left: calc(var(--sidebar-collapsed) + 20px); }
-    .converter-panel{ border:1px solid rgba(57,255,20,0.25); border-radius:14px; background: linear-gradient(180deg, rgba(6,20,14,0.7), rgba(2,10,6,0.85)); box-shadow: 0 0 24px rgba(57,255,20,0.15), inset 0 0 24px rgba(57,255,20,0.05); backdrop-filter: blur(6px); padding:24px; min-height: 400px; }
-    .converter-head{ display:flex; align-items:center; justify-content:space-between; gap:10px; padding:4px 6px 10px 6px; border-bottom:1px solid rgba(57,255,20,0.2); margin-bottom:20px; }
-    .converter-title{ font-weight:800; color:#b6ffd1; text-shadow: 0 0 6px rgba(57,255,20,0.35); letter-spacing:0.6px; }
-    .upload-zone{ border: 2px dashed rgba(57,255,20,0.3); border-radius:12px; padding:40px 20px; text-align:center; cursor:pointer; transition: all 0.2s ease; background: rgba(57,255,20,0.02); }
-    .upload-zone:hover{ border-color: rgba(57,255,20,0.5); background: rgba(57,255,20,0.06); }
-    .upload-zone.dragover{ border-color: #39ff14; background: rgba(57,255,20,0.1); }
-    .upload-icon{ width:48px; height:48px; margin:0 auto 12px; opacity:0.7; }
-    .upload-text{ color:#8bc9a7; font-size:16px; font-weight:500; margin-bottom:8px; }
-    .upload-subtext{ color:#6a8a7a; font-size:13px; }
-    .format-selector{ margin-top:20px; display:none; }
-    .format-selector.visible{ display:block; }
-    .format-label{ color:#8bc9a7; font-size:14px; font-weight:600; margin-bottom:8px; }
-    .format-options{ display:flex; flex-wrap:wrap; gap:8px; }
-    .format-btn{ background: rgba(57,255,20,0.08); border:1px solid rgba(57,255,20,0.3); color:#caffea; padding:8px 16px; border-radius:8px; font-weight:600; font-size:14px; cursor:pointer; transition: all 0.2s ease; }
-    .format-btn:hover{ background: rgba(57,255,20,0.16); border-color: rgba(57,255,20,0.5); }
-    .format-btn.selected{ background: rgba(57,255,20,0.2); border-color: #39ff14; }
-    .convert-actions{ margin-top:20px; display:none; }
-    .convert-actions.visible{ display:flex; gap:12px; }
-    .convert-btn{ flex:1; background: rgba(57,255,20,0.15); border:1px solid rgba(57,255,20,0.4); color:#caffea; padding:12px; border-radius:10px; cursor:pointer; font-weight:700; font-size:15px; transition: all 0.2s ease; }
-    .convert-btn:hover{ background: rgba(57,255,20,0.25); }
-    .convert-btn:disabled{ opacity:0.5; cursor:not-allowed; }
-    .progress-bar{ margin-top:16px; height:6px; background: rgba(57,255,20,0.1); border-radius:3px; overflow:hidden; display:none; }
-    .progress-bar.visible{ display:block; }
-    .progress-fill{ height:100%; background: #39ff14; width:0%; transition: width 0.3s ease; box-shadow: 0 0 10px rgba(57,255,20,0.5); }
-    .file-info{ margin-top:12px; padding:12px; background: rgba(57,255,20,0.06); border-radius:8px; display:none; }
-    .file-info.visible{ display:block; }
-    .file-name{ color:#b6ffd1; font-weight:600; font-size:14px; }
-    .file-size{ color:#8bc9a7; font-size:12px; margin-top:4px; }
-    
-    /* HoloMotion Panel */
-    .holomotion-dashboard{ position:relative; z-index:2; margin-left: calc(var(--sidebar-width) + 20px); transition: margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s ease; }
-    .holomotion-dashboard.sidebar-collapsed { margin-left: calc(var(--sidebar-collapsed) + 20px); }
-    .holomotion-panel{ border:1px solid rgba(57,255,20,0.25); border-radius:14px; background: linear-gradient(180deg, rgba(6,20,14,0.7), rgba(2,10,6,0.85)); box-shadow: 0 0 24px rgba(57,255,20,0.15), inset 0 0 24px rgba(57,255,20,0.05); backdrop-filter: blur(6px); padding:24px; min-height: 400px; }
-    .holomotion-head{ display:flex; align-items:center; justify-content:space-between; gap:10px; padding:4px 6px 10px 6px; border-bottom:1px solid rgba(57,255,20,0.2); margin-bottom:20px; }
-    .holomotion-title{ font-weight:800; color:#b6ffd1; text-shadow: 0 0 6px rgba(57,255,20,0.35); letter-spacing:0.6px; }
-    .camera-viewport{ width:100%; height:300px; background: rgba(0,0,0,0.5); border-radius:12px; border:1px solid rgba(57,255,20,0.2); display:flex; align-items:center; justify-content:center; position:relative; overflow:hidden; }
-    .camera-placeholder{ text-align:center; color:#6a8a7a; }
-    .camera-icon{ width:64px; height:64px; margin:0 auto 12px; opacity:0.5; }
-    .camera-feed{ width:100%; height:100%; object-fit:cover; display:none; }
-    .camera-feed.active{ display:block; }
-    .holomotion-description{ color:#8bc9a7; font-size:14px; text-align:center; margin-top:16px; line-height:1.5; }
-    .detection-controls{ margin-top:20px; display:flex; justify-content:center; }
-    .start-detection-btn{ background: rgba(57,255,20,0.15); border:1px solid rgba(57,255,20,0.4); color:#caffea; padding:12px 24px; border-radius:10px; cursor:pointer; font-weight:700; font-size:15px; transition: all 0.2s ease; }
-    .start-detection-btn:hover{ background: rgba(57,255,20,0.25); }
-    .start-detection-btn.active{ background: rgba(255,80,80,0.15); border-color: rgba(255,80,80,0.5); }
-    .gesture-status{ margin-top:16px; padding:12px; background: rgba(57,255,20,0.06); border-radius:8px; text-align:center; min-height:44px; display:flex; align-items:center; justify-content:center; }
-    .gesture-text{ color:#b6ffd1; font-weight:600; font-size:14px; }
-    .gesture-text.waiting{ color:#6a8a7a; font-style:italic; }
     .mic-btn{ width:48px; height:48px; border-radius:9999px; background: rgba(57,255,20,0.12); border:1px solid rgba(57,255,20,0.35); color:#caffea; display:grid; place-items:center; font-weight:800; transition: all 0.2s ease; }
     .mic-btn.recording{ background: rgba(255, 80, 80, 0.18); border-color: rgba(255,80,80,0.5); animation: pulse 1s infinite; }
     @keyframes pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.05); } }
@@ -198,8 +148,6 @@
     @media (max-width: 768px){
       .stacker { margin-left: calc(var(--sidebar-collapsed) + 16px); margin-right: 16px; }
       .voice-dashboard { margin-left: calc(var(--sidebar-collapsed) + 16px); margin-right: 16px; width: auto; }
-      .converter-dashboard { margin-left: calc(var(--sidebar-collapsed) + 16px); margin-right: 16px; width: auto; }
-      .holomotion-dashboard { margin-left: calc(var(--sidebar-collapsed) + 16px); margin-right: 16px; width: auto; }
       .sidebar { position: fixed; transform: translateX(-100%); width: var(--sidebar-width); }
       .sidebar.mobile-open { transform: translateX(0); }
       .sidebar.collapsed { transform: translateX(0); width: var(--sidebar-collapsed); }
@@ -207,16 +155,12 @@
       .sidebar-toggle { display: none; }
       .mobile-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 99; }
       .mobile-overlay.active { display: block; }
-      .converter-panel { padding:16px; min-height: 350px; }
-      .holomotion-panel { padding:16px; min-height: 350px; }
-      .camera-viewport { height:250px; }
-      .upload-zone { padding:30px 16px; }
+    .toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(100px); background: rgba(6,20,14,0.98); border: 1px solid rgba(57,255,20,0.4); border-radius: 10px; padding: 14px 24px; color: #caffea; font-weight: 600; font-size: 14px; box-shadow: 0 8px 32px rgba(0,0,0,0.5), 0 0 20px rgba(57,255,20,0.15); opacity: 0; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); z-index: 1000; pointer-events: none; }
+    .toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
     }
     @media (max-width: 640px){
       .stacker{ margin-left:0; margin-top: 60px; }
       .voice-dashboard{ margin-left:0; margin-top: 60px; }
-      .converter-dashboard{ margin-left:0; margin-top: 60px; }
-      .holomotion-dashboard{ margin-left:0; margin-top: 60px; }
       .sidebar{ top:0; height: auto; bottom: auto; flex-direction:row; gap:8px; border:0; background:transparent; padding:8px; transform: none; width: auto; }
       .sidebar.collapsed { width: auto; transform: none; }
       .brand-section { display:none; }
@@ -225,9 +169,6 @@
       .sidebar-container { position: fixed; top: 0; left: 0; right: 0; z-index: 50; background: linear-gradient(180deg, rgba(4,26,18,0.98), rgba(2,10,6,0.98)); border-bottom: 1px solid rgba(57,255,20,0.25); }
       .terminal { height: min(72vh, 640px); }
       #txt { font-size:15px; }
-      .converter-panel { padding:12px; }
-      .holomotion-panel { padding:12px; }
-      .camera-viewport { height:200px; }
     }
   </style>
 </head>
@@ -272,6 +213,11 @@
   
   <!-- Mobile Overlay -->
   <div id="mobileOverlay" class="mobile-overlay" onclick="closeMobileSidebar()"></div>
+  
+  <!-- Toast Notification -->
+  <div id="toast" class="toast">
+    <span id="toastMessage"></span>
+  </div>
 
   <!-- Sidebar -->
   <div class="sidebar-container">
@@ -301,7 +247,7 @@
           </svg>
           <span>Voice Mode</span>
         </button>
-                <button id="navFileConverter" class="nav-item" data-label="File Converter">
+                <button id="navFileConverter" class="nav-item nav-external" data-label="File Converter" data-url="https://convertio.co/">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
             <polyline points="14 2 14 8 20 8"></polyline>
@@ -310,14 +256,24 @@
             <polyline points="10 9 9 9 8 9"></polyline>
           </svg>
           <span>File Converter</span>
+          <svg class="external-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+            <polyline points="15 3 21 3 21 9"></polyline>
+            <line x1="10" y1="14" x2="21" y2="3"></line>
+          </svg>
         </button>
-        <button id="navHoloMotion" class="nav-item" data-label="HoloMotion">
+        <button id="navHoloMotion" class="nav-item nav-external" data-label="HoloMotion" data-url="https://hackerpgx.github.io/HoloMotion/">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
             <polyline points="2 17 12 22 22 17"></polyline>
             <polyline points="2 12 12 17 22 12"></polyline>
           </svg>
           <span>HoloMotion</span>
+          <svg class="external-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+            <polyline points="15 3 21 3 21 9"></polyline>
+            <line x1="10" y1="14" x2="21" y2="3"></line>
+          </svg>
         </button>
       </div>
 
@@ -423,69 +379,6 @@
         <button id="stopVoiceBtn" style="display:none; margin-top:12px; background:rgba(255,80,80,0.15); border:1px solid rgba(255,80,80,0.5); color:#ffcccc; padding:8px 20px; border-radius:8px; font-weight:600; cursor:pointer; transition:all 0.2s ease;">Stop</button>
       </div>
       <div id="voiceLog" class="voice-log" style="margin-top:20px; max-height:200px; overflow:auto;"></div>
-    </div>
-  </div>
-  
-  <div id="converterDash" class="converter-dashboard" style="display:none">
-    <div class="converter-panel">
-      <div class="converter-head">
-        <div class="converter-title">File Converter</div>
-      </div>
-      <div id="uploadZone" class="upload-zone">
-        <svg class="upload-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-          <polyline points="17 8 12 3 7 8"></polyline>
-          <line x1="12" y1="3" x2="12" y2="15"></line>
-        </svg>
-        <div class="upload-text">Drag a file here or click to upload</div>
-        <div class="upload-subtext">Supports images, documents, and more</div>
-      </div>
-      <input type="file" id="fileInput" style="display:none" />
-      <div id="fileInfo" class="file-info">
-        <div class="file-name" id="fileName"></div>
-        <div class="file-size" id="fileSize"></div>
-      </div>
-      <div id="formatSelector" class="format-selector">
-        <div class="format-label">Select output format:</div>
-        <div class="format-options" id="formatOptions">
-          <button class="format-btn" data-format="png">PNG</button>
-          <button class="format-btn" data-format="jpg">JPG</button>
-          <button class="format-btn" data-format="webp">WEBP</button>
-          <button class="format-btn" data-format="pdf">PDF</button>
-        </div>
-      </div>
-      <div id="convertActions" class="convert-actions">
-        <button id="convertBtn" class="convert-btn">Convert</button>
-        <button id="downloadBtn" class="convert-btn" style="display:none">Download</button>
-      </div>
-      <div id="progressBar" class="progress-bar">
-        <div id="progressFill" class="progress-fill"></div>
-      </div>
-    </div>
-  </div>
-  
-  <div id="holomotionDash" class="holomotion-dashboard" style="display:none">
-    <div class="holomotion-panel">
-      <div class="holomotion-head">
-        <div class="holomotion-title">HoloMotion</div>
-      </div>
-      <div class="camera-viewport">
-        <div class="camera-placeholder" id="cameraPlaceholder">
-          <svg class="camera-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
-            <circle cx="12" cy="13" r="4"></circle>
-          </svg>
-          <div>Camera not active</div>
-        </div>
-        <video id="cameraFeed" class="camera-feed" autoplay playsinline></video>
-      </div>
-      <div class="holomotion-description">HoloMotion detects hand or body gestures to control JAI hands-free.</div>
-      <div class="detection-controls">
-        <button id="startDetectionBtn" class="start-detection-btn">Start Detection</button>
-      </div>
-      <div class="gesture-status">
-        <div id="gestureText" class="gesture-text waiting">Waiting for motion input…</div>
-      </div>
     </div>
   </div>
   </div>
@@ -607,8 +500,6 @@
   const navHoloMotion = document.getElementById('navHoloMotion');
   const stacker = document.querySelector('.stacker');
   const voiceDash = document.getElementById('voiceDash');
-  const converterDash = document.getElementById('converterDash');
-  const holomotionDash = document.getElementById('holomotionDash');
   const sidebar = document.getElementById('sidebar');
   const helpSection = document.getElementById('helpSection');
   const mobileOverlay = document.getElementById('mobileOverlay');
@@ -623,8 +514,6 @@
         sidebar.classList.add('collapsed');
         stacker.classList.add('sidebar-collapsed');
         voiceDash.classList.add('sidebar-collapsed');
-        converterDash.classList.add('sidebar-collapsed');
-        holomotionDash.classList.add('sidebar-collapsed');
       }
     }
   }
@@ -641,8 +530,6 @@
       sidebar.classList.toggle('collapsed', sidebarCollapsed);
       stacker.classList.toggle('sidebar-collapsed', sidebarCollapsed);
       voiceDash.classList.toggle('sidebar-collapsed', sidebarCollapsed);
-      converterDash.classList.toggle('sidebar-collapsed', sidebarCollapsed);
-      holomotionDash.classList.toggle('sidebar-collapsed', sidebarCollapsed);
       localStorage.setItem('sidebarCollapsed', sidebarCollapsed);
     }
   }
@@ -680,25 +567,15 @@
     // Hide all panels
     stacker.style.display = 'none';
     voiceDash.style.display = 'none';
-    converterDash.style.display = 'none';
-    holomotionDash.style.display = 'none';
     
     // Remove active class from all nav items
     navChat.classList.remove('active');
     navVoice.classList.remove('active');
-    navFileConverter.classList.remove('active');
-    navHoloMotion.classList.remove('active');
     
     // Show selected panel and highlight nav item
     if(view === 'voice'){
       voiceDash.style.display = '';
       navVoice.classList.add('active');
-    } else if(view === 'converter'){
-      converterDash.style.display = '';
-      navFileConverter.classList.add('active');
-    } else if(view === 'holomotion'){
-      holomotionDash.style.display = '';
-      navHoloMotion.classList.add('active');
     } else {
       stacker.style.display = '';
       navChat.classList.add('active');
@@ -706,10 +583,36 @@
     // Close mobile sidebar after navigation
     closeMobileSidebar();
   }
+  
+  // Toast notification function
+  function showToast(message) {
+    const toast = document.getElementById('toast');
+    const toastMessage = document.getElementById('toastMessage');
+    toastMessage.textContent = message;
+    toast.classList.add('show');
+    setTimeout(() => {
+      toast.classList.remove('show');
+    }, 2500);
+  }
+  
+  // External link handler
+  function openExternalLink(url, name) {
+    showToast('Opening ' + name + ' in a new tab…');
+    setTimeout(() => {
+      window.open(url, '_blank', 'noopener noreferrer');
+    }, 500);
+  }
+  
   navChat.addEventListener('click', ()=> setView('chat'));
   navVoice.addEventListener('click', ()=> setView('voice'));
-  navFileConverter.addEventListener('click', ()=> setView('converter'));
-  navHoloMotion.addEventListener('click', ()=> setView('holomotion'));
+  navFileConverter.addEventListener('click', ()=> {
+    const url = navFileConverter.getAttribute('data-url');
+    openExternalLink(url, 'File Converter');
+  });
+  navHoloMotion.addEventListener('click', ()=> {
+    const url = navHoloMotion.getAttribute('data-url');
+    openExternalLink(url, 'HoloMotion');
+  });
 
   const voiceLog = document.getElementById('voiceLog');
   function vpush(role, text){
@@ -824,158 +727,6 @@
       const u = new SpeechSynthesisUtterance(text);
       speechSynthesis.speak(u);
     }catch(_){ /* no-op */ }
-  }
-
-  // ==================== FILE CONVERTER ====================
-  const uploadZone = document.getElementById('uploadZone');
-  const fileInput = document.getElementById('fileInput');
-  const fileInfo = document.getElementById('fileInfo');
-  const fileName = document.getElementById('fileName');
-  const fileSize = document.getElementById('fileSize');
-  const formatSelector = document.getElementById('formatSelector');
-  const formatOptions = document.getElementById('formatOptions');
-  const convertActions = document.getElementById('convertActions');
-  const convertBtn = document.getElementById('convertBtn');
-  const downloadBtn = document.getElementById('downloadBtn');
-  const progressBar = document.getElementById('progressBar');
-  const progressFill = document.getElementById('progressFill');
-  let selectedFile = null;
-  let selectedFormat = null;
-
-  uploadZone.addEventListener('click', () => fileInput.click());
-  
-  uploadZone.addEventListener('dragover', (e) => {
-    e.preventDefault();
-    uploadZone.classList.add('dragover');
-  });
-  
-  uploadZone.addEventListener('dragleave', () => {
-    uploadZone.classList.remove('dragover');
-  });
-  
-  uploadZone.addEventListener('drop', (e) => {
-    e.preventDefault();
-    uploadZone.classList.remove('dragover');
-    const files = e.dataTransfer.files;
-    if (files.length > 0) {
-      handleFileSelect(files[0]);
-    }
-  });
-  
-  fileInput.addEventListener('change', (e) => {
-    if (e.target.files.length > 0) {
-      handleFileSelect(e.target.files[0]);
-    }
-  });
-  
-  function handleFileSelect(file) {
-    selectedFile = file;
-    fileName.textContent = file.name;
-    fileSize.textContent = formatFileSize(file.size);
-    fileInfo.classList.add('visible');
-    uploadZone.style.display = 'none';
-    formatSelector.classList.add('visible');
-    convertActions.classList.add('visible');
-  }
-  
-  function formatFileSize(bytes) {
-    if (bytes === 0) return '0 Bytes';
-    const k = 1024;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
-  }
-  
-  formatOptions.addEventListener('click', (e) => {
-    if (e.target.classList.contains('format-btn')) {
-      document.querySelectorAll('.format-btn').forEach(btn => btn.classList.remove('selected'));
-      e.target.classList.add('selected');
-      selectedFormat = e.target.dataset.format;
-    }
-  });
-  
-  convertBtn.addEventListener('click', () => {
-    if (!selectedFile || !selectedFormat) {
-      alert('Please select a file and output format');
-      return;
-    }
-    
-    convertBtn.disabled = true;
-    convertBtn.textContent = 'Converting...';
-    progressBar.classList.add('visible');
-    
-    // Mock conversion progress
-    let progress = 0;
-    const interval = setInterval(() => {
-      progress += 10;
-      progressFill.style.width = progress + '%';
-      
-      if (progress >= 100) {
-        clearInterval(interval);
-        convertBtn.style.display = 'none';
-        downloadBtn.style.display = 'block';
-        downloadBtn.textContent = 'Download (backend integration pending)';
-        downloadBtn.disabled = true;
-        convertBtn.textContent = 'Convert';
-        convertBtn.disabled = false;
-      }
-    }, 200);
-  });
-
-  // ==================== HOLOMOTION ====================
-  const startDetectionBtn = document.getElementById('startDetectionBtn');
-  const cameraFeed = document.getElementById('cameraFeed');
-  const cameraPlaceholder = document.getElementById('cameraPlaceholder');
-  const gestureText = document.getElementById('gestureText');
-  let cameraStream = null;
-  let detectionActive = false;
-  
-  startDetectionBtn.addEventListener('click', async () => {
-    if (!detectionActive) {
-      try {
-        cameraStream = await navigator.mediaDevices.getUserMedia({ video: true });
-        cameraFeed.srcObject = cameraStream;
-        cameraFeed.classList.add('active');
-        cameraPlaceholder.style.display = 'none';
-        startDetectionBtn.textContent = 'Stop Detection';
-        startDetectionBtn.classList.add('active');
-        detectionActive = true;
-        gestureText.classList.remove('waiting');
-        gestureText.textContent = 'Detecting gestures...';
-        
-        // Mock gesture detection
-        const gestures = ['Open Palm', 'Fist', 'Victory', 'Thumbs Up', 'Pointing'];
-        let gestureIndex = 0;
-        window.gestureInterval = setInterval(() => {
-          if (detectionActive) {
-            gestureText.textContent = 'Gesture detected: ' + gestures[gestureIndex];
-            gestureIndex = (gestureIndex + 1) % gestures.length;
-          }
-        }, 3000);
-        
-      } catch (error) {
-        alert('Camera access denied or not available');
-      }
-    } else {
-      stopDetection();
-    }
-  });
-  
-  function stopDetection() {
-    if (cameraStream) {
-      cameraStream.getTracks().forEach(track => track.stop());
-      cameraStream = null;
-    }
-    cameraFeed.classList.remove('active');
-    cameraPlaceholder.style.display = 'block';
-    startDetectionBtn.textContent = 'Start Detection';
-    startDetectionBtn.classList.remove('active');
-    detectionActive = false;
-    gestureText.classList.add('waiting');
-    gestureText.textContent = 'Waiting for motion input…';
-    if (window.gestureInterval) {
-      clearInterval(window.gestureInterval);
-    }
   }
 
   // ==================== AUTHENTICATION ====================

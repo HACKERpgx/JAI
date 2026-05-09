@@ -1008,37 +1008,56 @@ def is_memory_intent(intent: str) -> bool:
     }
 
 def is_mathematical_query(command: str) -> bool:
-    """Detect if the user is asking a mathematical question"""
+    """Detect if the user is asking a mathematical question with numeric or operator context"""
     math_keywords = [
-        'solve', 'calculate', 'simplify', 'factor', 'expand', 'integrate', 
+        'simplify', 'factor', 'expand', 'integrate', 
         'differentiate', 'derivative', 'integral', 'limit', 'matrix',
-        'determinant', 'inverse', 'eigenvalue', 'statistics', 'mean',
-        'median', 'standard deviation', 'variance', 'equation', 'roots',
+        'determinant', 'inverse', 'eigenvalue', 'roots',
         'polynomial', 'algebra', 'calculus', 'geometry', 'trigonometry'
     ]
     
-    # Check for mathematical symbols and patterns
-    math_patterns = [
-        r'[=+\-*/^]',  # Mathematical operators
-        r'\b\d+\b',    # Numbers
-        r'[xy]',       # Variables
-        r'\b(sin|cos|tan|log|ln|sqrt|pi|e)\b',  # Math functions
-        r'\([^\)]+\)',  # Parentheses
+    # Strong math indicators (rarely used in normal conversation)
+    strong_math_patterns = [
+        r'\b(sin|cos|tan|log|ln|sqrt|pi|e)\b',
         r'\b\d+/\d+\b', # Fractions
+        r'[=^]',        # Equality or Power
+    ]
+    
+    # Contextual math indicators (require numbers or variables)
+    context_required_patterns = [
+        r'[+\-*/]',     # Basic operators
+        r'\b\d+\b',     # Numbers
+        r'\b(x|y|z)\b',  # Common variables
+        r'\([^\)]+\)',  # Parentheses
     ]
     
     command_lower = command.lower()
     
-    # Check for math keywords
+    # Check for strong math patterns first
+    if any(re.search(pattern, command_lower) for pattern in strong_math_patterns):
+        return True
+        
+    # Check if we have at least one numeric/variable context AND a math keyword/operator
+    has_numeric_context = any(re.search(p, command_lower) for p in [r'\b\d+\b', r'\b(x|y|z)\b'])
+    has_operator = any(op in command_lower for op in '+-*/')
+    
+    # Keyword check: requires at least some numeric context or operators to be math
     if any(keyword in command_lower for keyword in math_keywords):
-        return True
-    
-    # Check for math patterns
-    if any(re.search(pattern, command) for pattern in math_patterns):
-        return True
-    
-    # Check for equation-like structures
-    if '=' in command and any(char in command for char in 'xy1234567890'):
+        if has_numeric_context or has_operator:
+            return True
+            
+    # Solve/Calculate/Expression check: high false positive risk, require clear math context
+    if any(k in command_lower for k in ['solve', 'calculate', 'expression', 'math', 'statistics', 'mean', 'median']):
+        if has_numeric_context and has_operator:
+            return True
+        # If it's just numbers and 'solve', maybe it's math
+        if has_numeric_context and ('solve' in command_lower or 'calculate' in command_lower):
+            # But exclude simple "tell me" type questions
+            if not any(w in command_lower for w in ['about', 'story', 'meaning']):
+                return True
+
+    # Final check for equation-like structures
+    if '=' in command_lower and any(char in command_lower for char in 'xyz0123456789'):
         return True
     
     return False

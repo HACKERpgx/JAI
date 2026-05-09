@@ -74,6 +74,15 @@ from fastapi import APIRouter
 from pydantic import BaseModel
 from memory_sqlite import init_db, store_message, get_recent_messages, upsert_user_profile, update_user_preferences
 
+# Import emotional intelligence
+try:
+    from jai_emotional_intelligence import analyze_emotional_context, get_response_guidance
+    EMOTIONAL_INTELLIGENCE_AVAILABLE = True
+except Exception:
+    EMOTIONAL_INTELLIGENCE_AVAILABLE = False
+    analyze_emotional_context = None
+    get_response_guidance = None
+
 # Import Gmail OAuth functionality with security
 try:
     from jai_gmail import send_gmail_email, test_gmail_connection
@@ -1445,6 +1454,20 @@ def jai_reply(prompt: str, session: UserSession) -> str:
          current_time = datetime.now().strftime("%I:%M %p")
          return f"The current time is {current_time}."
 
+     # Emotional intelligence analysis (silent, internal)
+     emotional_guidance = ""
+     if EMOTIONAL_INTELLIGENCE_AVAILABLE and analyze_emotional_context:
+         try:
+             session_context = {
+                 'project_context': session.memory.recall_long_term('current_project'),
+                 'user_name': session.memory.recall_long_term("user_name") or session.user_name
+             }
+             emotional_context = analyze_emotional_context(prompt, session_context)
+             emotional_guidance = get_response_guidance(emotional_context)
+             logging.debug(f"Emotional context: {emotional_context.emotional_state.value}, Intent: {emotional_context.intent.value}, Mode: {emotional_context.response_mode}", extra={'user': session.username})
+         except Exception as e:
+             logging.debug(f"Emotional intelligence analysis skipped: {e}", extra={'user': session.username})
+
      user_name = session.memory.recall_long_term("user_name") or session.user_name
      context = session.memory.get_short_term(limit=10)
      
@@ -1475,6 +1498,10 @@ def jai_reply(prompt: str, session: UserSession) -> str:
      full_prompt += "\n\nIMPORTANT: If the user asks for the time, just return the time in a natural way without repeating it. Do not include the current time in your response unless specifically asked."
      # Ensure language consistency and avoid echoing the prompt
      full_prompt += "\nIMPORTANT: Respond in the same language as the user's input. Do not repeat or paraphrase the user's question; answer directly and concisely."
+     
+     # Add emotional intelligence guidance (silent, internal)
+     if emotional_guidance:
+         full_prompt += f"\n\nRESPONSE GUIDANCE: {emotional_guidance}"
      
      messages = [
          {"role": "system", "content": full_prompt},

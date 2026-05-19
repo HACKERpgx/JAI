@@ -240,6 +240,10 @@ async def api_text(req: WebTextRequest, request: Request):
     rid = request.headers.get("x-request-id") or str(uuid.uuid4())
     token = request_id_ctx_var.set(rid)
     try:
+        text = (req.text or "").strip()
+        if not text:
+            return {"response": "I didn't catch a message there. Type a question and I'll help.", "requestId": rid}
+
         web_id = request.cookies.get("jai_web_id") or "anon"
         username = f"web:{web_id}"
         if username not in ja_sessions:
@@ -253,11 +257,11 @@ async def api_text(req: WebTextRequest, request: Request):
         except Exception:
             pass
         desired_lang = "en"
-        special = _handle_special_qa(req.text)
+        special = _handle_special_qa(text)
         if special is not None:
             result = special
         else:
-            result = execute_command(req.text, session, suppress_tts=True)
+            result = execute_command(text, session, suppress_tts=True)
         result = _ensure_lang(result, desired_lang)
         return {"response": result, "requestId": rid}
     except Exception as e:

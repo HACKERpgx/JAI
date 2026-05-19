@@ -1474,10 +1474,26 @@ _HARMFUL_REQUEST_PATTERNS = [
         ),
         "I can't help create phishing or credential-theft material. I can help with defensive examples, detection checklists, or a safe awareness template.",
     ),
+    (
+        re.compile(
+            r"\b(write|draft|create|generate|compose|make|build|code|develop|give\s+me|help\s+me\s+make)\b"
+            r"(?=.*\b(malware|virus|trojan|ransomware|keylogger|credential\s+stealer|infostealer|worm|botnet|backdoor|spyware)\b)",
+            re.IGNORECASE,
+        ),
+        "I can't help create malware, credential stealers, or abusive code. I can help with malware analysis, detection logic, incident response, or hardening guidance.",
+    ),
+    (
+        re.compile(
+            r"\b(malware|virus|trojan|ransomware|keylogger|credential\s+stealer|infostealer|worm|botnet|backdoor|spyware)\b"
+            r"(?=.*\b(code|script|payload|sample|generator|builder|dropper|loader|persistence|evad(?:e|ing|es|ion))\b)",
+            re.IGNORECASE,
+        ),
+        "I can't provide malware code, payloads, loaders, persistence, or evasion help. I can help with defensive reverse engineering, YARA/Sigma rules, or remediation steps.",
+    ),
 ]
 
 _SAFE_SECURITY_CONTEXT = re.compile(
-    r"\b(detect|identify|spot|recognize|report|block|prevent|awareness|training|defensive|defense|protect|example\s+of\s+what\s+not\s+to\s+click)\b",
+    r"\b(detect|identify|spot|recognize|report|block|prevent|awareness|training|defensive|defense|protect|remediate|mitigate|incident\s+response|yara|sigma|ioc|indicators?\s+of\s+compromise|example\s+of\s+what\s+not\s+to\s+click)\b",
     re.IGNORECASE,
 )
 

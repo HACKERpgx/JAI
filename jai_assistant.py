@@ -1934,7 +1934,7 @@ class VoiceCommandListener(threading.Thread):
 def execute_command(command: str, session: UserSession, suppress_tts: bool = False) -> str:
     # Input validation
     if not command or not isinstance(command, str) or len(command) > 1000:
-        return "Invalid or empty command."
+        return "I didn't catch a message there. Type a question and I'll help."
     
     # Set logging extra for user
     logging_extra = {"user": session.username}

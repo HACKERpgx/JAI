@@ -8,6 +8,8 @@
   const SESSION_KEY = 'jai_session_id';
   const MESSAGES_KEY = 'jai_messages';
   const SYNC_CHANNEL = 'jai_sync_channel';
+  const EMPTY_MESSAGE_TEXT = "Type a message first and I'll help.";
+  const SEND_ERROR_TEXT = "I had trouble sending that. Please try again in a moment.";
   
   // Cross-tab sync variables
   let currentSessionId = null;
@@ -164,6 +166,45 @@
     }
   }
 
+  function escapeHtml(value) {
+    return String(value || '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  function configureMarkdown() {
+    if (!window.marked || window.__jaiMarkdownReady) return;
+
+    const renderer = new window.marked.Renderer();
+    renderer.html = function(token) {
+      const text = typeof token === 'string' ? token : (token && token.text) || '';
+      return escapeHtml(text);
+    };
+
+    window.marked.setOptions({
+      breaks: true,
+      gfm: true,
+      renderer
+    });
+    window.__jaiMarkdownReady = true;
+  }
+
+  function renderAssistantMarkdown(text) {
+    configureMarkdown();
+
+    if (!window.marked || !window.DOMPurify) {
+      return escapeHtml(text).replace(/\n/g, '<br>');
+    }
+
+    const rawHtml = window.marked.parse(String(text || ''));
+    return window.DOMPurify.sanitize(rawHtml, {
+      USE_PROFILES: { html: true }
+    });
+  }
+
   // Logout and session cleanup functions
   async function logout() {
     try {
@@ -251,7 +292,22 @@
   function addMsg(who, text){
     const div = document.createElement('div');
     div.className = 'msg ' + (who === 'You' ? 'you' : 'jai');
-    div.textContent = (who + ': ' + text);
+
+    const label = document.createElement('strong');
+    label.className = 'msg-sender';
+    label.textContent = who + ':';
+
+    const body = document.createElement('div');
+    body.className = 'msg-body';
+
+    if (who === 'JAI') {
+      body.innerHTML = renderAssistantMarkdown(text);
+    } else {
+      body.textContent = text || '';
+    }
+
+    div.appendChild(label);
+    div.appendChild(body);
     messages.appendChild(div);
     messages.scrollTop = messages.scrollHeight;
   }
@@ -270,7 +326,10 @@
 
   async function sendText(){
     const text = textInput.value.trim();
-    if(!text) return;
+    if(!text) {
+      addMsg('JAI', EMPTY_MESSAGE_TEXT);
+      return;
+    }
     
     if (!currentSessionId) {
       initializeSession();
@@ -288,8 +347,8 @@
         },
         body: JSON.stringify({ text })
       });
-      if(!res.ok) throw new Error('HTTP ' + res.status);
       const data = await res.json();
+      if(!res.ok) throw new Error(data.error || data.detail || 'send_failed');
       
       // Update session ID if server returned a new one
       if (data.sessionId && data.sessionId !== currentSessionId) {
@@ -297,7 +356,7 @@
         localStorage.setItem(SESSION_KEY, currentSessionId);
       }
       
-      addMsg('JAI', data.response || '');
+      addMsg('JAI', data.response || SEND_ERROR_TEXT);
       
       // Trigger sync event for other tabs
       triggerSyncEvent({
@@ -316,7 +375,7 @@
       }, 100);
       
     }catch(e){
-      addMsg('JAI', 'Error contacting server');
+      addMsg('JAI', SEND_ERROR_TEXT);
     }
   }
 

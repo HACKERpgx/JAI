@@ -21,6 +21,21 @@
     .line { color:#b6ffd1; text-shadow: 0 0 8px rgba(57,255,20,0.25); white-space: pre-wrap; }
     .line.me { color:#8fffc9; }
     .line.bot { color:#caffea; }
+    .line.bot { white-space: normal; }
+    .line.bot > :first-child { margin-top: 0; }
+    .line.bot > :last-child { margin-bottom: 0; }
+    .line.bot p { margin: 0 0 0.65rem; }
+    .line.bot h1, .line.bot h2, .line.bot h3, .line.bot h4 { margin: 0.85rem 0 0.4rem; line-height: 1.2; color:#d8fff0; }
+    .line.bot h1 { font-size: 1.25rem; }
+    .line.bot h2 { font-size: 1.15rem; }
+    .line.bot h3, .line.bot h4 { font-size: 1rem; }
+    .line.bot ul, .line.bot ol { margin: 0.4rem 0 0.75rem; padding-left: 1.35rem; }
+    .line.bot li { margin: 0.2rem 0; }
+    .line.bot a { color:#8fffc9; }
+    .line.bot blockquote { margin: 0.65rem 0; padding-left: 0.75rem; border-left: 3px solid rgba(57,255,20,0.3); color:#8bc9a7; }
+    .line.bot pre { margin: 0.7rem 0; padding: 0.75rem; overflow-x: auto; border-radius: 8px; border: 1px solid rgba(57,255,20,0.2); background: rgba(0,0,0,0.35); white-space: pre; }
+    .line.bot code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; color:#8fffc9; }
+    .line.bot pre code { color:#d9ffe8; }
     .welcome-state { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 20px; animation: fadeIn 0.6s ease-out; }
     .welcome-state.hidden { display: none; }
     .welcome-headline { font-size: 32px; font-weight: 800; color: #b6ffd1; text-shadow: 0 0 16px rgba(57,255,20,0.4); letter-spacing: 0.5px; margin-bottom: 8px; }
@@ -115,6 +130,9 @@
     .vline{ color:#b6ffd1; text-shadow: 0 0 8px rgba(57,255,20,0.25); white-space: pre-wrap; }
     .vline.me{ color:#8fffc9; }
     .vline.bot{ color:#caffea; }
+    .vline.bot{ white-space: normal; }
+    .vline.bot > :first-child { margin-top: 0; }
+    .vline.bot > :last-child { margin-bottom: 0; }
     /* Auth Styles */
     .auth-btn{ position:fixed; top:14px; right:14px; z-index:10; background:rgba(57,255,20,0.1); border:1px solid rgba(57,255,20,0.35); color:#caffea; padding:8px 14px; border-radius:8px; font-weight:700; cursor:pointer; transition: all .2s ease; }
     .auth-btn:hover{ background:rgba(57,255,20,0.18); }
@@ -383,10 +401,43 @@
   </div>
   </div>
   
+<script src="https://cdn.jsdelivr.net/npm/dompurify@3.2.6/dist/purify.min.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/marked@15.0.7/marked.min.js" crossorigin="anonymous"></script>
 <script>
   function rid(){ return ([1e7]+-1e3+-4e3+-8e3+-1e11).replace(/[018]/g,c=>(c^crypto.getRandomValues(new Uint8Array(1))[0]&15>>c/4).toString(16)); }
   const log = document.getElementById('log');
   const welcomeState = document.getElementById('welcomeState');
+  const EMPTY_MESSAGE_TEXT = "Type a message first and I'll help.";
+  const SEND_ERROR_TEXT = "I had trouble sending that. Please try again in a moment.";
+  
+  function escapeHtml(value) {
+    return String(value || '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+  
+  function configureMarkdown() {
+    if (!window.marked || window.__jaiMarkdownReady) return;
+    const renderer = new window.marked.Renderer();
+    renderer.html = function(token) {
+      const value = typeof token === 'string' ? token : (token && token.text) || '';
+      return escapeHtml(value);
+    };
+    window.marked.setOptions({ breaks: true, gfm: true, renderer });
+    window.__jaiMarkdownReady = true;
+  }
+  
+  function renderMarkdown(text) {
+    configureMarkdown();
+    if (!window.marked || !window.DOMPurify) {
+      return escapeHtml(text).replace(/\n/g, '<br>');
+    }
+    const rawHtml = window.marked.parse(String(text || ''));
+    return window.DOMPurify.sanitize(rawHtml, { USE_PROFILES: { html: true } });
+  }
   
   function push(role, text, imgSrc){
     const div = document.createElement('div');
@@ -399,7 +450,11 @@
     }
     if(text){
       const span = document.createElement('span');
-      span.textContent = text;
+      if (role === 'bot') {
+        span.innerHTML = renderMarkdown(text);
+      } else {
+        span.textContent = text;
+      }
       div.appendChild(span);
     }
     log.appendChild(div);
@@ -435,7 +490,10 @@
     async function sendText(){
     const input = document.getElementById('txt');
     const text = input.value.trim();
-    if(!text) return;
+    if(!text) {
+      push('bot', EMPTY_MESSAGE_TEXT);
+      return;
+    }
     push('me', '> ' + text);
     input.value = '';
     try {
@@ -445,9 +503,10 @@
         body: JSON.stringify({ text })
       });
       const data = await res.json();
-      push('bot', (data && data.response) ? data.response : JSON.stringify(data));
+      if(!res.ok) throw new Error((data && (data.error || data.detail)) || 'send_failed');
+      push('bot', (data && data.response) ? data.response : SEND_ERROR_TEXT);
     } catch(e){
-      push('bot', 'Network error');
+      push('bot', SEND_ERROR_TEXT);
     }
   }
   document.getElementById('send').addEventListener('click', sendText);
@@ -618,7 +677,11 @@
   function vpush(role, text){
     const d = document.createElement('div');
     d.className = 'vline ' + (role==='me'?'me':'bot');
-    d.textContent = text;
+    if (role === 'bot') {
+      d.innerHTML = renderMarkdown(text);
+    } else {
+      d.textContent = text;
+    }
     voiceLog.appendChild(d);
     voiceLog.scrollTop = voiceLog.scrollHeight;
   }

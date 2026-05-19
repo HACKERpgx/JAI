@@ -1457,11 +1457,53 @@ def solve_mathematical_problem(command: str) -> str:
 # -----------------------------
 # JAI Reply (Enhanced for Smarter Responses)
 # -----------------------------
+_HARMFUL_REQUEST_PATTERNS = [
+    (
+        re.compile(
+            r"\b(write|draft|create|generate|compose|make|help\s+me\s+write|give\s+me)\b"
+            r"(?=.*\b(phishing|credential\s+harvest|steal\s+password|steal\s+login|scam\s+email|fake\s+login|impersonat(?:e|ion))\b)",
+            re.IGNORECASE,
+        ),
+        "I can't help create phishing, impersonation, credential-theft, or scam content. I can help write a security-awareness example, a benign training notice, or guidance on spotting and reporting phishing instead.",
+    ),
+    (
+        re.compile(
+            r"\b(phishing|credential\s+harvest|steal\s+password|steal\s+login|fake\s+login)\b"
+            r"(?=.*\b(email|message|page|site|template|script|payload|link)\b)",
+            re.IGNORECASE,
+        ),
+        "I can't help create phishing or credential-theft material. I can help with defensive examples, detection checklists, or a safe awareness template.",
+    ),
+]
+
+_SAFE_SECURITY_CONTEXT = re.compile(
+    r"\b(detect|identify|spot|recognize|report|block|prevent|awareness|training|defensive|defense|protect|example\s+of\s+what\s+not\s+to\s+click)\b",
+    re.IGNORECASE,
+)
+
+def refuse_harmful_request(prompt: str) -> str | None:
+    text = (prompt or "").strip()
+    if not text:
+        return None
+
+    if _SAFE_SECURITY_CONTEXT.search(text):
+        return None
+
+    for pattern, refusal in _HARMFUL_REQUEST_PATTERNS:
+        if pattern.search(text):
+            return refusal
+
+    return None
+
 def jai_reply(prompt: str, session: UserSession) -> str:
      # Check if Groq client is available
      if client is None:
          logging.error("Groq client is not initialized - GROQ_API_KEY may be missing", extra={'user': session.username})
          return "I apologize, sir. My AI systems are not configured. Please set the GROQ_API_KEY environment variable."
+
+     harmful_refusal = refuse_harmful_request(prompt)
+     if harmful_refusal:
+         return harmful_refusal
 
      # Check for time-related queries first
      time_queries = [

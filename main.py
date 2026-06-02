@@ -235,6 +235,8 @@ async def favicon():
     path = os.path.join(BASE_DIR, "static", "favicon.ico")
     return FileResponse(path, media_type="image/x-icon")
 
+# ... (other imports and setup at the top of main.py) ...
+
 @app.post("/api/text")
 async def api_text(req: WebTextRequest, request: Request):
     rid = request.headers.get("x-request-id") or str(uuid.uuid4())
@@ -242,37 +244,56 @@ async def api_text(req: WebTextRequest, request: Request):
     try:
         text = (req.text or "").strip()
         if not text:
-            return {"response": "I didn't catch a message there. Type a question and I'll help.", "requestId": rid}
+            return {"response": "I didn't catch that. What would you like me to do?", "requestId": rid}
 
         web_id = request.cookies.get("jai_web_id") or "anon"
         username = f"web:{web_id}"
+        
         if username not in ja_sessions:
             ja_sessions[username] = JAUserSession(username)
+        
         session = ja_sessions[username]
-        # Force JAI WEBSITE to English-only responses
+
+        # ⬇️ THIS IS WHERE THE ROOT CAUSE CODE LIVES (Inside the session configuration)
         try:
             session.language_mode = "fixed"
             session.preferred_lang = "en"
             session.detected_lang = "en"
         except Exception:
             pass
-        desired_lang = "en"
+
+        # ⬇️ NEW IMPROVED HANDLING FOR PERSONAS & JOKES
+        lower_text = text.lower()
+        
+        if any(x in lower_text for x in ["therapist mode", "storyteller", "trivia", "meditation", "motivation"]):
+            from jai_assistant import _normalize_persona
+            p = _normalize_persona(text)
+            if p:
+                session.persona = p
+                return {"response": f"✅ Activated {p.title()} mode, sir.", "requestId": rid}
+
+        if "joke" in lower_text:
+            from jai_assistant import HUMOROUS_QUIPS
+            import random
+            return {"response": random.choice(HUMOROUS_QUIPS), "requestId": rid}
+
+        # Normal command processing
         special = _handle_special_qa(text)
         if special is not None:
             result = special
         else:
             result = execute_command(text, session, suppress_tts=True)
-        result = _ensure_lang(result, desired_lang)
+
         return {"response": result, "requestId": rid}
+
     except Exception as e:
         logging.error(f"Error in api_text: {e}", exc_info=True)
-        return {"response": f"I apologize, but I encountered an error processing your request. Please try again.", "requestId": rid, "error": str(e)}
+        return {"response": "I apologize, but I encountered an error. Please try again.", "requestId": rid}
     finally:
         try:
             request_id_ctx_var.reset(token)
         except Exception:
             pass
-
 _PERSONA_ALIASES = {
     "story teller": "storyteller",
     "story-teller": "storyteller",

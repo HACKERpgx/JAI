@@ -1416,6 +1416,11 @@ def solve_mathematical_problem(command: str) -> str:
 # -----------------------------
 # JAI Reply (Enhanced for Smarter Responses)
 # -----------------------------
+# Add this at the top of jai_reply function
+if session.persona:
+    system_prompt = build_system_prompt(session.username, session.persona)
+else:
+    system_prompt = build_system_prompt(session.username)
 def jai_reply(prompt: str, session: UserSession) -> str:
      # Check if Groq client is available
      if client is None:

@@ -930,78 +930,45 @@ def is_likely_math(text: str) -> bool:
 # -----------------------------
 # Intent Classification
 # -----------------------------
-def classify_intent(command: str) -> tuple[str, Optional[tuple]]:
-    command = command.lower().strip()
+def classify_intent(command: str) -> Tuple[str, Dict[str, Any]]:
+    cmd = command.lower().strip()
+    
+    # === PRIORITY 1: MATH DETECTION (Put this FIRST) ===
+    math_patterns = [
+        r'\b(\d+)\s*(times|multiply|multiplied by|\*|\+)\s*(\d+)\b',           # "15 times 27"
+        r'\b(what is|calculate|compute)\s*(\d+)\s*(times|\*)\s*(\d+)\b',      # "what is 15 times 27"
+        r'\b(\d+)\s*(plus|\+|\-|\*|divided by|/)\s*(\d+)\b',                  # "15 + 27"
+        r'\b(solve|simplify|factor|expand|integrate|derivative)\b',           # math keywords
+        r'\b(\d+)%\s*of\s*(\d+)\b',                                            # "15% of 200"
+    ]
+    
+    for pattern in math_patterns:
+        if re.search(pattern, cmd):
+            return "mathematical_query", {"expression": command}  # Keep original casing
+    
+    # === PRIORITY 2: Specific high-confidence patterns ===
     patterns = {
         "activate aj": r"act(?:iv|ic)?ate\s+(?:aj|jai|ai|assistant)",
         "activate text mode": r"act(?:iv|ic)?ate\s+text(?:\s+mode)?",
         "activate voice mode": r"act(?:iv|ic)?ate\s+voice(?:\s+mode)?",
         "screenshot": r"screenshot|screen\s+capture|snap",
-        "mouse up": r"mouse\s+up|move\s+up",
-        "open browser": r"open\s+browser|open\s+tab|open\s+firefox",
-        "open app": r"open\s+(notepad|calculator|word|excel|spotify|vscode|code|file explorer|recycle bin|control panel|google chrome|chrome|microsoft store|youtube)",
-        "set timer": r"set\s+timer\s+(for\s+)?(\d+)(?:\s+(minutes?|seconds?))?",
-        "terminate": r"terminate\b",
-        "shutdown": r"shutdown|power\s+off",
-        "restart": r"restart|reboot",
-        "sleep": r"sleep|snooze",
-        "hibernate": r"hibernate",
-        "lock": r"lock\s+screen",  # Expanded PC control
-        "download from chrome": r"download\s+(.+)\s+from\s+chrome",
-        "volume": r"set\s+volume\s+to\s+(\d+)|(?:^|\s)mute(?:$|\s)|unmute",
-        "system info": r"check\s+(battery|cpu|ram|memory|disk)",
-        "search": r"search\s+(.+)",
-        "search memory": r"search\s+memory\s+(.+)",
-        "remember": r"remember\s+(.+)",
-        "update": r"update\s+(.+?)\s+(to|with)\s+(.+)",
-        "forget": r"forget\s+(.+)",
-        "recall": r"recall\s+(.+)",
-        "set_fact": r"my\s+([a-z ]+?)\s+is\s+(.+)",
-        "recall_fact": r"(?:do\s+you\s+)?(?:remember|recall|know)\s+my\s+(.+?)\??$|what(?:'s|\s+is)\s+my\s+(.+?)\??$",
-        "show short term memory": r"(?:show|tell\s+me\s+about)\s+(?:your\s+)?short\s+term\s+memory|list\s+short\s+term\s+memories",
-        "show long term memory": r"(?:show|tell\s+me\s+about)\s+(?:your\s+)?long\s+term\s+memory|list\s+long\s+term\s+memories",
-        "close app": r"close\s+(notepad|calculator|word|excel|chrome|google chrome|youtube|browser|file explorer|vscode)",
+        "current_time": r"what time is it|what's the time|tell me the time|current time|time now",
         "greeting": r"hello|hi|hey|good\s+(morning|evening|night)",
-        "set language": r"(?:(?:you\s+will\s+)?(?:speak|set|use)\s+(?:only\s+)?(hindi|urdu|arabic|russian|spanish|english))|(?:english\s+only|only\s+english|always\s+english)",
-        "auto language": r"(?:auto\s+language|auto\s+lang|speak\s+auto|default\s+language)",
         "who are you": r"who\s+(are\s+you|is\s+(?:jai|aj))",
-        "set name": r"my\s+name\s+is\s+(\w+)",
-        "weather": r"weather(?:\s+in\s+(.+))?",
-        "news": r"news|headlines|top\s+\d*\s*(?:latest|recent)?\s*(?:world|global)?\s*news",  # New intent for news
-        "nasa apod": r"(?:(?:nasa\s+(?:apod|pictures?\s+of\s+(?:the\s+day|today)))|apod)(?:\s+(today|yesterday|\d{4}-\d{2}-\d{2}))?(?:\s+(hd))?",
-        "analyze_sentiment": r"analyz[e]?\s+.*sentiment|sentiment.*analyz|sentiment.*(?:positive|negative|neutral)",  # Sentiment analysis
-        "summarize_news": r"(?:create|write|make).*(?:summary|bulletin|paragraph).*(?:news|stories|headlines)|summarize.*(?:news|headlines|stories)|read.*(?:news|bulletin)",  # News summary
-        "rewrite_headlines": r"(?:rewrite|make|create|write).*?(?:catchy|social|friendly)?\s*headlines|headlines.*(?:catchy|social|friendly|style)",  # Rewrite headlines
-        "business_insights": r".*(?:trends|risks|insights|implications).*(?:business|owner|company)|business.*(?:trends|risks|insights)|(?:what|which).*(?:trends|risks).*(?:business|owner)",  # Business insights from news
-        "remind_me": r"remind me|set (?:a )?reminder|reminder for",  # Reminders
-        "list_reminders": r"list reminders|show reminders|what are my reminders|my reminders",  # List reminders
-        "list_events": r"list events|show events|what's on my calendar|my calendar|upcoming events",  # List events
-        "add_event": r"add event|create event|schedule (?:a |an )?(?:event|meeting|appointment)",  # Add calendar event
-        "write_here": r"(?:write|right|type)\s+(.+?)\s+(?:here|hear|hair|hare)\s*$",
-        "write_in_app": r"(?:write|right|type)\s+(.+?)\s+in\s+(notepad|word|chrome|edge|vscode|code|excel|teams)\s*$",
-        "start_dictation": r"(?:write\s+what\s+i\s+say\s+here|dictate\s+here|start\s+dictation)",
-        "stop_dictation": r"(?:stop\s+(?:dictation|writing)|cancel\s+(?:dictation|writing))",
-        "write_description_here": r"write\s+your\s+description\s+here",
-        "sum_primes": r"(?:compute|calculate|find|sum)\s+(?:the\s+)?(?:exact\s+)?sum\s+of\s+primes?(?:\s+which\s+is)?\s*(?:<=|less\s+and\s*equal\s+than|less\s+than\s+or\s+equal\s+to|up\s+to|below)\s*([\d_, ]+)",
-        "solve_math": r"(?:solve|calculate|simplify|factor|expand|integrate|differentiate)\s+(.+)$",
-        "feedback_wrong": r"(?:(?:this|that|it)\s+is\s+wrong|(?:you're|you are)\s+wrong|wrong\s+(?:answer|response)|that's\s+wrong|not\s+correct|incorrect)",
-        "muse_image": r"(?:muse\s+)?(?:generate|create|make)\s+(?:an?\s+)?image(?:\s+of|\s+for)?\s+(.+)",
-        "muse_transcribe": r"(?:muse\s+)?transcribe\s+(.+)",
-        "muse_detect": r"(?:muse\s+)?detect\s+objects\s+in\s+(.+)",
-        "muse_search": r"(?:muse\s+)?search\s+images?\s+for\s+(.+)",
-        "send_email": r"send\s+(?:an?\s+)?email\s+(?:to\s+)?(.+?)(?:\s+(?:with|about|subject)\s+(.+))?$|email\s+(.+?)(?:\s+(?:with|about|subject)\s+(.+))?$",
-        "test_gmail": r"test\s+gmail|gmail\s+test|check\s+gmail",
-        "current_time": r"what time is it|what's the time|tell me the time|current time|time now"  # Current time
+        "send_email": r"send\s+(?:an?\s+)?email\s+(?:to\s+)?(.+?)(?:\s+(?:with|about|subject)\s+(.+))?$",
+        # ... keep your other patterns here ...
     }
+    
     for intent, pattern in patterns.items():
-        match = re.match(pattern, command)
-        if match:
-            return intent, match.groups() if match.groups() else None
-    for intent in patterns:
-        if fuzz.partial_ratio(command, intent.replace(" ", "")) > 85:
+        if re.search(pattern, cmd):   # Changed from re.match to re.search
             return intent, None
+    
+    # Fuzzy fallback (last resort)
+    for intent in patterns:
+        if fuzz.partial_ratio(cmd, intent.replace(" ", "")) > 85:
+            return intent, None
+    
     return "query", None
-
 def is_memory_intent(intent: str) -> bool:
     return intent in {
         "search memory",
@@ -1895,28 +1862,44 @@ class VoiceCommandListener(threading.Thread):
 # -----------------------------
 # Execute Command
 # -----------------------------
-# At the top with other imports
-try:
-    from jai_carbon import carbon_client, handle_carbon_command
-    CARBON_AVAILABLE = True
-except ImportError:
-    CARBON_AVAILABLE = False
-    handle_carbon_command = None
 def execute_command(command: str, session: UserSession, suppress_tts: bool = False) -> str:
     """Main command executor with carbon interface support."""
-    
+  
     # Input validation
     if not command or not isinstance(command, str) or len(command) > 1000:
         return "I didn't catch a message there. Type a question and I'll help."
-    
+  
     command_lower = command.lower().strip()
-    
-    # === NEW: Carbon Footprint Commands ===
+  
+    # === CARBON FOOTPRINT COMMANDS ===
     if any(keyword in command_lower for keyword in ["carbon", "footprint", "co2"]):
         if "handle_carbon_command" in globals():
             return handle_carbon_command(command, session)
         else:
             return "Carbon estimation feature is not loaded. Please check server configuration."
+
+    # === MATH QUERY HANDLING (Highest Priority) ===
+    if is_mathematical_query(command):
+        return solve_mathematical_problem(command)
+
+    # === REGULAR INTENT CLASSIFICATION ===
+    intent, args = classify_intent(command)
+
+    # ... your existing code for other intents goes here ...
+
+    # Example of how you can continue (keep your current logic):
+    if intent == "greeting":
+        return f"Hello, {session.user_name or 'sir'}! How can I assist you today?"
+    elif intent == "current_time":
+        from datetime import datetime
+        return f"The current time is {datetime.now().strftime('%I:%M %p')}, sir."
+    elif intent == "send_email":
+        # your email handling...
+        pass
+    # ... rest of your intents ...
+
+    # Default fallback
+    return "I'm not sure how to handle that request. Could you please rephrase?"
     
     # === EXISTING COMMAND HANDLING ===
     # Put ALL your original if/elif conditions here

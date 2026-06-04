@@ -5,6 +5,11 @@ from dotenv import load_dotenv
 import requests
 import re
 try:
+    from jai_carbon import carbon_client
+    CARBON_AVAILABLE = True
+except ImportError:
+    CARBON_AVAILABLE = False
+try:
     from fuzzywuzzy import fuzz
 except ImportError:
     from difflib import SequenceMatcher
@@ -1890,11 +1895,60 @@ class VoiceCommandListener(threading.Thread):
 # -----------------------------
 # Execute Command
 # -----------------------------
+# At the top with other imports
+try:
+    from jai_carbon import carbon_client, handle_carbon_command
+    CARBON_AVAILABLE = True
+except ImportError:
+    CARBON_AVAILABLE = False
+    handle_carbon_command = None
 def execute_command(command: str, session: UserSession, suppress_tts: bool = False) -> str:
+    """Main command executor with carbon interface support."""
+    
     # Input validation
     if not command or not isinstance(command, str) or len(command) > 1000:
         return "I didn't catch a message there. Type a question and I'll help."
     
+    command_lower = command.lower().strip()
+    
+    # === NEW: Carbon Footprint Commands ===
+    if any(keyword in command_lower for keyword in ["carbon", "footprint", "co2"]):
+        if "handle_carbon_command" in globals():
+            return handle_carbon_command(command, session)
+        else:
+            return "Carbon estimation feature is not loaded. Please check server configuration."
+    
+    # === EXISTING COMMAND HANDLING ===
+    # Put ALL your original if/elif conditions here
+    # (weather, news, open apps, reminders, controls, etc.)
+    
+    if "weather" in command_lower:
+        return get_weather(command)
+    elif "news" in command_lower:
+        return get_news()
+    elif "open" in command_lower:
+        return handle_open_command(command, session)
+    elif "remind" in command_lower or "reminder" in command_lower:
+        return handle_calendar_command(command, session)
+    # ... add your other handlers here ...
+    
+    # Default to AI reply if no specific handler matched
+    response = jai_reply(command, session)
+    
+    # Optional TTS
+    if not suppress_tts and SPEAK_RESPONSES and tts:
+        try:
+            tts.speak(response)
+        except Exception as e:
+            logging.error(f"TTS error: {e}")
+    
+    # Save to memory
+    try:
+        session.memory.add_short_term({"user": command, "response": response})
+    except Exception as e:
+        logging.error(f"Memory error: {e}")
+    
+    return response
     # Set logging extra for user
     logging_extra = {"user": session.username}
     global voice_listener_thread

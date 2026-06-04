@@ -4,6 +4,9 @@ from datetime import datetime, timedelta
 from dotenv import load_dotenv
 import requests
 import re
+
+
+
 try:
     from jai_carbon import carbon_client
     CARBON_AVAILABLE = True
@@ -336,6 +339,7 @@ def get_phrase(key: str, lang: str = 'en') -> str:
 # -----------------------------
 # Configuration
 # -----------------------------
+
 current_dir = pathlib.Path(__file__).parent.absolute()
 env_path = current_dir / '.env'
 load_dotenv(dotenv_path=env_path)
@@ -378,6 +382,19 @@ TYPE_DEDUP_WINDOW_SEC = float(os.environ.get("TYPE_DEDUP_WINDOW_SEC", "3.0"))
 VOICE_DEDUP_WINDOW_SEC = float(os.environ.get("VOICE_DEDUP_WINDOW_SEC", "2.0"))
 TTS_CALL_DEDUP_WINDOW_SEC = float(os.environ.get("TTS_CALL_DEDUP_WINDOW_SEC", "4.0"))
 
+# jai_carbon.py
+def handle_carbon_command(command: str, session) -> str:
+    """Simple carbon footprint handler"""
+    cmd = command.lower()
+    if "driving" in cmd or "car" in cmd:
+        return "Driving a car for 100 km produces approximately 20-25 kg of CO2 (depending on the car type and fuel efficiency)."
+    elif "flight" in cmd or "flying" in cmd or "plane" in cmd:
+        return "A round-trip flight from New York to London produces around 1,000-1,800 kg of CO2 per passenger."
+    elif "beef" in cmd or "meat" in cmd:
+        return "Eating beef has a high carbon footprint — about 60 kg CO2 per kg of beef, much higher than vegetables."
+    else:
+        return "I can help estimate carbon footprints for activities like driving, flying, or diet. Try asking something specific like 'carbon footprint of driving a car for 100 km'."
+        
 # Initialize TTS with comprehensive error handling
 tts = None
 TTS_VOICE = TTS_VOICE

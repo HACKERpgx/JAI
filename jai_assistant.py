@@ -1506,7 +1506,14 @@ def jai_reply(prompt: str, session: UserSession) -> str:
              return answer
          return answer
      except Exception as e:
+         error_str = str(e).lower()
          logging.error(f"AI error: {str(e)}", extra={'user': session.username})
+         
+         # Check for timeout specifically
+         if "timeout" in error_str or "timed out" in error_str:
+             logging.warning("AI request timed out", extra={'user': session.username})
+             return "I apologize, sir. The request took too long to process. Please try again."
+         
          # Try fallback models on Groq
          fallback_models = [
              "llama3-8b-8192",  # Llama 3 8B
@@ -1520,11 +1527,17 @@ def jai_reply(prompt: str, session: UserSession) -> str:
                      model=fallback_model,
                      messages=messages,
                      max_tokens=1000,
-                     temperature=0.7
+                     temperature=0.7,
+                     timeout=30.0  # 30 second timeout to prevent hanging
                  )
                  logging.info(f"Fallback model {fallback_model} succeeded", extra={'user': session.username})
                  return response.choices[0].message.content
              except Exception as e_fallback:
+                 fallback_error_str = str(e_fallback).lower()
+                 # Check for timeout in fallback
+                 if "timeout" in fallback_error_str or "timed out" in fallback_error_str:
+                     logging.warning(f"Fallback model {fallback_model} timed out", extra={'user': session.username})
+                     continue
                  logging.warning(f"Fallback model {fallback_model} failed: {str(e_fallback)[:100]}", extra={'user': session.username})
                  continue
          
@@ -1665,6 +1678,7 @@ def _generate_description_text() -> str:
                 messages=messages,
                 max_tokens=80,
                 temperature=0.5,
+                timeout=30.0  # 30 second timeout to prevent hanging
             )
             txt = resp.choices[0].message.content.strip()
             return txt

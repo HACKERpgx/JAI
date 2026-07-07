@@ -671,7 +671,8 @@ def _analyze_with_groq(data: bytes, mime: str, prompt: str, analysis_type: str =
                     model=model_name,
                     messages=messages,
                     max_tokens=1024,
-                    temperature=0.3
+                    temperature=0.3,
+                    timeout=30.0  # 30 second timeout to prevent hanging
                 )
                 
                 if response.choices and response.choices[0].message.content:
@@ -2076,4 +2077,5 @@ if __name__ == "__main__":
         host="0.0.0.0",
         port=8000,
         log_level="info"
+    )
     )

@@ -329,6 +329,7 @@ def _analyze_image_bytes(data: bytes, mime: str, prompt: str) -> str:
                     messages=messages,
                     max_tokens=800,
                     temperature=0.2,
+                    timeout=30.0  # 30 second timeout to prevent hanging
                 )
                 text = resp.choices[0].message.content
                 return (text or "").strip() or "No description generated."

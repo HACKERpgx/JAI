@@ -80,7 +80,10 @@ try:
     load_dotenv('.env.local', override=True)
 except Exception:
     pass
-app = FastAPI(title="JAI Web API")
+app = FastAPI(
+    title="JAI Web API",
+    default_response_class=JSONResponse
+)
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 # Also load env files relative to server directory to avoid CWD issues
 try:
@@ -111,10 +114,20 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+<<<<<<< HEAD
+=======
+# Add UTF-8 charset middleware
+@app.middleware("http")
+    if "content-type" in response.headers:
+        content_type = response.headers["content-type"]
+        if "charset" not in content_type.lower():
+            if "text/" in content_type.lower() or "application/json" in content_type.lower():
+                response.headers["content-type"] = f"{content_type}; charset=utf-8"
+    return response
+
+>>>>>>> master
 try:
-    if init_ids is not None:
-        _ids = init_ids(app)
-    else:
+    if init_ids i
         _ids = None
 except Exception:
     _ids = None

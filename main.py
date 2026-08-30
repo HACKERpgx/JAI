@@ -114,20 +114,20 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-<<<<<<< HEAD
-=======
 # Add UTF-8 charset middleware
 @app.middleware("http")
+async def add_charset_header(request: Request, call_next):
+    response = await call_next(request)
     if "content-type" in response.headers:
         content_type = response.headers["content-type"]
         if "charset" not in content_type.lower():
             if "text/" in content_type.lower() or "application/json" in content_type.lower():
                 response.headers["content-type"] = f"{content_type}; charset=utf-8"
     return response
-
->>>>>>> master
 try:
-    if init_ids i
+    if init_ids is not None:
+        _ids = init_ids(app)
+    else:
         _ids = None
 except Exception:
     _ids = None

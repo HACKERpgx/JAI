@@ -25,6 +25,7 @@ class CalendarManager:
         self.db_path = db_path
         self.conn = sqlite3.connect(db_path, check_same_thread=False)
         self.cursor = self.conn.cursor()
+        self.cursor.execute('PRAGMA encoding = "UTF-8"')
         self.on_reminder = on_reminder or self._default_reminder_handler
         self._create_tables()
         

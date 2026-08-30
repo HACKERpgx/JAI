@@ -9,6 +9,7 @@ DB_PATH = os.path.join(_DATA_DIR, 'jai_memory.db')
 def _connect():
     conn = sqlite3.connect(DB_PATH, check_same_thread=False)
     conn.row_factory = sqlite3.Row
+    conn.execute('PRAGMA encoding = "UTF-8"')
     return conn
 
 def init_db(db_path=None):

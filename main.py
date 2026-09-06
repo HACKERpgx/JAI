@@ -94,8 +94,8 @@ try:
     load_dotenv(os.path.join(BASE_DIR, '.env.local'), override=True)
 except Exception:
     pass
-templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "templates"))
-app.mount("/static", StaticFiles(directory=os.path.join(BASE_DIR, "static")), name="static")
+templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "JAI", "templates"))
+app.mount("/static", StaticFiles(directory=os.path.join(BASE_DIR, "JAI", "static")), name="static")
 # Favicon directory - mount only if exists and not empty
 favicon_dir = os.path.join(BASE_DIR, "apps", "web_static", "favicon")
 if os.path.isdir(favicon_dir) and os.listdir(favicon_dir):
@@ -225,27 +225,27 @@ async def index(request: Request):
 
 @app.get("/manifest.json")
 async def manifest():
-    path = os.path.join(BASE_DIR, "static", "manifest.json")
+    path = os.path.join(BASE_DIR, "JAI", "static", "manifest.json")
     return FileResponse(path)
 
 @app.get("/service-worker.js")
 async def service_worker():
-    path = os.path.join(BASE_DIR, "static", "service-worker.js")
+    path = os.path.join(BASE_DIR, "JAI", "static", "service-worker.js")
     return FileResponse(path, media_type="application/javascript")
 
 @app.get("/static/icon-192.png")
 async def icon_192():
-    path = os.path.join(BASE_DIR, "static", "icon-192.png")
+    path = os.path.join(BASE_DIR, "JAI", "static", "icon-192.png")
     return FileResponse(path, media_type="image/png")
 
 @app.get("/static/icon-512.png")
 async def icon_512():
-    path = os.path.join(BASE_DIR, "static", "icon-512.png")
+    path = os.path.join(BASE_DIR, "JAI", "static", "icon-512.png")
     return FileResponse(path, media_type="image/png")
 
 @app.get("/static/favicon.ico")
 async def favicon():
-    path = os.path.join(BASE_DIR, "static", "favicon.ico")
+    path = os.path.join(BASE_DIR, "JAI", "static", "favicon.ico")
     return FileResponse(path, media_type="image/x-icon")
 
 # ... (other imports and setup at the top of main.py) ...
@@ -1141,7 +1141,7 @@ async def email_categorizer_interface(request: Request):
 @app.get("/space-tracker", response_class=HTMLResponse)
 async def space_tracker_interface(request: Request):
     """Serve the space tracker interface"""
-    path = os.path.join(BASE_DIR, "templates", "space-tracker.html")
+    path = os.path.join(BASE_DIR, "JAI", "templates", "space-tracker.html")
     if os.path.exists(path):
         return FileResponse(path)
     else:

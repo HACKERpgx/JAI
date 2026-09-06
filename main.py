@@ -1138,6 +1138,15 @@ async def email_categorizer_interface(request: Request):
     else:
         return HTMLResponse("<h1>Email categorizer interface not found</h1>", status_code=404)
 
+@app.get("/space-tracker", response_class=HTMLResponse)
+async def space_tracker_interface(request: Request):
+    """Serve the space tracker interface"""
+    path = os.path.join(BASE_DIR, "templates", "space-tracker.html")
+    if os.path.exists(path):
+        return FileResponse(path)
+    else:
+        return HTMLResponse("<h1>Space tracker interface not found</h1>", status_code=404)
+
 @app.post("/api/autonomous/process")
 async def autonomous_process(req: AutonomousRequest, request: Request):
     """Process request using autonomous system"""

@@ -8,6 +8,7 @@ from typing import Optional, List, Any, Union
 import time
 import uuid
 import os
+import logging
 from dotenv import load_dotenv
 import re
 from jai_assistant import execute_command, sessions as ja_sessions, UserSession as JAUserSession, request_id_ctx_var, detect_language as jai_detect_language
@@ -47,6 +48,10 @@ try:
 except Exception as e:
     init_ids = None
     get_ids_instance = None
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # Import math engine
 try:
@@ -94,8 +99,59 @@ try:
     load_dotenv(os.path.join(BASE_DIR, '.env.local'), override=True)
 except Exception:
     pass
-templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "JAI", "templates"))
-app.mount("/static", StaticFiles(directory=os.path.join(BASE_DIR, "JAI", "static")), name="static")
+
+# Determine template directory - check multiple possible locations
+template_dirs = [
+    os.path.join(BASE_DIR, "JAI", "templates"),
+    os.path.join(BASE_DIR, "templates"),
+    os.path.join(BASE_DIR, "..", "JAI", "templates"),
+    os.path.join(BASE_DIR, "..", "templates"),
+]
+
+logger.info(f"BASE_DIR: {BASE_DIR}")
+logger.info("Looking for templates in:")
+for dir_path in template_dirs:
+    logger.info(f"  - {dir_path} (exists: {os.path.isdir(dir_path)})")
+
+templates_dir = None
+for dir_path in template_dirs:
+    if os.path.isdir(dir_path) and os.path.exists(os.path.join(dir_path, "index.html")):
+        templates_dir = dir_path
+        logger.info(f"Found templates at: {templates_dir}")
+        break
+
+if templates_dir is None:
+    # Fallback to original path if none found
+    templates_dir = os.path.join(BASE_DIR, "JAI", "templates")
+    logger.warning(f"Using fallback templates directory: {templates_dir}")
+
+templates = Jinja2Templates(directory=templates_dir)
+
+# Determine static directory - check multiple possible locations
+static_dirs = [
+    os.path.join(BASE_DIR, "JAI", "static"),
+    os.path.join(BASE_DIR, "static"),
+    os.path.join(BASE_DIR, "..", "JAI", "static"),
+    os.path.join(BASE_DIR, "..", "static"),
+]
+
+logger.info("Looking for static files in:")
+for dir_path in static_dirs:
+    logger.info(f"  - {dir_path} (exists: {os.path.isdir(dir_path)})")
+
+static_dir = None
+for dir_path in static_dirs:
+    if os.path.isdir(dir_path):
+        static_dir = dir_path
+        logger.info(f"Found static files at: {static_dir}")
+        break
+
+if static_dir is None:
+    # Fallback to original path if none found
+    static_dir = os.path.join(BASE_DIR, "JAI", "static")
+    logger.warning(f"Using fallback static directory: {static_dir}")
+
+app.mount("/static", StaticFiles(directory=static_dir), name="static")
 # Favicon directory - mount only if exists and not empty
 favicon_dir = os.path.join(BASE_DIR, "apps", "web_static", "favicon")
 if os.path.isdir(favicon_dir) and os.listdir(favicon_dir):

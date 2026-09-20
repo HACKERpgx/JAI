@@ -100,6 +100,23 @@
     .tip-icon{ width:22px; height:22px; display:grid; place-items:center; border-radius:50%; border:1px solid rgba(57,255,20,0.35); background: rgba(57,255,20,0.08); color:#b6ffd1; font-weight:800; cursor:default; }
     .tip-bubble{ display:none; position:absolute; top:120%; right:0; min-width:280px; max-width:380px; background: rgba(6,20,14,0.95); border:1px solid rgba(57,255,20,0.35); color:#d8ffe9; padding:10px 12px; border-radius:10px; box-shadow: 0 0 14px rgba(57,255,20,0.15); z-index:5; }
     .tooltip:hover .tip-bubble{ display:block; }
+    .auth-modal{ position:fixed; inset:0; z-index:10; display:none; align-items:center; justify-content:center; background: rgba(0,0,0,0.72); backdrop-filter: blur(4px); }
+    .auth-modal.open{ display:flex; }
+    .auth-panel{ width:min(420px, 92vw); background: linear-gradient(180deg, rgba(6,20,14,0.96), rgba(2,10,6,0.98)); border:1px solid rgba(57,255,20,0.3); border-radius:14px; box-shadow: 0 0 28px rgba(57,255,20,0.18); padding:20px; position:relative; }
+    .auth-panel h2{ margin:0 0 14px; font-size:18px; color:#b6ffd1; text-shadow: 0 0 8px rgba(57,255,20,0.3); }
+    .auth-close{ position:absolute; top:10px; right:12px; background:none; border:none; color:#8bc9a7; font-size:22px; line-height:1; cursor:pointer; }
+    .auth-tabs{ display:flex; gap:8px; margin-bottom:16px; }
+    .auth-tab{ flex:1; padding:8px 10px; border-radius:9px; border:1px solid rgba(57,255,20,0.25); background: rgba(57,255,20,0.06); color:#caffea; font-weight:700; cursor:pointer; }
+    .auth-tab.active{ background: rgba(57,255,20,0.18); color:#eaffef; }
+    .auth-field{ margin-bottom:14px; display:flex; flex-direction:column; }
+    .auth-field label{ font-size:12px; letter-spacing:0.4px; color:#8bc9a7; margin-bottom:6px; }
+    .auth-input{ background: rgba(0,0,0,0.35); border:1px solid rgba(57,255,20,0.25); border-radius:9px; color:#d9ffe8; padding:10px 12px; font: 14px/1.3 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; outline-color: rgba(57,255,20,0.5); }
+    .auth-submit{ width:100%; padding:11px 12px; border-radius:10px; border:1px solid rgba(57,255,20,0.4); background: rgba(57,255,20,0.14); color:#eaffef; font-weight:800; cursor:pointer; }
+    .auth-submit:disabled{ opacity:0.6; cursor:progress; }
+    .auth-status{ margin-top:12px; font-size:13px; min-height:18px; color:#8bc9a7; }
+    .auth-status.error{ color:#ff6b6b; }
+    .auth-status.success{ color:#8fffc9; }
+    #navAuth .auth-email{ display:block; font-size:11px; font-weight:500; color:#8bc9a7; overflow:hidden; text-overflow:ellipsis; }
     @media (max-width: 940px){ .modes{ grid-template-columns: repeat(2, minmax(0,1fr)); } }
     @media (max-width: 640px){ .stacker{ margin-left:0; } .voice-dashboard{ margin-left:0; } .sidebar{ position:static; width:auto; flex-direction:row; gap:8px; border:0; background:transparent; padding:8px; } .brand{ border:0; margin:0; padding:0 8px; } }
   </style>
@@ -109,6 +126,7 @@
   <div class="overlay"></div>
   <nav class="sidebar">
     <div class="brand">JAI</div>
+    <button id="navAuth" class="nav-item">Sign In</button>
     <button id="navChat" class="nav-item active">Chat</button>
     <button id="navVoice" class="nav-item">Voice Mode</button>
     <button id="navFileConverter" class="nav-item" onclick="window.open('https://convertio.co/', '_blank', 'noopener,noreferrer')">File Converter</button>
@@ -242,7 +260,35 @@
     </div>
   </div>
   <div id="imageDash" class="image-dashboard" style="display:none"></div>
-  
+
+  <div id="authModal" class="auth-modal" role="dialog" aria-modal="true" aria-labelledby="authTitle">
+    <div class="auth-panel">
+      <button type="button" class="auth-close" id="authClose" aria-label="Close">&times;</button>
+      <h2 id="authTitle">Sign in to JAI</h2>
+      <div class="auth-tabs">
+        <button type="button" class="auth-tab active" id="tabSignin">Sign In</button>
+        <button type="button" class="auth-tab" id="tabSignup">Sign Up</button>
+      </div>
+      <form id="authForm" novalidate>
+        <div class="auth-field">
+          <label for="authEmail">Email</label>
+          <input class="auth-input" id="authEmail" name="email" type="email" autocomplete="email" placeholder="you@example.com" />
+        </div>
+        <div class="auth-field">
+          <label for="authPassword">Password</label>
+          <input class="auth-input" id="authPassword" name="password" type="password" autocomplete="current-password" placeholder="At least 8 characters" />
+        </div>
+        <div class="auth-field" id="confirmField" style="display:none">
+          <label for="authConfirm">Confirm Password</label>
+          <input class="auth-input" id="authConfirm" name="confirm" type="password" autocomplete="new-password" placeholder="Re-enter your password" />
+        </div>
+        <button type="submit" class="auth-submit" id="authSubmit">Sign In</button>
+        <div class="auth-status" id="authStatus" role="status" aria-live="polite"></div>
+      </form>
+    </div>
+  </div>
+
+<script src="/static/form-validation.js"></script>
 <script>
   function rid(){ return ([1e7]+-1e3+-4e3+-8e3+-1e11).replace(/[018]/g,c=>(c^crypto.getRandomValues(new Uint8Array(1))[0]&15>>c/4).toString(16)); }
   const log = document.getElementById('log');
@@ -479,6 +525,158 @@
       speechSynthesis.speak(u);
     }catch(_){ /* no-op */ }
   }
+
+  // ---- Authentication (Supabase) ----
+  (function(){
+    const V = window.JAIValidation;
+    const modal = document.getElementById('authModal');
+    const form = document.getElementById('authForm');
+    const navAuth = document.getElementById('navAuth');
+    const tabSignin = document.getElementById('tabSignin');
+    const tabSignup = document.getElementById('tabSignup');
+    const confirmField = document.getElementById('confirmField');
+    const submit = document.getElementById('authSubmit');
+    const statusEl = document.getElementById('authStatus');
+    const title = document.getElementById('authTitle');
+    if(!V || !form) return;
+
+    let mode = 'signin';
+    let client = null;
+    let clientPromise = null;
+    let currentUser = null;
+
+    function setStatus(text, kind){
+      statusEl.textContent = text || '';
+      statusEl.className = 'auth-status' + (kind ? ' ' + kind : '');
+    }
+
+    function setMode(next){
+      mode = next;
+      const isSignup = mode === 'signup';
+      tabSignup.classList.toggle('active', isSignup);
+      tabSignin.classList.toggle('active', !isSignup);
+      confirmField.style.display = isSignup ? 'flex' : 'none';
+      document.getElementById('authPassword').setAttribute('autocomplete', isSignup ? 'new-password' : 'current-password');
+      title.textContent = isSignup ? 'Create your JAI account' : 'Sign in to JAI';
+      submit.textContent = isSignup ? 'Sign Up' : 'Sign In';
+      V.clearErrors(form);
+      setStatus('');
+    }
+
+    function openModal(){ modal.classList.add('open'); document.getElementById('authEmail').focus(); }
+    function closeModal(){
+      modal.classList.remove('open');
+      form.reset();
+      V.clearErrors(form);
+      setStatus('');
+      submit.disabled = false;
+      submit.textContent = mode === 'signup' ? 'Sign Up' : 'Sign In';
+    }
+
+    async function getClient(){
+      if(client) return client;
+      if(clientPromise) return clientPromise;
+      clientPromise = (async ()=>{
+        const cfg = await (await fetch('/api/auth/config')).json();
+        if(!cfg.enabled) throw new Error('Authentication is not configured on this server.');
+        if(!window.supabase){
+          await new Promise((resolve, reject)=>{
+            const s = document.createElement('script');
+            s.src = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.47.10/dist/umd/supabase.min.js';
+            s.onload = resolve;
+            s.onerror = ()=> reject(new Error('Could not load the authentication library.'));
+            document.head.appendChild(s);
+          });
+        }
+        client = window.supabase.createClient(cfg.supabase_url, cfg.supabase_anon_key, {
+          auth: { autoRefreshToken: true, persistSession: true, detectSessionInUrl: true }
+        });
+        return client;
+      })();
+      return clientPromise;
+    }
+
+    function renderUser(user){
+      currentUser = user;
+      if(user){
+        navAuth.innerHTML = 'Sign Out<span class="auth-email"></span>';
+        navAuth.querySelector('.auth-email').textContent = user.email || '';
+      } else {
+        navAuth.textContent = 'Sign In';
+      }
+    }
+
+    async function refreshSession(){
+      try{
+        const c = await getClient();
+        const { data } = await c.auth.getSession();
+        renderUser(data && data.session ? data.session.user : null);
+      }catch(_){ renderUser(null); }
+    }
+
+    navAuth.addEventListener('click', async ()=>{
+      if(currentUser){
+        try{ const c = await getClient(); await c.auth.signOut(); }catch(_){ /* no-op */ }
+        renderUser(null);
+        push('bot', 'Signed out.');
+        return;
+      }
+      setMode('signin');
+      openModal();
+    });
+    document.getElementById('authClose').addEventListener('click', closeModal);
+    modal.addEventListener('click', (e)=>{ if(e.target === modal) closeModal(); });
+    document.addEventListener('keydown', (e)=>{ if(e.key === 'Escape' && modal.classList.contains('open')) closeModal(); });
+    tabSignin.addEventListener('click', ()=> setMode('signin'));
+    tabSignup.addEventListener('click', ()=> setMode('signup'));
+
+    const rules = {
+      email: [V.rules.required('Email is required.'), V.rules.email()],
+      password: [
+        V.rules.required('Password is required.'),
+        function(value){
+          if(mode !== 'signup') return null;
+          return value.length >= 8 ? null : 'Password must be at least 8 characters.';
+        }
+      ],
+      confirm: [function(value, f){
+        if(mode !== 'signup') return null;
+        if(!value) return 'Please confirm your password.';
+        return value === V.field(f, 'password').value ? null : 'Passwords do not match.';
+      }]
+    };
+
+    V.attach(form, rules, async (values)=>{
+      submit.disabled = true;
+      submit.textContent = mode === 'signup' ? 'Creating account…' : 'Signing in…';
+      setStatus('');
+      try{
+        const c = await getClient();
+        const credentials = { email: values.email, password: values.password };
+        const { data, error } = mode === 'signup'
+          ? await c.auth.signUp(credentials)
+          : await c.auth.signInWithPassword(credentials);
+        if(error) throw error;
+        if(mode === 'signup' && data && data.session === null){
+          setStatus('Account created. Check your email to confirm your address.', 'success');
+          submit.disabled = false;
+          submit.textContent = 'Sign Up';
+          return;
+        }
+        renderUser(data && data.user ? data.user : null);
+        setStatus('Signed in.', 'success');
+        closeModal();
+        push('bot', 'Signed in as ' + values.email);
+      }catch(err){
+        setStatus(err && err.message ? err.message : 'Something went wrong. Please try again.', 'error');
+      }finally{
+        submit.disabled = false;
+        submit.textContent = mode === 'signup' ? 'Sign Up' : 'Sign In';
+      }
+    });
+
+    refreshSession();
+  })();
 </script>
 </body>
 </html>

@@ -305,6 +305,7 @@
     </footer>
   </div>
 
+  <script src="/static/form-validation.js"></script>
   <script>
     let apiBase = 'https://j-ai.top';
 
@@ -315,15 +316,18 @@
     });
 
     // Submit feedback
-    document.getElementById('feedbackForm').addEventListener('submit', async function(e) {
-      e.preventDefault();
-      
-      const formData = new FormData(e.target);
+    const V = window.JAIValidation;
+    V.attach(document.getElementById('feedbackForm'), {
+      title: [V.rules.required('A title is required.'), V.rules.minLength(3, 'Title must be at least 3 characters.')],
+      content: [V.rules.required('Please describe your feedback.'), V.rules.minLength(10, 'Please add at least 10 characters.')],
+      email: [V.rules.email('Enter a valid email address or leave this blank.')]
+    }, async function(values, form) {
+      const formData = new FormData(form);
       const feedback = {
         feedback_type: formData.get('feedback_type'),
-        title: formData.get('title'),
-        content: formData.get('content'),
-        email: formData.get('email'),
+        title: values.title,
+        content: values.content,
+        email: values.email,
         category: formData.get('category'),
         timestamp: new Date().toISOString()
       };
@@ -414,7 +418,9 @@
 
     // Clear form
     function clearForm() {
-      document.getElementById('feedbackForm').reset();
+      const form = document.getElementById('feedbackForm');
+      form.reset();
+      V.clearErrors(form);
     }
 
     // Like feedback

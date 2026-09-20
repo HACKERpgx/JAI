@@ -322,6 +322,7 @@
         </section>
     </div>
 
+    <script src="/static/form-validation.js"></script>
     <script>
         let apiBase = 'https://j-ai.top';
         let categories = {};
@@ -405,17 +406,15 @@
         }
 
         // Handle test form submission
-        document.getElementById('testForm').addEventListener('submit', async function(e) {
-            e.preventDefault();
-            
-            const subject = document.getElementById('testSubject').value;
-            const sender = document.getElementById('testSender').value;
-            const body = document.getElementById('testBody').value;
-            
-            if (!subject && !sender && !body) {
-                showError('Please enter at least one field');
-                return;
-            }
+        const V = window.JAIValidation;
+        V.attach(document.getElementById('testForm'), {
+            testSubject: [V.rules.anyOf(['testSubject', 'testSender', 'testBody'], 'Enter a subject, sender or body to categorize.')],
+            testSender: [V.rules.email('Enter a valid sender email address.')],
+            testBody: []
+        }, async function(values) {
+            const subject = values.testSubject;
+            const sender = values.testSender;
+            const body = values.testBody;
 
             showLoading(true);
             
@@ -490,9 +489,9 @@
 
         // Clear form
         function clearForm() {
-            document.getElementById('testSubject').value = '';
-            document.getElementById('testSender').value = '';
-            document.getElementById('testBody').value = '';
+            const form = document.getElementById('testForm');
+            form.reset();
+            V.clearErrors(form);
             document.getElementById('resultSection').style.display = 'none';
         }
 

@@ -381,6 +381,7 @@ SCREEN_WATCH_INTERVAL = float(os.environ.get("SCREEN_WATCH_INTERVAL", "0.7"))
 TYPE_DEDUP_WINDOW_SEC = float(os.environ.get("TYPE_DEDUP_WINDOW_SEC", "3.0"))
 VOICE_DEDUP_WINDOW_SEC = float(os.environ.get("VOICE_DEDUP_WINDOW_SEC", "2.0"))
 TTS_CALL_DEDUP_WINDOW_SEC = float(os.environ.get("TTS_CALL_DEDUP_WINDOW_SEC", "4.0"))
+MAX_COMMAND_CHARS = int(os.environ.get("MAX_COMMAND_CHARS", "8000"))
 
 # jai_carbon.py
 def handle_carbon_command(command: str, session) -> str:
@@ -961,7 +962,7 @@ def classify_intent(command: str) -> Tuple[str, Dict[str, Any]]:
     
     for pattern in math_patterns:
         if re.search(pattern, cmd):
-            return "mathematical_query", {"expression": command}  # Keep original casing
+            return "mathematical_query", (command,)  # Keep original casing
     
     # === PRIORITY 2: Specific high-confidence patterns ===
     patterns = {
@@ -969,21 +970,75 @@ def classify_intent(command: str) -> Tuple[str, Dict[str, Any]]:
         "activate text mode": r"act(?:iv|ic)?ate\s+text(?:\s+mode)?",
         "activate voice mode": r"act(?:iv|ic)?ate\s+voice(?:\s+mode)?",
         "screenshot": r"screenshot|screen\s+capture|snap",
-        "current_time": r"what time is it|what's the time|tell me the time|current time|time now",
-        "greeting": r"hello|hi|hey|good\s+(morning|evening|night)",
+        "mouse up": r"mouse\s+up|move\s+up",
+        "open browser": r"open\s+browser|open\s+tab|open\s+firefox",
+        "open app": r"open\s+(notepad|calculator|word|excel|spotify|vscode|code|file explorer|recycle bin|control panel|google chrome|chrome|microsoft store|youtube)",
+        "set timer": r"set\s+timer\s+(for\s+)?(\d+)(?:\s+(minutes?|seconds?))?",
+        "terminate": r"terminate\b",
+        "shutdown": r"(?:shut\s?down|power\s+off)(?:\s+(?:the\s+)?(?:pc|computer|system|laptop))?(?:\s+in\s+\d+\s*\w*)?\s*[.!]?$",
+        "restart": r"(?:restart|reboot)(?:\s+(?:the\s+)?(?:pc|computer|system|laptop))?(?:\s+in\s+\d+\s*\w*)?\s*[.!]?$",
+        "sleep": r"(?:go\s+to\s+sleep|sleep|snooze)(?:\s+(?:the\s+)?(?:pc|computer|system|laptop))?\s*[.!]?$",
+        "hibernate": r"hibernate(?:\s+(?:the\s+)?(?:pc|computer|system|laptop))?\s*[.!]?$",
+        "lock": r"lock\s+screen",
+        "download from chrome": r"download\s+(.+)\s+from\s+chrome",
+        "volume": r"set\s+volume\s+to\s+(\d+)|mute\b|unmute\b",
+        "system info": r"check\s+(battery|cpu|ram|memory|disk)",
+        "search memory": r"search\s+memory\s+(.+)",
+        "search": r"search\s+(.+)",
+        "remember": r"remember\s+(.+)",
+        "update": r"update\s+(.+?)\s+(to|with)\s+(.+)",
+        "forget": r"forget\s+(.+)",
+        "recall": r"recall\s+(.+)",
+        "set name": r"my\s+name\s+is\s+(\w+)",
+        "set_fact": r"my\s+([a-z ]+?)\s+is\s+(.+)",
+        "recall_fact": r"(?:do\s+you\s+)?(?:remember|recall|know)\s+my\s+(.+?)\??$|what(?:'s|\s+is)\s+my\s+(.+?)\??$",
+        "show short term memory": r"(?:show|tell\s+me\s+about)\s+(?:your\s+)?short\s+term\s+memory|list\s+short\s+term\s+memories",
+        "show long term memory": r"(?:show|tell\s+me\s+about)\s+(?:your\s+)?long\s+term\s+memory|list\s+long\s+term\s+memories",
+        "close app": r"close\s+(notepad|calculator|word|excel|chrome|google chrome|youtube|browser|file explorer|vscode)",
+        "greeting": r"(hello|hi|hey|yo|salam|greetings|good\s+(morning|afternoon|evening|night))\b",
+        "set language": r"(?:(?:you\s+will\s+)?(?:speak|set|use)\s+(?:only\s+)?(hindi|urdu|arabic|russian|spanish|english))|(?:english\s+only|only\s+english|always\s+english)",
+        "auto language": r"(?:auto\s+language|auto\s+lang|speak\s+auto|default\s+language)",
         "who are you": r"who\s+(are\s+you|is\s+(?:jai|aj))",
+        "current_time": r"what time is it|what's the time|tell me the time|what is the time|current time|time now",
+        "weather": r"weather(?:\s+in\s+(.+))?",
+        "news": r"news|headlines|top\s+\d*\s*(?:latest|recent)?\s*(?:world|global)?\s*news",
+        "nasa apod": r"(?:(?:nasa\s+(?:apod|pictures?\s+of\s+(?:the\s+day|today)))|apod)(?:\s+(today|yesterday|\d{4}-\d{2}-\d{2}))?(?:\s+(hd))?",
+        "analyze_sentiment": r"analyz[e]?\s+.*sentiment|sentiment.*analyz|sentiment.*(?:positive|negative|neutral)",
+        "summarize_news": r"(?:create|write|make).*(?:summary|bulletin|paragraph).*(?:news|stories|headlines)|summarize.*(?:news|headlines|stories)|read.*(?:news|bulletin)",
+        "rewrite_headlines": r"(?:rewrite|make|create|write).*?(?:catchy|social|friendly)?\s*headlines|headlines.*(?:catchy|social|friendly|style)",
+        "business_insights": r".*(?:trends|risks|insights|implications).*(?:business|owner|company)|business.*(?:trends|risks|insights)|(?:what|which).*(?:trends|risks).*(?:business|owner)",
+        "remind_me": r"remind me|set (?:a )?reminder|reminder for",
+        "list_reminders": r"list reminders|show reminders|what are my reminders|my reminders",
+        "list_events": r"list events|show events|what's on my calendar|my calendar|upcoming events",
+        "add_event": r"add event|create event|schedule (?:a |an )?(?:event|meeting|appointment)",
+        "write_here": r"(?:write|right|type)\s+(.+?)\s+(?:here|hear|hair|hare)\s*$",
+        "write_in_app": r"(?:write|right|type)\s+(.+?)\s+in\s+(notepad|word|chrome|edge|vscode|code|excel|teams)\s*$",
+        "start_dictation": r"(?:write\s+what\s+i\s+say\s+here|dictate\s+here|start\s+dictation)",
+        "stop_dictation": r"(?:stop\s+(?:dictation|writing)|cancel\s+(?:dictation|writing))",
+        "write_description_here": r"write\s+your\s+description\s+here",
+        "sum_primes": r"(?:compute|calculate|find|sum)\s+(?:the\s+)?(?:exact\s+)?sum\s+of\s+primes?(?:\s+which\s+is)?\s*(?:<=|less\s+and\s*equal\s+than|less\s+than\s+or\s+equal\s+to|up\s+to|below)\s*([\d_, ]+)",
+        "solve_math": r"(?:solve|calculate|simplify|factor|expand|integrate|differentiate)\s+(.+)$",
+        "feedback_wrong": r"(?:(?:this|that|it)\s+is\s+wrong|(?:you're|you are)\s+wrong|wrong\s+(?:answer|response)|that's\s+wrong|not\s+correct|incorrect)",
+        "muse_image": r"(?:muse\s+)?(?:generate|create|make)\s+(?:an?\s+)?image(?:\s+of|\s+for)?\s+(.+)",
+        "muse_transcribe": r"(?:muse\s+)?transcribe\s+(.+)",
+        "muse_detect": r"(?:muse\s+)?detect\s+objects\s+in\s+(.+)",
+        "muse_search": r"(?:muse\s+)?search\s+images?\s+for\s+(.+)",
         "send_email": r"send\s+(?:an?\s+)?email\s+(?:to\s+)?(.+?)(?:\s+(?:with|about|subject)\s+(.+))?$",
-        # ... keep your other patterns here ...
+        "test_gmail": r"test\s+gmail|check\s+gmail\s+connection",
     }
     
+    # Commands are matched from the start of the input so that a keyword
+    # mentioned inside a longer sentence does not trigger a system action.
     for intent, pattern in patterns.items():
-        if re.search(pattern, cmd):   # Changed from re.match to re.search
-            return intent, None
+        match = re.match(pattern, cmd)
+        if match:
+            return intent, (match.groups() if match.groups() else None)
     
-    # Fuzzy fallback (last resort)
-    for intent in patterns:
-        if fuzz.partial_ratio(cmd, intent.replace(" ", "")) > 85:
-            return intent, None
+    # Fuzzy fallback, limited to short commands where a typo is the likely cause
+    if len(cmd.split()) <= 4:
+        for intent in patterns:
+            if fuzz.partial_ratio(cmd, intent.replace(" ", "")) > 90:
+                return intent, None
     
     return "query", None
 def is_memory_intent(intent: str) -> bool:
@@ -1010,10 +1065,15 @@ def is_mathematical_query(command: str) -> bool:
     
     # Strong math indicators (rarely used in normal conversation)
     strong_math_patterns = [
-        r'\b(sin|cos|tan|log|ln|sqrt|pi|e)\b',
+        r'\b(sin|cos|tan|log|ln|sqrt)\s*\(?\s*[\d\w]',
         r'\b\d+/\d+\b', # Fractions
-        r'[=^]',        # Equality or Power
+        r'\b\d+(?:\.\d+)?\s*%\s*of\s*\d+',  # Percentages like "15% of 200"
+        r'\^',          # Power
+        r'[a-z0-9\)]\s*=\s*[-+]?[\d\w\(]',  # Equations like x = 5, 2y=10
     ]
+
+    # Single-letter constants are too common in prose to be strong signals
+    ambiguous_math_patterns = [r'\b(pi|e)\b']
     
     # Contextual math indicators (require numbers or variables)
     context_required_patterns = [
@@ -1028,10 +1088,13 @@ def is_mathematical_query(command: str) -> bool:
     # Check for strong math patterns first
     if any(re.search(pattern, command_lower) for pattern in strong_math_patterns):
         return True
-        
+
     # Check if we have at least one numeric/variable context AND a math keyword/operator
     has_numeric_context = any(re.search(p, command_lower) for p in [r'\b\d+\b', r'\b(x|y|z)\b'])
     has_operator = any(op in command_lower for op in '+-*/')
+
+    if has_numeric_context and any(re.search(p, command_lower) for p in ambiguous_math_patterns):
+        return True
     
     # Keyword check: requires at least some numeric context or operators to be math
     if any(keyword in command_lower for keyword in math_keywords):
@@ -1883,9 +1946,12 @@ def execute_command(command: str, session: UserSession, suppress_tts: bool = Fal
     """Main command executor with carbon interface support."""
   
     # Input validation
-    if not command or not isinstance(command, str) or len(command) > 1000:
+    if not command or not isinstance(command, str) or not command.strip():
         return "I didn't catch a message there. Type a question and I'll help."
-  
+
+    if len(command) > MAX_COMMAND_CHARS:
+        command = command[:MAX_COMMAND_CHARS]
+
     command_lower = command.lower().strip()
   
     # === CARBON FOOTPRINT COMMANDS ===
@@ -1895,60 +1961,6 @@ def execute_command(command: str, session: UserSession, suppress_tts: bool = Fal
         else:
             return "Carbon estimation feature is not loaded. Please check server configuration."
 
-    # === MATH QUERY HANDLING (Highest Priority) ===
-    if is_mathematical_query(command):
-        return solve_mathematical_problem(command)
-
-    # === REGULAR INTENT CLASSIFICATION ===
-    intent, args = classify_intent(command)
-
-    # ... your existing code for other intents goes here ...
-
-    # Example of how you can continue (keep your current logic):
-    if intent == "greeting":
-        return f"Hello, {session.user_name or 'sir'}! How can I assist you today?"
-    elif intent == "current_time":
-        from datetime import datetime
-        return f"The current time is {datetime.now().strftime('%I:%M %p')}, sir."
-    elif intent == "send_email":
-        # your email handling...
-        pass
-    # ... rest of your intents ...
-
-    # Default fallback
-    return "I'm not sure how to handle that request. Could you please rephrase?"
-    
-    # === EXISTING COMMAND HANDLING ===
-    # Put ALL your original if/elif conditions here
-    # (weather, news, open apps, reminders, controls, etc.)
-    
-    if "weather" in command_lower:
-        return get_weather(command)
-    elif "news" in command_lower:
-        return get_news()
-    elif "open" in command_lower:
-        return handle_open_command(command, session)
-    elif "remind" in command_lower or "reminder" in command_lower:
-        return handle_calendar_command(command, session)
-    # ... add your other handlers here ...
-    
-    # Default to AI reply if no specific handler matched
-    response = jai_reply(command, session)
-    
-    # Optional TTS
-    if not suppress_tts and SPEAK_RESPONSES and tts:
-        try:
-            tts.speak(response)
-        except Exception as e:
-            logging.error(f"TTS error: {e}")
-    
-    # Save to memory
-    try:
-        session.memory.add_short_term({"user": command, "response": response})
-    except Exception as e:
-        logging.error(f"Memory error: {e}")
-    
-    return response
     # Set logging extra for user
     logging_extra = {"user": session.username}
     global voice_listener_thread
@@ -1973,7 +1985,7 @@ def execute_command(command: str, session: UserSession, suppress_tts: bool = Fal
     speak_lang = "en"  # Force English responses
     
     # Check for mathematical problems first
-    if is_mathematical_query(translated_command):
+    if intent == "mathematical_query" or is_mathematical_query(translated_command):
         math_response = solve_mathematical_problem(translated_command)
         try:
             if getattr(session, "tts_enabled", False):

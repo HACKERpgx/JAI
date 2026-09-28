@@ -21,6 +21,16 @@ PERSONA_GUIDANCE = {
     "meditation": "Voice Mode: Meditation. Guide calm, soothing breathing...",
     "motivation": "Voice Mode: Motivation. Be a high-energy coach...",
 }
+def time_greeting(user_name: str) -> str:
+    now = datetime.now()
+    hour = now.hour
+    if hour >= 22 or hour < 6:
+        return "It's late, sir—let me keep things brief and precise."
+    if hour < 12:
+        return "Good morning, sir."
+    if hour < 18:
+        return "Good afternoon, sir."
+    return "Good evening, sir."
 
 def build_system_prompt(user_name: str, persona: str | None = None) -> str:
     """Build enhanced system prompt with humor twists + persona support"""

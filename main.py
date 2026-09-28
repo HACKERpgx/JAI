@@ -357,7 +357,7 @@ async def api_text(req: WebTextRequest, request: Request):
 
     except Exception as e:
         logging.error(f"Error in api_text: {e}", exc_info=True)
-        return {"response": "I apologize, but I encountered an error. Please try again.", "requestId": rid}
+               return {"response": f"DEBUG: {type(e).__name__}: {e}", "requestId": rid}
     finally:
         try:
             request_id_ctx_var.reset(token)

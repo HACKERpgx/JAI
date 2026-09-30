@@ -1469,6 +1469,14 @@ def solve_mathematical_problem(command: str) -> str:
 # JAI Reply (Enhanced for Smarter Responses)
 # -----------------------------
 def jai_reply(prompt: str, session: UserSession) -> str:
+    GROQ_MODEL = os.environ.get("GROQ_MODEL", "llama-3.3-70b-versatile")
+    GROQ_FALLBACK_MODELS = [
+    m.strip()
+    for m in os.environ.get("GROQ_FALLBACK_MODELS", "openai/gpt-oss-20b,openai/gpt-oss-120b").split(",")
+    if m.strip()
+]
+
+def jai_reply(prompt: str, session: UserSession) -> str:
      # Check if Groq client is available
      if client is None:
          logging.error("Groq client is not initialized - GROQ_API_KEY may be missing", extra={'user': session.username})

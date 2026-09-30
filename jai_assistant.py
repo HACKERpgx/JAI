@@ -1469,10 +1469,6 @@ def solve_mathematical_problem(command: str) -> str:
 # JAI Reply (Enhanced for Smarter Responses)
 # -----------------------------
 def jai_reply(prompt: str, session: UserSession) -> str:
-                "llama3-8b-8192",  # Llama 3 8B
-            "mixtral-8x7b-32768",  # Mixtral
-            "gemma-7b-it"  # Gemma
-def jai_reply(prompt: str, session: UserSession) -> str:
      # Check if Groq client is available
      if client is None:
          logging.error("Groq client is not initialized - GROQ_API_KEY may be missing", extra={'user': session.username})
@@ -1576,9 +1572,8 @@ def jai_reply(prompt: str, session: UserSession) -> str:
          logging.error(f"AI error: {str(e)}", extra={'user': session.username})
          # Try fallback models on Groq
          fallback_models = [
-             "llama3-8b-8192",  # Llama 3 8B
-             "mixtral-8x7b-32768",  # Mixtral
-             "gemma-7b-it"  # Gemma
+            "openai/gpt-oss-20b",
+            "openai/gpt-oss-120b"
          ]
          
          for fallback_model in fallback_models:

@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="description" content="How JAI handles messages, uploads, account sign-in, browser sessions, and links to external services." />
+  <title>Privacy Notice — JAI</title>
+  <style>
+    *,*::before,*::after{box-sizing:border-box}
+    body{margin:0;min-height:100svh;background:#020806;color:#e4ffed;font:16px/1.65 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+    main{width:min(820px,calc(100% - 32px));margin:0 auto;padding:32px 0 56px}
+    a{color:#b6ffd1;text-underline-offset:3px}
+    .back{display:inline-flex;min-height:44px;align-items:center;margin-bottom:18px}
+    h1{font-size:clamp(30px,6vw,42px);line-height:1.15;margin:0 0 12px}
+    h2{font-size:20px;margin:28px 0 8px}
+    p,li{color:#c8ffdf}
+    .notice{padding:14px 16px;border-left:3px solid #39ff14;background:rgba(57,255,20,.06);border-radius:0 10px 10px 0}
+    :focus-visible{outline:3px solid #b6ffd1;outline-offset:3px}
+  </style>
+</head>
+<body>
+  <main>
+    <a class="back" href="/">← Back to JAI</a>
+    <h1>Privacy Notice</h1>
+    <p>This notice describes the current JAI website behavior in plain language. JAI is an independent personal-assistant project; its hosting and connected AI providers may change.</p>
+
+    <h2>Messages and uploads</h2>
+    <p>When you send a chat message, JAI sends it to the JAI server for processing. If you attach an image, the image and any accompanying prompt are uploaded to the server for image analysis. Voice Mode records audio only after you activate the microphone; the audio is sent to the server for transcription and response processing. The server may use AI or other providers configured by the project operator to fulfil these requests.</p>
+    <p>Do not submit passwords, payment-card details, confidential business information, or other sensitive personal data. Provider and infrastructure logging or retention may depend on the active deployment and provider policies; JAI does not promise zero retention.</p>
+
+    <h2>Browser session</h2>
+    <p>JAI uses a first-party, HttpOnly session cookie to associate requests with an in-memory assistant session. Signing in or creating an account uses Supabase Authentication. The Supabase client is configured to keep an authentication session in your browser; your password is submitted to Supabase Auth rather than stored by this page. Supabase’s own terms and privacy practices also apply.</p>
+
+    <h2>External tools</h2>
+    <p>The optional Convertio, HoloMotion, SatelliteMap.Space, and Leonardo AI links open services operated by other providers. If you follow a link, upload a file, enter a prompt, or grant camera access there, that activity is governed by the provider’s terms and privacy notice—not this JAI notice. Review those terms before sharing information.</p>
+
+    <h2>Support</h2>
+    <p>For questions or to report a problem, use the <a href="https://github.com/HACKERpgx/JAI/issues" target="_blank" rel="noopener noreferrer">JAI GitHub issue tracker</a>. It is public: do not include passwords, private conversation contents, or sensitive personal information in an issue.</p>
+
+    <p class="notice">This notice reflects the repository’s current implementation and is not a guarantee about the logging or retention practices of hosting, authentication, or AI providers. Those providers’ policies should be reviewed separately.</p>
+  </main>
+</body>
+</html>

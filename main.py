@@ -279,6 +279,16 @@ async def index(request: Request):
         resp.set_cookie("jai_web_id", web_id, httponly=True, samesite="Lax")
     return resp
 
+
+@app.get("/privacy", response_class=HTMLResponse)
+async def privacy_notice(request: Request):
+    return templates.TemplateResponse("privacy.html", {"request": request})
+
+
+@app.get("/terms", response_class=HTMLResponse)
+async def terms_of_use(request: Request):
+    return templates.TemplateResponse("terms.html", {"request": request})
+
 @app.get("/manifest.json")
 async def manifest():
     path = os.path.join(BASE_DIR, "JAI", "static", "manifest.json")

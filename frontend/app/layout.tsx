@@ -1,9 +1,9 @@
 import type { Metadata } from 'next'
 import { Analytics } from '@vercel/analytics/next'
 
-const title = 'JAI Assistant — Advanced AI Assistant Platform'
+const title = 'JAI — Personal AI Assistant for Chat, Voice & Image Analysis'
 const description =
-  'JAI is an advanced AI assistant platform with voice and chat control, vision analysis, email and calendar automation, reminders, media control and autonomous task execution — all from one interface.'
+  'Chat with JAI, use voice input, and analyze images. Explore optional third-party tools for file conversion, image generation, satellite tracking, and interactive demos.'
 
 export const metadata: Metadata = {
   metadataBase: new URL('https://j-ai.top'),

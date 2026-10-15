@@ -42,23 +42,20 @@ class SignupRequest(BaseModel):
 
 
 def verify_supabase_token(token: str) -> Optional[Dict[str, Any]]:
-    """Verify a Supabase JWT token"""
+    """Verify a Supabase JWT token; fail closed when verification is unconfigured."""
+    if not SUPABASE_URL or not SUPABASE_JWT_SECRET or not token:
+        return None
     try:
-        # Decode without verification first to check structure
         payload = jwt.decode(
             token,
-            options={"verify_signature": False, "verify_exp": False}
+            SUPABASE_JWT_SECRET,
+            algorithms=["HS256"],
+            audience="authenticated",
+            issuer=f"{SUPABASE_URL.rstrip('/')}/auth/v1",
+            options={"require": ["exp", "sub", "aud", "iss"]},
         )
-        
-        # If we have a JWT secret, verify properly
-        if SUPABASE_JWT_SECRET:
-            payload = jwt.decode(
-                token,
-                SUPABASE_JWT_SECRET,
-                algorithms=["HS256"],
-                audience="authenticated"
-            )
-        
+        if not isinstance(payload.get("sub"), str) or not payload["sub"]:
+            return None
         return payload
     except jwt.ExpiredSignatureError:
         return None
@@ -66,6 +63,15 @@ def verify_supabase_token(token: str) -> Optional[Dict[str, Any]]:
         return None
     except Exception:
         return None
+
+
+def is_allowed_admin(payload: Optional[Dict[str, Any]], allowed_user_ids: Optional[str] = None) -> bool:
+    """Return true only for Supabase subjects explicitly configured as JAI admins."""
+    if not payload or not isinstance(payload.get("sub"), str):
+        return False
+    configured = os.environ.get("JAI_ADMIN_USER_IDS", "") if allowed_user_ids is None else allowed_user_ids
+    allowed = {item.strip() for item in configured.split(",") if item.strip()}
+    return bool(allowed and payload["sub"] in allowed)
 
 
 async def get_current_user(

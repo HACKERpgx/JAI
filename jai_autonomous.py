@@ -190,6 +190,49 @@ class TaskPlanner:
         
         return plan
     
+    def _plan_email_task(self, intent: Intent) -> List[Dict[str, Any]]:
+        """Plan for email tasks"""
+        plan = []
+        text_lower = intent.text.lower()
+
+        if 'send' in text_lower:
+            plan.append({
+                'action': 'send_email',
+                'handler': 'gmail',
+                'params': {
+                    'to': intent.entities.get('email', [None])[0],
+                    'subject': self._extract_subject(intent.text),
+                    'body': self._extract_body(intent.text)
+                },
+                'description': 'Send email'
+            })
+
+        return plan
+
+    def _plan_calendar_task(self, intent: Intent) -> List[Dict[str, Any]]:
+        """Plan for calendar tasks"""
+        plan = []
+        text_lower = intent.text.lower()
+
+        if 'create' in text_lower or 'add' in text_lower or 'schedule' in text_lower:
+            if 'event' in text_lower or 'meeting' in text_lower or 'reminder' in text_lower:
+                plan.append({
+                    'action': 'create_event',
+                    'handler': 'calendar',
+                    'params': self._extract_event_params(intent),
+                    'description': 'Create calendar event'
+                })
+        elif 'get' in text_lower or 'list' in text_lower or 'show' in text_lower:
+            if 'event' in text_lower or 'calendar' in text_lower:
+                plan.append({
+                    'action': 'get_events',
+                    'handler': 'calendar',
+                    'params': {'days': 7},
+                    'description': 'Get upcoming events'
+                })
+
+        return plan
+
     def _plan_query_task(self, intent: Intent) -> List[Dict[str, Any]]:
         """Plan for query intents"""
         plan = []

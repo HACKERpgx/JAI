@@ -1,0 +1,24 @@
+services:
+  - type: web
+    name: jai-website
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements-render.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    workingDir: .
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12.5"
+      - key: PORT
+        value: "10000"
+      # Supabase Auth Configuration
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_ANON_KEY
+        sync: false
+      - key: SUPABASE_JWT_SECRET
+        sync: false
+    healthCheckPath: /
+    autoDeploy: true
+    domains:
+      - j-ai.top

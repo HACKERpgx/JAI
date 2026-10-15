@@ -1,10 +1,20 @@
 (function(){
   // Global variables for elements
   let apiBaseInput, saveBaseBtn, healthBtn, healthStatus, messages, textInput, sendBtn;
-  let startRecBtn, stopRecBtn, voiceLang, voiceStatus;
+  let startRecBtn, stopRecBtn, voiceLang, voiceStatus, logoutBtn;
   let isRecording = false;
 
   const LS_KEY = 'jai_api_base';
+  const SESSION_KEY = 'jai_session_id';
+  const MESSAGES_KEY = 'jai_messages';
+  const SYNC_CHANNEL = 'jai_sync_channel';
+  const EMPTY_MESSAGE_TEXT = "Type a message first and I'll help.";
+  const SEND_ERROR_TEXT = "I had trouble sending that. Please try again in a moment.";
+
+  // Cross-tab sync variables
+  let currentSessionId = null;
+  let lastMessageTimestamp = null;
+  let syncPollingInterval = null;
   
   // Initialize all DOM element references
   function initializeElements() {
@@ -12,6 +22,7 @@
     saveBaseBtn = document.getElementById('saveBase');
     healthBtn = document.getElementById('healthBtn');
     healthStatus = document.getElementById('healthStatus');
+    logoutBtn = document.getElementById('logoutBtn');
     messages = document.getElementById('messages');
     textInput = document.getElementById('textInput');
     sendBtn = document.getElementById('sendBtn');
@@ -25,6 +36,7 @@
       apiBaseInput: !!apiBaseInput,
       saveBaseBtn: !!saveBaseBtn,
       healthBtn: !!healthBtn,
+      logoutBtn: !!logoutBtn,
       startRecBtn: !!startRecBtn,
       stopRecBtn: !!stopRecBtn,
       voiceLang: !!voiceLang,
@@ -32,15 +44,270 @@
     });
   }
   
-  function getBase(){ return apiBaseInput ? apiBaseInput.value.trim() : 'http://localhost:8080'; }
+  function getBase(){ return apiBaseInput ? apiBaseInput.value.trim() : 'https://j-ai.top'; }
   function setBase(v){ apiBaseInput.value = v; }
-  function loadBase(){ setBase(localStorage.getItem(LS_KEY) || 'http://localhost:8080'); }
+  function loadBase(){ setBase(localStorage.getItem(LS_KEY) || 'https://j-ai.top'); }
   function saveBase(){ localStorage.setItem(LS_KEY, getBase()); }
+
+  // Cross-tab synchronization functions
+  function initializeSession() {
+    currentSessionId = localStorage.getItem(SESSION_KEY) || generateSessionId();
+    localStorage.setItem(SESSION_KEY, currentSessionId);
+    return currentSessionId;
+  }
+
+  function generateSessionId() {
+    return 'session_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+  }
+
+  function saveMessagesToStorage(messages) {
+    try {
+      localStorage.setItem(MESSAGES_KEY, JSON.stringify({
+        sessionId: currentSessionId,
+        messages: messages,
+        lastUpdated: Date.now()
+      }));
+    } catch (e) {
+      console.error('Failed to save messages to localStorage:', e);
+    }
+  }
+
+  function loadMessagesFromStorage() {
+    try {
+      const stored = localStorage.getItem(MESSAGES_KEY);
+      if (stored) {
+        const data = JSON.parse(stored);
+        if (data.sessionId === currentSessionId) {
+          return data.messages || [];
+        }
+      }
+    } catch (e) {
+      console.error('Failed to load messages from localStorage:', e);
+    }
+    return [];
+  }
+
+  function triggerSyncEvent(messageData) {
+    // Use localStorage event to notify other tabs
+    const syncData = {
+      type: 'message_added',
+      sessionId: currentSessionId,
+      message: messageData,
+      timestamp: Date.now()
+    };
+
+    localStorage.setItem(SYNC_CHANNEL, JSON.stringify(syncData));
+    // Remove the item to trigger the storage event in other tabs
+    localStorage.removeItem(SYNC_CHANNEL);
+  }
+
+  function handleStorageEvent(event) {
+    if (event.key === SYNC_CHANNEL && event.newValue) {
+      try {
+        const syncData = JSON.parse(event.newValue);
+        if (syncData.type === 'message_added' && syncData.sessionId === currentSessionId) {
+          // Another tab added a message, fetch latest from server
+          fetchLatestMessages();
+        } else if (syncData.type === 'logout') {
+          // Another tab logged out, sync the logout
+          handleLogoutSync();
+        }
+      } catch (e) {
+        console.error('Failed to parse sync data:', e);
+      }
+    }
+  }
+
+  async function fetchLatestMessages() {
+    if (!currentSessionId) return;
+
+    try {
+      const response = await fetch(getBase() + '/api/messages/' + currentSessionId);
+      if (response.ok) {
+        const data = await response.json();
+        if (data.messages && data.messages.length > 0) {
+          updateMessagesDisplay(data.messages);
+          saveMessagesToStorage(data.messages);
+        }
+      }
+    } catch (e) {
+      console.error('Failed to fetch latest messages:', e);
+    }
+  }
+
+  function updateMessagesDisplay(serverMessages) {
+    if (!serverMessages || !Array.isArray(serverMessages)) return;
+
+    // Clear current messages
+    messages.innerHTML = '';
+
+    // Add messages from server
+    serverMessages.forEach(msg => {
+      const who = msg.role === 'user' ? 'You' : 'JAI';
+      addMsg(who, msg.content);
+    });
+  }
+
+  function startSyncPolling() {
+    // Poll for new messages every 5 seconds
+    if (syncPollingInterval) {
+      clearInterval(syncPollingInterval);
+    }
+
+    syncPollingInterval = setInterval(() => {
+      fetchLatestMessages();
+    }, 5000);
+  }
+
+  function stopSyncPolling() {
+    if (syncPollingInterval) {
+      clearInterval(syncPollingInterval);
+      syncPollingInterval = null;
+    }
+  }
+
+  function escapeHtml(value) {
+    return String(value || '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  function configureMarkdown() {
+    if (!window.marked || window.__jaiMarkdownReady) return;
+
+    const renderer = new window.marked.Renderer();
+    renderer.html = function(token) {
+      const text = typeof token === 'string' ? token : (token && token.text) || '';
+      return escapeHtml(text);
+    };
+
+    window.marked.setOptions({
+      breaks: true,
+      gfm: true,
+      renderer
+    });
+    window.__jaiMarkdownReady = true;
+  }
+
+  function renderAssistantMarkdown(text) {
+    configureMarkdown();
+
+    if (!window.marked || !window.DOMPurify) {
+      return escapeHtml(text).replace(/\n/g, '<br>');
+    }
+
+    const rawHtml = window.marked.parse(String(text || ''));
+    return window.DOMPurify.sanitize(rawHtml, {
+      USE_PROFILES: { html: true }
+    });
+  }
+
+  // Logout and session cleanup functions
+  async function logout() {
+    try {
+      // Stop sync polling
+      stopSyncPolling();
+
+      // Clear UI messages
+      if (messages) {
+        messages.innerHTML = '';
+      }
+
+      // Clear localStorage
+      localStorage.removeItem(SESSION_KEY);
+      localStorage.removeItem(MESSAGES_KEY);
+
+      // Reset session variables
+      currentSessionId = null;
+      lastMessageTimestamp = null;
+
+      // Notify server
+      const response = await fetch(getBase() + '/api/logout', {
+        method: 'POST',
+        credentials: 'include'
+      });
+
+      if (response.ok) {
+        addMsg('System', '👋 You have been logged out. Session cleared successfully.');
+
+        // Trigger logout sync event for other tabs
+        triggerLogoutSync();
+
+        // Generate new session ID for fresh start
+        setTimeout(() => {
+          initializeSession();
+          startSyncPolling();
+          addMsg('System', '🆕 New session started. You can begin chatting again.');
+        }, 1500);
+      } else {
+        addMsg('System', '⚠️ Logout completed locally. Server session may still be active.');
+      }
+    } catch (e) {
+      console.error('Logout error:', e);
+      addMsg('System', '⚠️ Logout completed with some errors. Local data cleared.');
+    }
+  }
+
+  function triggerLogoutSync() {
+    // Use localStorage event to notify other tabs of logout
+    const logoutData = {
+      type: 'logout',
+      sessionId: currentSessionId,
+      timestamp: Date.now()
+    };
+
+    localStorage.setItem(SYNC_CHANNEL, JSON.stringify(logoutData));
+    localStorage.removeItem(SYNC_CHANNEL);
+  }
+
+  function handleLogoutSync() {
+    // Handle logout event from other tabs
+    stopSyncPolling();
+
+    // Clear UI
+    if (messages) {
+      messages.innerHTML = '';
+    }
+
+    // Clear localStorage
+    localStorage.removeItem(SESSION_KEY);
+    localStorage.removeItem(MESSAGES_KEY);
+
+    // Reset variables
+    currentSessionId = null;
+    lastMessageTimestamp = null;
+
+    addMsg('System', '🔄 Session synchronized from another tab. Starting fresh session...');
+
+    // Reinitialize after delay
+    setTimeout(() => {
+      initializeSession();
+      startSyncPolling();
+    }, 1500);
+  }
 
   function addMsg(who, text){
     const div = document.createElement('div');
     div.className = 'msg ' + (who === 'You' ? 'you' : 'jai');
-    div.textContent = (who + ': ' + text);
+
+    const label = document.createElement('strong');
+    label.className = 'msg-sender';
+    label.textContent = who + ':';
+
+    const body = document.createElement('div');
+    body.className = 'msg-body';
+
+    if (who === 'JAI') {
+      body.innerHTML = renderAssistantMarkdown(text);
+    } else {
+      body.textContent = text || '';
+    }
+
+    div.appendChild(label);
+    div.appendChild(body);
     messages.appendChild(div);
     messages.scrollTop = messages.scrollHeight;
   }
@@ -59,20 +326,56 @@
 
   async function sendText(){
     const text = textInput.value.trim();
-    if(!text) return;
+    if(!text) {
+      addMsg('JAI', EMPTY_MESSAGE_TEXT);
+      return;
+    }
+
+    if (!currentSessionId) {
+      initializeSession();
+    }
+
     addMsg('You', text);
     textInput.value = '';
+
     try{
       const res = await fetch(getBase() + '/api/text', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Session-ID': currentSessionId
+        },
         body: JSON.stringify({ text })
       });
-      if(!res.ok) throw new Error('HTTP ' + res.status);
       const data = await res.json();
-      addMsg('JAI', data.response || '');
+      if(!res.ok) throw new Error(data.error || data.detail || 'send_failed');
+
+      // Update session ID if server returned a new one
+      if (data.sessionId && data.sessionId !== currentSessionId) {
+        currentSessionId = data.sessionId;
+        localStorage.setItem(SESSION_KEY, currentSessionId);
+      }
+
+      addMsg('JAI', data.response || SEND_ERROR_TEXT);
+
+      // Trigger sync event for other tabs
+      triggerSyncEvent({
+        role: 'user',
+        content: text,
+        timestamp: Date.now()
+      });
+
+      // Also trigger for the assistant response
+      setTimeout(() => {
+        triggerSyncEvent({
+          role: 'assistant',
+          content: data.response || '',
+          timestamp: Date.now()
+        });
+      }, 100);
+
     }catch(e){
-      addMsg('JAI', 'Error contacting server');
+      addMsg('JAI', SEND_ERROR_TEXT);
     }
   }
 
@@ -201,6 +504,10 @@
     try{
       console.log('Sending audio to server...');
       
+      if (!currentSessionId) {
+        initializeSession();
+      }
+
       const fd = new FormData();
       const fname = (blob.type && blob.type.includes('ogg')) ? 'voice.ogg' : 'voice.webm';
       fd.append('file', blob, fname);
@@ -208,6 +515,9 @@
       
       const response = await fetch(getBase() + '/api/voice', { 
         method: 'POST', 
+        headers: {
+          'X-Session-ID': currentSessionId
+        },
         body: fd,
         timeout: 30000 // 30 second timeout
       });
@@ -219,12 +529,33 @@
       const data = await response.json();
       console.log('Server response:', data);
       
+      // Update session ID if server returned a new one
+      if (data.sessionId && data.sessionId !== currentSessionId) {
+        currentSessionId = data.sessionId;
+        localStorage.setItem(SESSION_KEY, currentSessionId);
+      }
+
       if(data && (data.transcript || data.response)){
         if(data.transcript){ 
-          addMsg('You', data.transcript); 
+          addMsg('You', data.transcript);
+
+          // Trigger sync event for transcript
+          triggerSyncEvent({
+            role: 'user',
+            content: data.transcript,
+            timestamp: Date.now()
+          });
         }
         if(data.response){ 
           addMsg('JAI', data.response); 
+
+          // Trigger sync event for response
+          triggerSyncEvent({
+            role: 'assistant',
+            content: data.response,
+            timestamp: Date.now()
+          });
+
           // Trigger text-to-speech if available
           if(window.speechSynthesis && data.response) {
             speakResponse(data.response);
@@ -328,6 +659,7 @@
     // Basic event listeners
     if(saveBaseBtn) saveBaseBtn.addEventListener('click', function(){ saveBase(); checkHealth(); });
     if(healthBtn) healthBtn.addEventListener('click', checkHealth);
+    if(logoutBtn) logoutBtn.addEventListener('click', logout);
     if(sendBtn) sendBtn.addEventListener('click', sendText);
     if(textInput) textInput.addEventListener('keydown', function(e){ if(e.key === 'Enter') sendText(); });
     
@@ -444,7 +776,7 @@
     initializeElements();
     
     // Check if all required elements exist
-    const requiredElements = ['apiBase', 'saveBase', 'healthBtn', 'healthStatus', 'messages', 'textInput', 'sendBtn', 'startRecBtn', 'stopRecBtn', 'voiceLang', 'voiceStatus'];
+    const requiredElements = ['apiBase', 'saveBase', 'healthBtn', 'logoutBtn', 'healthStatus', 'messages', 'textInput', 'sendBtn', 'startRecBtn', 'stopRecBtn', 'voiceLang', 'voiceStatus'];
     const missingElements = requiredElements.filter(id => !document.getElementById(id));
     
     if(missingElements.length > 0) {
@@ -454,6 +786,24 @@
       console.log('All required elements found');
     }
     
+    // Initialize session and cross-tab sync
+    initializeSession();
+
+    // Set up storage event listener for cross-tab sync
+    window.addEventListener('storage', handleStorageEvent);
+
+    // Load existing messages from storage or server
+    const storedMessages = loadMessagesFromStorage();
+    if (storedMessages.length > 0) {
+      updateMessagesDisplay(storedMessages);
+    } else {
+      // Try to fetch from server if we have a session
+      fetchLatestMessages();
+    }
+
+    // Start polling for new messages
+    startSyncPolling();
+
     // Initialize event listeners
     initializeEventListeners();
     
@@ -463,8 +813,9 @@
     
     // Show welcome message
     addMsg('System', '🎤 Voice mode ready! Click the microphone button or press Ctrl+M to start recording.');
+    addMsg('System', '🔄 Cross-tab synchronization enabled - messages will sync across all open tabs.');
     
-    console.log('JAI Web App initialized successfully');
+    console.log('JAI Web App initialized successfully with cross-tab sync');
   }
 
   // Wait for DOM to be ready

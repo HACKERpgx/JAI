@@ -1,11 +1,17 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
+    <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google" content="notranslate" />
     <title>JAI Auto-Reply System</title>
+    <script src="/static/api-security.js" defer></script>
     <link rel="stylesheet" href="styles.css">
+    <link rel="icon" href="/favicon/favicon.ico">
+    <link rel="icon" type="image/svg+xml" href="/favicon/favicon.svg">
+    <link rel="icon" type="image/png" sizes="96x96" href="/favicon/favicon-96x96.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="/favicon/apple-touch-icon.png">
+    <link rel="manifest" href="/favicon/site.webmanifest">
     <style>
         .auto-reply-container {
             max-width: 1200px;
@@ -382,8 +388,9 @@
         </div>
     </div>
 
+    <script src="/static/form-validation.js"></script>
     <script>
-        let apiBase = 'http://localhost:8080';
+        let apiBase = 'https://j-ai.top';
         let currentConfig = {};
 
         // Initialize page
@@ -451,10 +458,15 @@
         }
 
         // Save configuration
-        document.getElementById('configForm').addEventListener('submit', async function(e) {
-            e.preventDefault();
-            
-            const formData = new FormData(e.target);
+        const V = window.JAIValidation;
+        V.attach(document.getElementById('configForm'), {
+            max_replies_per_hour: [V.rules.required('Enter a value.'), V.rules.numberRange(1, 100, 'Enter a number between 1 and 100.')],
+            delay_seconds: [V.rules.required('Enter a value.'), V.rules.numberRange(0, 300, 'Enter a number between 0 and 300.')],
+            confidence_threshold: [V.rules.required('Enter a value.'), V.rules.numberRange(0, 1, 'Enter a confidence between 0 and 1.')],
+            work_start: [V.rules.required('Enter an hour.'), V.rules.numberRange(0, 23, 'Enter an hour between 0 and 23.')],
+            work_end: [V.rules.required('Enter an hour.'), V.rules.numberRange(0, 23, 'Enter an hour between 0 and 23.')]
+        }, async function(values, form) {
+            const formData = new FormData(form);
             const config = {
                 enabled: formData.get('enabled') === 'on',
                 max_replies_per_hour: parseInt(formData.get('max_replies_per_hour')),
@@ -491,14 +503,16 @@
         });
 
         // Test auto-reply
-        document.getElementById('testForm').addEventListener('submit', async function(e) {
-            e.preventDefault();
-            
+        V.attach(document.getElementById('testForm'), {
+            testSender: [V.rules.required('Sender email is required.'), V.rules.email()],
+            testSubject: [V.rules.required('Subject is required.')],
+            testBody: [V.rules.required('Message body is required.')]
+        }, async function(values) {
             const testData = {
                 message_id: 'test_' + Date.now(),
-                sender: document.getElementById('testSender').value,
-                subject: document.getElementById('testSubject').value,
-                body: document.getElementById('testBody').value,
+                sender: values.testSender,
+                subject: values.testSubject,
+                body: values.testBody,
                 date: new Date().toISOString(),
                 thread_id: 'test_' + Date.now()
             };
@@ -589,7 +603,9 @@
 
         // Clear test form
         function clearTestForm() {
-            document.getElementById('testForm').reset();
+            const form = document.getElementById('testForm');
+            form.reset();
+            V.clearErrors(form);
             document.getElementById('testResult').style.display = 'none';
         }
 

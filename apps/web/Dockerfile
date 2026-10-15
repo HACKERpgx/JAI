@@ -19,7 +19,7 @@ RUN pip install --upgrade pip && pip install -r requirements-web.txt
 # Copy the whole project
 COPY . /app
 
-EXPOSE 8080
+EXPOSE 80
 
 # Use env file at runtime if provided
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8080"]
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "80"]

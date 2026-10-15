@@ -2,10 +2,31 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="theme-color" content="#0c0c0d" />
   <link rel="manifest" href="/manifest.json" />
-  <title>JAI Assistant</title>
+  <title>JAI — Personal AI Assistant for Chat, Voice &amp; Image Analysis</title>
+  <meta name="description" content="Chat with JAI, use voice input, and analyze images. Explore optional third-party tools for file conversion, image generation, satellite tracking, and interactive demos." />
+  <meta name="keywords" content="JAI, AI assistant, voice assistant, AI chat, automation, productivity, virtual assistant" />
+  <meta name="author" content="JAI" />
+  <meta name="robots" content="index, follow" />
+  <link rel="canonical" href="https://j-ai.top/" />
+
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="JAI" />
+  <meta property="og:url" content="https://j-ai.top/" />
+  <meta property="og:title" content="JAI — Personal AI Assistant for Chat, Voice &amp; Image Analysis" />
+  <meta property="og:description" content="Chat with JAI, use voice input, and analyze images. Explore optional third-party tools for file conversion, image generation, satellite tracking, and interactive demos." />
+  <meta property="og:image" content="https://j-ai.top/static/icon-512.png" />
+  <meta property="og:image:width" content="512" />
+  <meta property="og:image:height" content="512" />
+  <meta property="og:image:alt" content="JAI Assistant logo" />
+  <meta property="og:locale" content="en_US" />
+
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="JAI — Personal AI Assistant for Chat, Voice &amp; Image Analysis" />
+  <meta name="twitter:description" content="Chat with JAI, use voice input, and analyze images. Explore optional third-party tools for file conversion, image generation, satellite tracking, and interactive demos." />
+  <meta name="twitter:image" content="https://j-ai.top/static/icon-512.png" />
   <style>
     :root { --bg:#020202; --fg:#c8ffdf; --neon:#39ff14; --dim:#0a0a0a; --grid:#0d1f15; --glass:#041a12; --muted:#8bc9a7; }
     html, body { margin:0; padding:0; height:100%; background:#000; color: var(--fg); font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; }
@@ -46,7 +67,7 @@
     .voice-head{ display:flex; align-items:center; justify-content:space-between; gap:10px; padding:4px 6px 10px 6px; border-bottom:1px solid rgba(57,255,20,0.2); margin-bottom:12px; }
     .voice-title{ font-weight:800; color:#b6ffd1; text-shadow: 0 0 6px rgba(57,255,20,0.35); letter-spacing:0.6px; }
     .modes{ display:grid; grid-template-columns: repeat(5, minmax(0,1fr)); gap:12px; }
-    .mode-card{ display:flex; flex-direction:column; align-items:center; gap:8px; padding:12px; border:1px solid rgba(57,255,20,0.25); border-radius:12px; background: rgba(57,255,20,0.06); cursor:pointer; transition: transform .1s ease, background .2s ease; }
+    .mode-card{ display:flex; width:100%; flex-direction:column; align-items:center; gap:8px; padding:12px; border:1px solid rgba(57,255,20,0.25); border-radius:12px; background: rgba(57,255,20,0.06); color:inherit; font:inherit; cursor:pointer; transition: transform .1s ease, background .2s ease; }
     .mode-card:hover{ transform: translateY(-1px); background: rgba(57,255,20,0.12); }
     .mode-card.active{ outline: 2px solid rgba(57,255,20,0.5); background: rgba(57,255,20,0.16); }
     .mode-label{ font-weight:700; color:#d8ffe9; font-size:14px; text-align:center; }
@@ -79,31 +100,140 @@
     .tip-icon{ width:22px; height:22px; display:grid; place-items:center; border-radius:50%; border:1px solid rgba(57,255,20,0.35); background: rgba(57,255,20,0.08); color:#b6ffd1; font-weight:800; cursor:default; }
     .tip-bubble{ display:none; position:absolute; top:120%; right:0; min-width:280px; max-width:380px; background: rgba(6,20,14,0.95); border:1px solid rgba(57,255,20,0.35); color:#d8ffe9; padding:10px 12px; border-radius:10px; box-shadow: 0 0 14px rgba(57,255,20,0.15); z-index:5; }
     .tooltip:hover .tip-bubble{ display:block; }
+    .auth-modal{ position:fixed; inset:0; z-index:10; display:none; align-items:center; justify-content:center; background: rgba(0,0,0,0.72); backdrop-filter: blur(4px); }
+    .auth-modal.open{ display:flex; }
+    .auth-panel{ width:min(420px, 92vw); background: linear-gradient(180deg, rgba(6,20,14,0.96), rgba(2,10,6,0.98)); border:1px solid rgba(57,255,20,0.3); border-radius:14px; box-shadow: 0 0 28px rgba(57,255,20,0.18); padding:20px; position:relative; }
+    .auth-panel h2{ margin:0 0 14px; font-size:18px; color:#b6ffd1; text-shadow: 0 0 8px rgba(57,255,20,0.3); }
+    .auth-close{ position:absolute; top:10px; right:12px; background:none; border:none; color:#8bc9a7; font-size:22px; line-height:1; cursor:pointer; }
+    .auth-tabs{ display:flex; gap:8px; margin-bottom:16px; }
+    .auth-tab{ flex:1; padding:8px 10px; border-radius:9px; border:1px solid rgba(57,255,20,0.25); background: rgba(57,255,20,0.06); color:#caffea; font-weight:700; cursor:pointer; }
+    .auth-tab.active{ background: rgba(57,255,20,0.18); color:#eaffef; }
+    .auth-field{ margin-bottom:14px; display:flex; flex-direction:column; }
+    .auth-field label{ font-size:12px; letter-spacing:0.4px; color:#8bc9a7; margin-bottom:6px; }
+    .auth-input{ background: rgba(0,0,0,0.35); border:1px solid rgba(57,255,20,0.25); border-radius:9px; color:#d9ffe8; padding:10px 12px; font: 14px/1.3 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; outline-color: rgba(57,255,20,0.5); }
+    .auth-submit{ width:100%; padding:11px 12px; border-radius:10px; border:1px solid rgba(57,255,20,0.4); background: rgba(57,255,20,0.14); color:#eaffef; font-weight:800; cursor:pointer; }
+    .auth-submit:disabled{ opacity:0.6; cursor:progress; }
+    .auth-status{ margin-top:12px; font-size:13px; min-height:18px; color:#8bc9a7; }
+    .auth-status.error{ color:#ff6b6b; }
+    .auth-status.success{ color:#8fffc9; }
+    #navAuth .auth-email{ display:block; font-size:11px; font-weight:500; color:#8bc9a7; overflow:hidden; text-overflow:ellipsis; }
     @media (max-width: 940px){ .modes{ grid-template-columns: repeat(2, minmax(0,1fr)); } }
     @media (max-width: 640px){ .stacker{ margin-left:0; } .voice-dashboard{ margin-left:0; } .sidebar{ position:static; width:auto; flex-direction:row; gap:8px; border:0; background:transparent; padding:8px; } .brand{ border:0; margin:0; padding:0 8px; } }
+
+    *,*::before,*::after{box-sizing:border-box}
+    html,body{width:100%;min-height:100%;overflow-x:hidden}
+    body{display:block;min-height:100svh;padding:0}
+    .sidebar{width:240px;box-sizing:border-box}
+    .nav-item{min-height:44px;font-size:14px}
+    .workspace{position:relative;z-index:2;margin-left:240px;width:calc(100% - 240px);min-height:calc(100svh - 64px);padding:18px 20px;display:flex;align-items:center;justify-content:center}
+    .stacker,.voice-dashboard,.tools-dashboard{position:relative;z-index:2;margin:0;width:min(1100px,100%);max-width:1100px}
+    .terminal{width:100%;height:min(70svh,720px);min-height:440px}
+    .log{min-height:0;gap:14px}
+    .welcome{width:min(100%,680px);margin:auto;padding:clamp(18px,4vw,34px);border:1px solid rgba(57,255,20,.25);border-radius:16px;background:rgba(4,26,18,.72);box-shadow:0 0 24px rgba(57,255,20,.08)}
+    .welcome h1{margin:0 0 12px;font-size:clamp(24px,4vw,38px);line-height:1.15;color:#e4ffed;text-shadow:0 0 10px rgba(57,255,20,.25)}
+    .welcome p{margin:0 0 16px;color:#c8ffdf;font:16px/1.6 system-ui,sans-serif}
+    .prompt-examples{display:flex;flex-wrap:wrap;gap:8px;margin:16px 0}
+    .prompt-example{min-height:44px;padding:9px 12px;border:1px solid rgba(57,255,20,.35);border-radius:999px;background:rgba(57,255,20,.08);color:#e4ffed;font:14px/1.3 system-ui,sans-serif;cursor:pointer}
+    .prompt-example:hover{background:rgba(57,255,20,.16)}
+    .welcome .privacy-hint,.tools-intro,.external-note{font:13px/1.55 system-ui,sans-serif;color:#b8d9c5}
+    .voice-dashboard,.tools-dashboard{padding:18px;border:1px solid rgba(57,255,20,.25);border-radius:16px;background:linear-gradient(180deg,rgba(6,20,14,.92),rgba(2,10,6,.96));box-shadow:0 0 24px rgba(57,255,20,.12)}
+    .voice-title{margin:0;font-size:24px}
+    .voice-intro{margin:0 0 14px;color:#c8ffdf;font:14px/1.55 system-ui,sans-serif}
+    .tools-dashboard h1{margin:0 0 8px;font-size:clamp(24px,3vw,32px);color:#e4ffed}
+    .tools-intro{margin:0 0 18px}
+    .tool-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+    .tool-card{min-width:0;padding:16px;border:1px solid rgba(57,255,20,.22);border-radius:12px;background:rgba(57,255,20,.045)}
+    .tool-card h2{margin:0 0 8px;color:#e4ffed;font:700 18px/1.3 system-ui,sans-serif}
+    .tool-card p{margin:0 0 12px;color:#c8ffdf;font:14px/1.55 system-ui,sans-serif}
+    .external-pill{display:inline-block;margin:0 0 10px;padding:4px 8px;border:1px solid rgba(57,255,20,.24);border-radius:999px;color:#c8ffdf;font:12px/1.2 system-ui,sans-serif}
+    .tool-link{display:inline-flex;align-items:center;min-height:44px;padding:9px 12px;border:1px solid rgba(57,255,20,.4);border-radius:9px;background:rgba(57,255,20,.12);color:#e4ffed;font:700 14px/1.2 system-ui,sans-serif;text-decoration:none}
+    .tool-link:hover{background:rgba(57,255,20,.2)}
+    .external-note{margin:16px 0 0;padding:12px;border-left:3px solid #39ff14;background:rgba(57,255,20,.05)}
+    .auth-note{margin:14px 0 0;color:#b8d9c5;font:13px/1.5 system-ui,sans-serif}
+    .auth-note a,.app-footer a{color:#caffea;text-underline-offset:3px}
+    .app-footer{position:relative;z-index:2;margin:0 20px 0 260px;width:calc(100% - 280px);max-width:1100px;padding:12px 0 18px;display:flex;justify-content:center;flex-wrap:wrap;gap:8px 18px;color:#b8d9c5;font:13px/1.5 system-ui,sans-serif}
+    .send,.icon-btn{min-height:44px}
+    .icon-btn{width:44px;height:44px}
+    #txt::placeholder{color:rgba(200,255,223,.68)}
+    :focus-visible{outline:3px solid #b6ffd1!important;outline-offset:3px}
+    @media (max-width:760px){
+      .sidebar{position:sticky;left:auto;top:0;bottom:auto;width:100%;height:auto;min-height:0;flex-direction:row;flex-wrap:wrap;align-items:center;padding:10px;border-right:0;border-bottom:1px solid rgba(57,255,20,.25);background:rgba(2,10,6,.96)}
+      .brand{flex:1 0 100%;margin:0;padding:4px 8px;border:0}
+      .nav-item{flex:1 1 9rem;width:auto;min-width:0;text-align:center}
+      .workspace{width:100%;margin:0;min-height:0;padding:12px}
+      .stacker,.voice-dashboard,.tools-dashboard{width:100%;max-width:none}
+      .terminal{height:min(72svh,720px);min-height:360px}
+      .tool-grid{grid-template-columns:1fr}
+      .app-footer{width:auto;margin:0 12px;padding:12px 0 18px}
+    }
+    @media (max-width:380px){.nav-item{flex:1 1 calc(50% - 8px);font-size:13px;padding-inline:6px}.prompt-example{font-size:13px}}
+    @media (prefers-reduced-motion:reduce){ #rain{display:none}*,*::before,*::after{scroll-behavior:auto!important;animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}
+
+    /* Responsive, accessible interaction refinements */
+    button:not(:disabled),a{touch-action:manipulation}
+    button:disabled{cursor:not-allowed;opacity:.55;filter:saturate(.65)}
+    .send:not(:disabled):hover,.nav-item:hover,.icon-btn:not(:disabled):hover{filter:brightness(1.18)}
+    .attachment-help,.interaction-status{margin:8px 14px 0;color:#b8d9c5;font:13px/1.5 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+    .interaction-status:empty{display:none}
+    @media (max-width:760px){
+      .sidebar{flex-wrap:nowrap;align-items:center;overflow-x:auto;overscroll-behavior-x:contain;scrollbar-width:none}
+      .sidebar::-webkit-scrollbar{display:none}
+      .brand{flex:0 0 auto}
+      .nav-item{flex:0 0 auto;width:auto;white-space:nowrap;padding-inline:14px}
+      .workspace{padding:12px 10px calc(12px + env(safe-area-inset-bottom))}
+      .terminal{height:min(72dvh,720px)}
+      .app-footer{padding-bottom:calc(18px + env(safe-area-inset-bottom))}
+      #rain{display:none}
+    }
+    @media (max-width:420px){
+      .sidebar{gap:5px;padding-inline:6px}
+      .brand{padding-inline:4px;font-size:14px}
+      .nav-item{font-size:12px;padding-inline:7px}
+      .prompt{gap:6px;padding:10px}
+      .prompt .caret,.prompt .blink{display:none}
+      #txt{min-width:0;font-size:16px}
+      .terminal{height:min(68dvh,660px);min-height:320px}
+      .log{padding:12px}
+    }
+    @media (hover:hover){
+      .prompt-example:hover,.tool-link:hover,.mode-card:hover{filter:brightness(1.12)}
+    }
   </style>
 </head>
 <body>
   <canvas id="rain"></canvas>
   <div class="overlay"></div>
-  <nav class="sidebar">
+  <nav class="sidebar" aria-label="Main navigation">
     <div class="brand">JAI</div>
-    <button id="navChat" class="nav-item active">Chat</button>
-    <button id="navVoice" class="nav-item">Voice Mode</button>
-    <button id="navImage" class="nav-item">Image Generator</button>
-      </nav>
-  <div class="stacker">
+      <button id="navChat" class="nav-item active" type="button" aria-current="page" aria-controls="chatView">Chat</button>
+      <button id="navVoice" class="nav-item" type="button" aria-controls="voiceDash">Voice Mode</button>
+      <button id="navTools" class="nav-item" type="button" aria-controls="toolsDash">Explore tools</button>
+    <button id="navAuth" class="nav-item" type="button">Sign In</button>
+  </nav>
+  <main class="workspace">
+  <div class="stacker" id="chatView">
     <div class="terminal">
     <div class="term-head">
       <div class="led"></div>
-      <div class="title">JAI WEBSITE</div>
+      <div class="title">JAI Assistant</div>
     </div>
-    <div id="log" class="log"></div>
+    <div id="log" class="log" role="log" aria-live="polite" aria-relevant="additions">
+      <section id="welcome" class="welcome" aria-labelledby="welcomeTitle">
+        <h1 id="welcomeTitle">Meet JAI, your personal AI assistant</h1>
+        <p>Ask a question, explore an idea, or attach an image for analysis. Voice input is available in Voice Mode. Your message is sent to JAI for processing—avoid sharing passwords or other sensitive information.</p>
+        <div class="prompt-examples" aria-label="Example prompts">
+          <button class="prompt-example" type="button" data-prompt="Explain a difficult topic in simple terms">Explain a topic simply</button>
+          <button class="prompt-example" type="button" data-prompt="Help me brainstorm a few ideas for a project">Brainstorm ideas</button>
+          <button class="prompt-example" type="button" data-prompt="What can you help me do?">What can you help me do?</button>
+        </div>
+        <p class="privacy-hint">Photos attached to a message are uploaded to JAI for analysis. Optional tools open separate services with their own policies.</p>
+      </section>
+    </div>
     <div class="prompt">
       <span class="caret">&gt;</span>
-      <input id="txt" type="text" placeholder="Type a command..." autocomplete="off" spellcheck="false" />
+          <input id="txt" type="text" placeholder="Ask JAI a question..." aria-label="Message for JAI" autocomplete="off" spellcheck="false" />
       <span class="blink"></span>
-      <button id="send" class="send">Send</button>
+      <button id="send" class="send" type="button" aria-controls="log">Send</button>
     </div>
     <div class="attach-row" role="group" aria-label="Attachments">
       <button id="btnPhoto" class="icon-btn" aria-label="Photos" title="Photos">
@@ -113,7 +243,7 @@
           <path d="M3 16l5-5 4 4 3-3 6 6"/>
         </svg>
       </button>
-      <button id="btnVideo" class="icon-btn" aria-label="Videos" title="Videos">
+      <button id="btnVideo" class="icon-btn" aria-label="Videos (not available yet)" title="Video uploads aren't available yet" aria-describedby="attachmentHelp" disabled>
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
           <rect x="3" y="5" width="18" height="14" rx="2"/>
           <path d="M7 5v14M17 5v14"/>
@@ -128,7 +258,7 @@
           <path d="M10 11v6M14 11v6"/>
         </svg>
       </button>
-      <button id="btnFile" class="icon-btn" aria-label="Files" title="Files">
+      <button id="btnFile" class="icon-btn" aria-label="Files (not available yet)" title="Document uploads aren't available yet" aria-describedby="attachmentHelp" disabled>
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
           <path d="M21.44 11.05l-8.49 8.49a5.5 5.5 0 0 1-7.78-7.78l9.19-9.19a3.5 3.5 0 1 1 4.95 4.95l-9.19 9.19a1.5 1.5 0 0 1-2.12-2.12l8.49-8.49"/>
         </svg>
@@ -142,19 +272,22 @@
         </svg>
       </button>
     </div>
+    <p id="attachmentHelp" class="attachment-help">Photo uploads are supported for image analysis. Video and document uploads aren’t available yet.</p>
+    <div id="interactionStatus" class="interaction-status" role="status" aria-live="polite" aria-atomic="true"></div>
     <input id="filePhoto" type="file" accept="image/*" style="display:none" />
     <input id="fileVideo" type="file" accept="video/*" style="display:none" />
     <input id="fileFile" type="file" style="display:none" />
     <input id="fileCamera" type="file" accept="image/*" capture="environment" style="display:none" />
     </div>
   </div>
-  <div id="voiceDash" class="voice-dashboard" style="display:none">
+  <div id="voiceDash" class="voice-dashboard" style="display:none" aria-labelledby="voiceTitle">
     <div class="voice-panel">
       <div class="voice-head">
-        <div class="voice-title">Voice Mode</div>
+        <h1 class="voice-title" id="voiceTitle">Voice Mode</h1>
       </div>
+      <p class="voice-intro" id="voiceHelp">Allow microphone access when prompted. Tap the microphone to start recording, then tap again to stop and send the audio to JAI for transcription.</p>
       <div class="modes">
-        <div class="mode-card" data-persona="therapist" id="modeTherapist" aria-label="Therapist">
+        <div class="mode-card" data-persona="therapist" id="modeTherapist" role="button" tabindex="0" aria-label="Therapist" aria-pressed="false">
           <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <circle cx="12" cy="8" r="4"/>
             <path d="M4 20c1.5-3 4.5-5 8-5s6.5 2 8 5"/>
@@ -162,14 +295,14 @@
           </svg>
           <div class="mode-label">Therapist</div>
         </div>
-        <div class="mode-card" data-persona="storyteller" id="modeStory" aria-label="StoryTeller">
+        <div class="mode-card" data-persona="storyteller" id="modeStory" role="button" tabindex="0" aria-label="StoryTeller" aria-pressed="false">
           <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <path d="M4 5h12a4 4 0 0 1 4 4v10H8a4 4 0 0 1-4-4V5z"/>
             <path d="M8 9h8M8 13h6"/>
           </svg>
           <div class="mode-label">StoryTeller</div>
         </div>
-        <div class="mode-card" data-persona="trivia" id="modeTrivia" aria-label="Trivia Game">
+        <div class="mode-card" data-persona="trivia" id="modeTrivia" role="button" tabindex="0" aria-label="Trivia Game" aria-pressed="false">
           <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <circle cx="12" cy="12" r="9"/>
             <path d="M9 10a3 3 0 1 1 6 0c0 2-3 2.5-3 5"/>
@@ -177,14 +310,14 @@
           </svg>
           <div class="mode-label">Trivia Game</div>
         </div>
-        <div class="mode-card" data-persona="meditation" id="modeMeditation" aria-label="Meditation">
+        <div class="mode-card" data-persona="meditation" id="modeMeditation" role="button" tabindex="0" aria-label="Meditation" aria-pressed="false">
           <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <circle cx="12" cy="5" r="2.5"/>
             <path d="M6 21c2-2 4-3 6-3s4 1 6 3M6 14c2-1 4-2 6-2s4 1 6 2"/>
           </svg>
           <div class="mode-label">Meditation</div>
         </div>
-        <div class="mode-card" data-persona="motivation" id="modeMotivation" aria-label="Motivation">
+        <div class="mode-card" data-persona="motivation" id="modeMotivation" role="button" tabindex="0" aria-label="Motivation" aria-pressed="false">
           <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <path d="M5 12l4 4L19 6"/>
             <path d="M3 12a9 9 0 1 0 18 0a9 9 0 1 0 -18 0"/>
@@ -193,7 +326,7 @@
         </div>
       </div>
       <div class="voice-controls">
-        <button id="btnMic" class="mic-btn" aria-label="Record"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10a7 7 0 0 1-14 0"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg></button>
+        <button id="btnMic" class="mic-btn" aria-label="Start recording" aria-describedby="voiceHelp"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10a7 7 0 0 1-14 0"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg></button>
         <div id="wave" class="wave">
           <div class="bar" style="animation-delay:0ms"></div>
           <div class="bar" style="animation-delay:60ms"></div>
@@ -213,11 +346,81 @@
     </div>
   </div>
   <div id="imageDash" class="image-dashboard" style="display:none"></div>
-  
+  <section id="toolsDash" class="tools-dashboard" style="display:none" aria-labelledby="toolsTitle">
+    <h1 id="toolsTitle">Explore tools</h1>
+    <p class="tools-intro">These are optional services from other providers, not built into JAI. They open in a new tab so you can see when you leave JAI.</p>
+    <div class="tool-grid">
+      <article class="tool-card">
+        <h2>File Converter</h2>
+        <span class="external-pill">Third-party service · Convertio</span>
+        <p>Convert documents, images, audio, and other file formats. Check the provider’s privacy and file-handling terms before uploading anything sensitive.</p>
+        <a class="tool-link" href="https://convertio.co/" target="_blank" rel="noopener noreferrer">Open Convertio ↗</a>
+      </article>
+      <article class="tool-card">
+        <h2>HoloMotion</h2>
+        <span class="external-pill">Third-party demo · GitHub Pages</span>
+        <p>An interactive hand-tracking particle demo. It needs a compatible camera and browser permission; if it reports that a device was not found, check camera access or try another device.</p>
+        <a class="tool-link" href="https://hackerpgx.github.io/HoloMotion/" target="_blank" rel="noopener noreferrer">Open HoloMotion ↗</a>
+      </article>
+      <article class="tool-card">
+        <h2>Satellite Tracker</h2>
+        <span class="external-pill">Third-party service · SatelliteMap.Space</span>
+        <p>Explore a live satellite map. Loading and availability depend on the external provider and your browser or network.</p>
+        <a class="tool-link" href="https://satellitemap.space/" target="_blank" rel="noopener noreferrer">Open SatelliteMap.Space ↗</a>
+      </article>
+      <article class="tool-card">
+        <h2>Image Generator</h2>
+        <span class="external-pill">Third-party service · Leonardo AI</span>
+        <p>Generate images using Leonardo AI. Its account requirements, availability, privacy terms, and usage rules are separate from JAI.</p>
+        <a class="tool-link" href="https://app.leonardo.ai/" target="_blank" rel="noopener noreferrer">Open Leonardo AI ↗</a>
+      </article>
+    </div>
+    <p class="external-note">JAI does not control these services. Review each provider’s terms and privacy policy before sharing prompts, files, or camera access.</p>
+  </section>
+  </main>
+
+  <div id="authModal" class="auth-modal" role="dialog" aria-modal="true" aria-labelledby="authTitle">
+    <div class="auth-panel">
+      <button type="button" class="auth-close" id="authClose" aria-label="Close">&times;</button>
+      <h2 id="authTitle">Sign in to JAI</h2>
+      <div class="auth-tabs">
+        <button type="button" class="auth-tab active" id="tabSignin">Sign In</button>
+        <button type="button" class="auth-tab" id="tabSignup">Sign Up</button>
+      </div>
+      <form id="authForm" novalidate>
+        <div class="auth-field">
+          <label for="authEmail">Email</label>
+          <input class="auth-input" id="authEmail" name="email" type="email" autocomplete="email" placeholder="you@example.com" />
+        </div>
+        <div class="auth-field">
+          <label for="authPassword">Password</label>
+          <input class="auth-input" id="authPassword" name="password" type="password" autocomplete="current-password" placeholder="At least 8 characters" />
+        </div>
+        <div class="auth-field" id="confirmField" style="display:none">
+          <label for="authConfirm">Confirm Password</label>
+          <input class="auth-input" id="authConfirm" name="confirm" type="password" autocomplete="new-password" placeholder="Re-enter your password" />
+        </div>
+        <button type="submit" class="auth-submit" id="authSubmit">Sign In</button>
+      <div class="auth-status" id="authStatus" role="status" aria-live="polite"></div>
+    </form>
+      <p class="auth-note">Sign-in is handled by Supabase. See our <a href="/privacy">Privacy Notice</a> and <a href="/terms">Terms of Use</a>.</p>
+    </div>
+  </div>
+
+  <footer class="app-footer">
+    <span>JAI is an independent personal assistant project.</span>
+    <a href="/privacy">Privacy Notice</a>
+    <a href="/terms">Terms of Use</a>
+    <a href="https://github.com/HACKERpgx/JAI/issues" target="_blank" rel="noopener noreferrer">Support / report an issue ↗</a>
+  </footer>
+
+<script src="/static/form-validation.js"></script>
 <script>
   function rid(){ return ([1e7]+-1e3+-4e3+-8e3+-1e11).replace(/[018]/g,c=>(c^crypto.getRandomValues(new Uint8Array(1))[0]&15>>c/4).toString(16)); }
   const log = document.getElementById('log');
   function push(role, text){
+    const welcome = document.getElementById('welcome');
+    if(welcome) welcome.remove();
     const div = document.createElement('div');
     div.className = 'line ' + (role === 'me' ? 'me' : 'bot');
     div.textContent = text;
@@ -225,13 +428,29 @@
     log.scrollTop = log.scrollHeight;
   }
 
+  function setInteractionStatus(message){
+    const status = document.getElementById('interactionStatus');
+    if(status) status.textContent = message || '';
+  }
+
     async function sendText(){
     const input = document.getElementById('txt');
+    const sendButton = document.getElementById('send');
+    if(sendButton.disabled) return;
     const text = input.value.trim();
     const photoInput = document.getElementById('filePhoto');
     const cameraInput = document.getElementById('fileCamera');
     const imgFile = (photoInput && photoInput.files && photoInput.files[0]) || (cameraInput && cameraInput.files && cameraInput.files[0]) || null;
-    if(!text && !imgFile) return;
+    if(!text && !imgFile){
+      input.focus();
+      setInteractionStatus('Type a message or choose a photo before sending.');
+      return;
+    }
+    const originalLabel = sendButton.textContent;
+    sendButton.disabled = true;
+    sendButton.setAttribute('aria-busy','true');
+    sendButton.textContent = 'Sending…';
+    setInteractionStatus(imgFile ? 'Uploading your photo…' : 'Sending your message to JAI…');
     if(text) push('me', '> ' + text);
     input.value = '';
     try {
@@ -246,10 +465,17 @@
           body: JSON.stringify({ text })
         });
         const data = await res.json();
+        if(!res.ok) throw new Error((data && (data.error || data.detail)) || 'request_failed');
         push('bot', (data && data.response) ? data.response : JSON.stringify(data));
+        setInteractionStatus('');
       }
     } catch(e){
-      push('bot', 'Network error');
+      push('bot', 'JAI couldn’t complete that request. Check your connection and try again.');
+      setInteractionStatus('Message not sent. Please try again.');
+    } finally {
+      sendButton.disabled = false;
+      sendButton.removeAttribute('aria-busy');
+      sendButton.textContent = originalLabel;
     }
   }
   async function sendImage(file, prompt){
@@ -259,14 +485,22 @@
       form.append('prompt', prompt || '');
       const res = await fetch('/api/image', { method:'POST', headers: { 'X-Request-Id': rid() }, body: form });
       const data = await res.json();
+      if(!res.ok) throw new Error((data && (data.error || data.detail)) || 'upload_failed');
       push('bot', (data && data.response) ? data.response : JSON.stringify(data));
+      setInteractionStatus('');
     } catch(e){
-      push('bot', 'Image analysis failed');
+      push('bot', 'JAI couldn’t analyze that photo. Check your connection and try again.');
+      setInteractionStatus('Photo not uploaded. Please try again.');
     }
   }
   document.getElementById('send').addEventListener('click', sendText);
   document.getElementById('txt').addEventListener('keydown', e=>{ if(e.key==='Enter') sendText(); });
   window.addEventListener('load', ()=>{ document.getElementById('txt').focus(); });
+  document.querySelectorAll('[data-prompt]').forEach(button=>button.addEventListener('click', ()=>{
+    const input = document.getElementById('txt');
+    input.value = button.getAttribute('data-prompt') || '';
+    input.focus();
+  }));
 
   const btnPhoto = document.getElementById('btnPhoto');
   const btnVideo = document.getElementById('btnVideo');
@@ -329,7 +563,7 @@
   }
   window.addEventListener('resize', resize);
   resize();
-  draw();
+  if(!window.matchMedia('(prefers-reduced-motion: reduce)').matches) draw();
 
   if('serviceWorker' in navigator){
     window.addEventListener('load', ()=>{
@@ -339,42 +573,35 @@
 
   const navChat = document.getElementById('navChat');
   const navVoice = document.getElementById('navVoice');
-  const navImage = document.getElementById('navImage');
+  const navTools = document.getElementById('navTools');
   const stacker = document.querySelector('.stacker');
   const voiceDash = document.getElementById('voiceDash');
   const imageDash = document.getElementById('imageDash');
+  const toolsDash = document.getElementById('toolsDash');
   function setView(view){
-    if(view === 'voice'){
-      voiceDash.style.display = '';
-      stacker.style.display = 'none';
-      imageDash.style.display = 'none';
-      navVoice.classList.add('active');
-      navChat.classList.remove('active');
-      navImage.classList.remove('active');
-    } else if(view === 'image'){
-      imageDash.style.display = '';
-      voiceDash.style.display = 'none';
-      stacker.style.display = 'none';
-      navImage.classList.add('active');
-      navChat.classList.remove('active');
-      navVoice.classList.remove('active');
-      refreshImageQuota();
-    } else {
-      voiceDash.style.display = 'none';
-      imageDash.style.display = 'none';
-      stacker.style.display = '';
-      navChat.classList.add('active');
-      navVoice.classList.remove('active');
-      navImage.classList.remove('active');
-    }
+    const activeView = ['chat','voice','tools'].includes(view) ? view : 'chat';
+    stacker.style.display = activeView === 'chat' ? '' : 'none';
+    voiceDash.style.display = activeView === 'voice' ? '' : 'none';
+    toolsDash.style.display = activeView === 'tools' ? '' : 'none';
+    imageDash.style.display = 'none';
+    [[navChat,'chat'],[navVoice,'voice'],[navTools,'tools']].forEach(([button,key])=>{
+      const active = activeView === key;
+      button.classList.toggle('active', active);
+      if(active) button.setAttribute('aria-current','page');
+      else button.removeAttribute('aria-current');
+    });
   }
   navChat.addEventListener('click', ()=> setView('chat'));
-  navVoice.addEventListener('click', ()=> { window.location.href = 'https://grok.com/'; });
-  navImage.addEventListener('click', ()=> { window.location.href = 'https://app.leonardo.ai/'; });
+  navVoice.addEventListener('click', ()=> setView('voice'));
+  navTools.addEventListener('click', ()=> setView('tools'));
 
   const cards = Array.from(document.querySelectorAll('.mode-card'));
   function highlightCard(id){
-    cards.forEach(c=> c.classList.toggle('active', c.id === id));
+    cards.forEach(c=>{
+      const active = c.id === id;
+      c.classList.toggle('active', active);
+      c.setAttribute('aria-pressed', String(active));
+    });
   }
   async function setPersona(p){
     try{
@@ -383,11 +610,16 @@
       return !!data && !data.error;
     }catch(_){ return false }
   }
-  cards.forEach(c=> c.addEventListener('click', async ()=>{
+  cards.forEach(c=>{
+    c.addEventListener('keydown', event=>{
+      if(event.key === 'Enter' || event.key === ' '){ event.preventDefault(); c.click(); }
+    });
+    c.addEventListener('click', async ()=>{
     const p = c.getAttribute('data-persona');
     const ok = await setPersona(p);
     if(ok) highlightCard(c.id);
-  }));
+    });
+  });
 
   const voiceLog = document.getElementById('voiceLog');
   function vpush(role, text){
@@ -432,6 +664,7 @@
       mediaRecorder.start();
       recording = true;
       btnMic.classList.add('recording');
+      btnMic.setAttribute('aria-label','Stop recording');
       setWave('listening');
     }catch(_){ vpush('bot', 'Microphone permission denied'); }
   }
@@ -439,6 +672,7 @@
     try{ if(mediaRecorder && recording){ mediaRecorder.stop(); } }catch(_){ }
     recording = false;
     btnMic.classList.remove('recording');
+    btnMic.setAttribute('aria-label','Start recording');
   }
   btnMic.addEventListener('click', ()=>{ if(recording){ stopRec(); } else { startRec(); } });
 
@@ -450,6 +684,159 @@
       speechSynthesis.speak(u);
     }catch(_){ /* no-op */ }
   }
+
+  // ---- Authentication (Supabase) ----
+  (function(){
+    const V = window.JAIValidation;
+    const modal = document.getElementById('authModal');
+    const form = document.getElementById('authForm');
+    const navAuth = document.getElementById('navAuth');
+    const tabSignin = document.getElementById('tabSignin');
+    const tabSignup = document.getElementById('tabSignup');
+    const confirmField = document.getElementById('confirmField');
+    const submit = document.getElementById('authSubmit');
+    const statusEl = document.getElementById('authStatus');
+    const title = document.getElementById('authTitle');
+    if(!V || !form) return;
+
+    let mode = 'signin';
+    let client = null;
+    let clientPromise = null;
+    let currentUser = null;
+
+    function setStatus(text, kind){
+      statusEl.textContent = text || '';
+      statusEl.className = 'auth-status' + (kind ? ' ' + kind : '');
+    }
+
+    function setMode(next){
+      mode = next;
+      const isSignup = mode === 'signup';
+      tabSignup.classList.toggle('active', isSignup);
+      tabSignin.classList.toggle('active', !isSignup);
+      confirmField.style.display = isSignup ? 'flex' : 'none';
+      document.getElementById('authPassword').setAttribute('autocomplete', isSignup ? 'new-password' : 'current-password');
+      title.textContent = isSignup ? 'Create your JAI account' : 'Sign in to JAI';
+      submit.textContent = isSignup ? 'Sign Up' : 'Sign In';
+      V.clearErrors(form);
+      setStatus('');
+    }
+
+    function openModal(){ modal.classList.add('open'); document.getElementById('authEmail').focus(); }
+    function closeModal(){
+      modal.classList.remove('open');
+      form.reset();
+      V.clearErrors(form);
+      setStatus('');
+      submit.disabled = false;
+      submit.textContent = mode === 'signup' ? 'Sign Up' : 'Sign In';
+      navAuth.focus();
+    }
+
+    async function getClient(){
+      if(client) return client;
+      if(clientPromise) return clientPromise;
+      clientPromise = (async ()=>{
+        const cfg = await (await fetch('/api/auth/config')).json();
+        if(!cfg.enabled) throw new Error('Authentication is not configured on this server.');
+        if(!window.supabase){
+          await new Promise((resolve, reject)=>{
+            const s = document.createElement('script');
+            s.src = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.47.10/dist/umd/supabase.min.js';
+            s.onload = resolve;
+            s.onerror = ()=> reject(new Error('Could not load the authentication library.'));
+            document.head.appendChild(s);
+          });
+        }
+        client = window.supabase.createClient(cfg.supabase_url, cfg.supabase_anon_key, {
+          auth: { autoRefreshToken: true, persistSession: true, detectSessionInUrl: true }
+        });
+        return client;
+      })();
+      return clientPromise;
+    }
+
+    function renderUser(user){
+      currentUser = user;
+      if(user){
+        navAuth.innerHTML = 'Sign Out<span class="auth-email"></span>';
+        navAuth.querySelector('.auth-email').textContent = user.email || '';
+      } else {
+        navAuth.textContent = 'Sign In';
+      }
+    }
+
+    async function refreshSession(){
+      try{
+        const c = await getClient();
+        const { data } = await c.auth.getSession();
+        renderUser(data && data.session ? data.session.user : null);
+      }catch(_){ renderUser(null); }
+    }
+
+    navAuth.addEventListener('click', async ()=>{
+      if(currentUser){
+        try{ const c = await getClient(); await c.auth.signOut(); }catch(_){ /* no-op */ }
+        renderUser(null);
+        push('bot', 'Signed out.');
+        return;
+      }
+      setMode('signin');
+      openModal();
+    });
+    document.getElementById('authClose').addEventListener('click', closeModal);
+    modal.addEventListener('click', (e)=>{ if(e.target === modal) closeModal(); });
+    document.addEventListener('keydown', (e)=>{ if(e.key === 'Escape' && modal.classList.contains('open')) closeModal(); });
+    tabSignin.addEventListener('click', ()=> setMode('signin'));
+    tabSignup.addEventListener('click', ()=> setMode('signup'));
+
+    const rules = {
+      email: [V.rules.required('Email is required.'), V.rules.email()],
+      password: [
+        V.rules.required('Password is required.'),
+        function(value){
+          if(mode !== 'signup') return null;
+          return value.length >= 8 ? null : 'Password must be at least 8 characters.';
+        }
+      ],
+      confirm: [function(value, f){
+        if(mode !== 'signup') return null;
+        if(!value) return 'Please confirm your password.';
+        return value === V.field(f, 'password').value ? null : 'Passwords do not match.';
+      }]
+    };
+
+    V.attach(form, rules, async (values)=>{
+      submit.disabled = true;
+      submit.textContent = mode === 'signup' ? 'Creating account…' : 'Signing in…';
+      setStatus('');
+      try{
+        const c = await getClient();
+        const credentials = { email: values.email, password: values.password };
+        const { data, error } = mode === 'signup'
+          ? await c.auth.signUp(credentials)
+          : await c.auth.signInWithPassword(credentials);
+        if(error) throw error;
+        if(mode === 'signup' && data && data.session === null){
+          setStatus('Account created. Check your email to confirm your address.', 'success');
+          submit.disabled = false;
+          submit.textContent = 'Sign Up';
+          return;
+        }
+        renderUser(data && data.user ? data.user : null);
+        setStatus('Signed in.', 'success');
+        closeModal();
+        push('bot', 'Signed in as ' + values.email);
+      }catch(err){
+        setStatus(err && err.message ? err.message : 'Something went wrong. Please try again.', 'error');
+      }finally{
+        submit.disabled = false;
+        submit.textContent = mode === 'signup' ? 'Sign Up' : 'Sign In';
+      }
+    });
+
+    refreshSession();
+  })();
 </script>
 </body>
 </html>

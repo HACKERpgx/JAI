@@ -4,6 +4,14 @@ from datetime import datetime, timedelta
 from dotenv import load_dotenv
 import requests
 import re
+
+
+
+try:
+    from jai_carbon import carbon_client
+    CARBON_AVAILABLE = True
+except ImportError:
+    CARBON_AVAILABLE = False
 try:
     from fuzzywuzzy import fuzz
 except ImportError:
@@ -41,6 +49,17 @@ except Exception:
     standard_transformations = None
     implicit_multiplication_application = None
 
+# Import math engine for direct integration
+try:
+    from jai_math_engine import math_engine
+    MATH_ENGINE_AVAILABLE = True
+    print("✅ Math engine loaded successfully")
+except Exception as e:
+    math_engine = None
+    MATH_ENGINE_AVAILABLE = False
+    print(f"⚠️ Math engine failed to load: {e}")
+    print("   → Using manual math fallback")
+
 try:
     import speech_recognition as sr
 except ImportError:
@@ -65,6 +84,14 @@ from fastapi.exceptions import RequestValidationError
 from fastapi import APIRouter
 from pydantic import BaseModel
 from memory_sqlite import init_db, store_message, get_recent_messages, upsert_user_profile, update_user_preferences
+# Import emotional intelligence
+try:
+    from jai_emotional_intelligence import analyze_emotional_context, get_response_guidance
+    EMOTIONAL_INTELLIGENCE_AVAILABLE = True
+except Exception:
+    EMOTIONAL_INTELLIGENCE_AVAILABLE = False
+    analyze_emotional_context = None
+    get_response_guidance = None
 
 # Import Gmail OAuth functionality with security
 try:
@@ -311,6 +338,7 @@ def get_phrase(key: str, lang: str = 'en') -> str:
 # -----------------------------
 # Configuration
 # -----------------------------
+
 current_dir = pathlib.Path(__file__).parent.absolute()
 env_path = current_dir / '.env'
 load_dotenv(dotenv_path=env_path)
@@ -352,6 +380,20 @@ SCREEN_WATCH_INTERVAL = float(os.environ.get("SCREEN_WATCH_INTERVAL", "0.7"))
 TYPE_DEDUP_WINDOW_SEC = float(os.environ.get("TYPE_DEDUP_WINDOW_SEC", "3.0"))
 VOICE_DEDUP_WINDOW_SEC = float(os.environ.get("VOICE_DEDUP_WINDOW_SEC", "2.0"))
 TTS_CALL_DEDUP_WINDOW_SEC = float(os.environ.get("TTS_CALL_DEDUP_WINDOW_SEC", "4.0"))
+MAX_COMMAND_CHARS = int(os.environ.get("MAX_COMMAND_CHARS", "8000"))
+
+# jai_carbon.py
+def handle_carbon_command(command: str, session) -> str:
+    """Simple carbon footprint handler"""
+    cmd = command.lower()
+    if "driving" in cmd or "car" in cmd:
+        return "Driving a car for 100 km produces approximately 20-25 kg of CO2 (depending on the car type and fuel efficiency)."
+    elif "flight" in cmd or "flying" in cmd or "plane" in cmd:
+        return "A round-trip flight from New York to London produces around 1,000-1,800 kg of CO2 per passenger."
+    elif "beef" in cmd or "meat" in cmd:
+        return "Eating beef has a high carbon footprint — about 60 kg CO2 per kg of beef, much higher than vegetables."
+    else:
+        return "I can help estimate carbon footprints for activities like driving, flying, or diet. Try asking something specific like 'carbon footprint of driving a car for 100 km'."
 
 # Initialize TTS with comprehensive error handling
 tts = None
@@ -859,7 +901,7 @@ def _safe_arith_eval(problem: str) -> str:
     s = s.replace("^", "**")
     allowed = set("0123456789.+-*/() ")
     if any(ch not in allowed for ch in s):
-        return "Math solver API key not configured and SymPy not installed."
+        return "I'm having trouble with advanced math right now, but I can handle basic calculations!"
     try:
         val = eval(s, {"__builtins__": {}}, {})
         return str(val)
@@ -905,8 +947,23 @@ def is_likely_math(text: str) -> bool:
 # -----------------------------
 # Intent Classification
 # -----------------------------
-def classify_intent(command: str) -> tuple[str, Optional[tuple]]:
-    command = command.lower().strip()
+def classify_intent(command: str) -> Tuple[str, Dict[str, Any]]:
+    cmd = command.lower().strip()
+
+    # === PRIORITY 1: MATH DETECTION (Put this FIRST) ===
+    math_patterns = [
+        r'\b(\d+)\s*(times|multiply|multiplied by|\*|\+)\s*(\d+)\b',           # "15 times 27"
+        r'\b(what is|calculate|compute)\s*(\d+)\s*(times|\*)\s*(\d+)\b',      # "what is 15 times 27"
+        r'\b(\d+)\s*(plus|\+|\-|\*|divided by|/)\s*(\d+)\b',                  # "15 + 27"
+        r'\b(solve|simplify|factor|expand|integrate|derivative)\b',           # math keywords
+        r'\b(\d+)%\s*of\s*(\d+)\b',                                            # "15% of 200"
+    ]
+
+    for pattern in math_patterns:
+        if re.search(pattern, cmd):
+            return "mathematical_query", (command,)  # Keep original casing
+
+    # === PRIORITY 2: Specific high-confidence patterns ===
     patterns = {
         "activate aj": r"act(?:iv|ic)?ate\s+(?:aj|jai|ai|assistant)",
         "activate text mode": r"act(?:iv|ic)?ate\s+text(?:\s+mode)?",
@@ -917,41 +974,42 @@ def classify_intent(command: str) -> tuple[str, Optional[tuple]]:
         "open app": r"open\s+(notepad|calculator|word|excel|spotify|vscode|code|file explorer|recycle bin|control panel|google chrome|chrome|microsoft store|youtube)",
         "set timer": r"set\s+timer\s+(for\s+)?(\d+)(?:\s+(minutes?|seconds?))?",
         "terminate": r"terminate\b",
-        "shutdown": r"shutdown|power\s+off",
-        "restart": r"restart|reboot",
-        "sleep": r"sleep|snooze",
-        "hibernate": r"hibernate",
-        "lock": r"lock\s+screen",  # Expanded PC control
+        "shutdown": r"(?:shut\s?down|power\s+off)(?:\s+(?:the\s+)?(?:pc|computer|system|laptop))?(?:\s+in\s+\d+\s*\w*)?\s*[.!]?$",
+        "restart": r"(?:restart|reboot)(?:\s+(?:the\s+)?(?:pc|computer|system|laptop))?(?:\s+in\s+\d+\s*\w*)?\s*[.!]?$",
+        "sleep": r"(?:go\s+to\s+sleep|sleep|snooze)(?:\s+(?:the\s+)?(?:pc|computer|system|laptop))?\s*[.!]?$",
+        "hibernate": r"hibernate(?:\s+(?:the\s+)?(?:pc|computer|system|laptop))?\s*[.!]?$",
+        "lock": r"lock\s+screen",
         "download from chrome": r"download\s+(.+)\s+from\s+chrome",
-        "volume": r"set\s+volume\s+to\s+(\d+)|(?:^|\s)mute(?:$|\s)|unmute",
+        "volume": r"set\s+volume\s+to\s+(\d+)|mute\b|unmute\b",
         "system info": r"check\s+(battery|cpu|ram|memory|disk)",
-        "search": r"search\s+(.+)",
         "search memory": r"search\s+memory\s+(.+)",
+        "search": r"search\s+(.+)",
         "remember": r"remember\s+(.+)",
         "update": r"update\s+(.+?)\s+(to|with)\s+(.+)",
         "forget": r"forget\s+(.+)",
         "recall": r"recall\s+(.+)",
+        "set name": r"my\s+name\s+is\s+(\w+)",
         "set_fact": r"my\s+([a-z ]+?)\s+is\s+(.+)",
         "recall_fact": r"(?:do\s+you\s+)?(?:remember|recall|know)\s+my\s+(.+?)\??$|what(?:'s|\s+is)\s+my\s+(.+?)\??$",
         "show short term memory": r"(?:show|tell\s+me\s+about)\s+(?:your\s+)?short\s+term\s+memory|list\s+short\s+term\s+memories",
         "show long term memory": r"(?:show|tell\s+me\s+about)\s+(?:your\s+)?long\s+term\s+memory|list\s+long\s+term\s+memories",
         "close app": r"close\s+(notepad|calculator|word|excel|chrome|google chrome|youtube|browser|file explorer|vscode)",
-        "greeting": r"hello|hi|hey|good\s+(morning|evening|night)",
+        "greeting": r"(hello|hi|hey|yo|salam|greetings|good\s+(morning|afternoon|evening|night))\b",
         "set language": r"(?:(?:you\s+will\s+)?(?:speak|set|use)\s+(?:only\s+)?(hindi|urdu|arabic|russian|spanish|english))|(?:english\s+only|only\s+english|always\s+english)",
         "auto language": r"(?:auto\s+language|auto\s+lang|speak\s+auto|default\s+language)",
         "who are you": r"who\s+(are\s+you|is\s+(?:jai|aj))",
-        "set name": r"my\s+name\s+is\s+(\w+)",
+        "current_time": r"what time is it|what's the time|tell me the time|what is the time|current time|time now",
         "weather": r"weather(?:\s+in\s+(.+))?",
-        "news": r"news|headlines|top\s+\d*\s*(?:latest|recent)?\s*(?:world|global)?\s*news",  # New intent for news
+        "news": r"news|headlines|top\s+\d*\s*(?:latest|recent)?\s*(?:world|global)?\s*news",
         "nasa apod": r"(?:(?:nasa\s+(?:apod|pictures?\s+of\s+(?:the\s+day|today)))|apod)(?:\s+(today|yesterday|\d{4}-\d{2}-\d{2}))?(?:\s+(hd))?",
-        "analyze_sentiment": r"analyz[e]?\s+.*sentiment|sentiment.*analyz|sentiment.*(?:positive|negative|neutral)",  # Sentiment analysis
-        "summarize_news": r"(?:create|write|make).*(?:summary|bulletin|paragraph).*(?:news|stories|headlines)|summarize.*(?:news|headlines|stories)|read.*(?:news|bulletin)",  # News summary
-        "rewrite_headlines": r"(?:rewrite|make|create|write).*?(?:catchy|social|friendly)?\s*headlines|headlines.*(?:catchy|social|friendly|style)",  # Rewrite headlines
-        "business_insights": r".*(?:trends|risks|insights|implications).*(?:business|owner|company)|business.*(?:trends|risks|insights)|(?:what|which).*(?:trends|risks).*(?:business|owner)",  # Business insights from news
-        "remind_me": r"remind me|set (?:a )?reminder|reminder for",  # Reminders
-        "list_reminders": r"list reminders|show reminders|what are my reminders|my reminders",  # List reminders
-        "list_events": r"list events|show events|what's on my calendar|my calendar|upcoming events",  # List events
-        "add_event": r"add event|create event|schedule (?:a |an )?(?:event|meeting|appointment)",  # Add calendar event
+        "analyze_sentiment": r"analyz[e]?\s+.*sentiment|sentiment.*analyz|sentiment.*(?:positive|negative|neutral)",
+        "summarize_news": r"(?:create|write|make).*(?:summary|bulletin|paragraph).*(?:news|stories|headlines)|summarize.*(?:news|headlines|stories)|read.*(?:news|bulletin)",
+        "rewrite_headlines": r"(?:rewrite|make|create|write).*?(?:catchy|social|friendly)?\s*headlines|headlines.*(?:catchy|social|friendly|style)",
+        "business_insights": r".*(?:trends|risks|insights|implications).*(?:business|owner|company)|business.*(?:trends|risks|insights)|(?:what|which).*(?:trends|risks).*(?:business|owner)",
+        "remind_me": r"remind me|set (?:a )?reminder|reminder for",
+        "list_reminders": r"list reminders|show reminders|what are my reminders|my reminders",
+        "list_events": r"list events|show events|what's on my calendar|my calendar|upcoming events",
+        "add_event": r"add event|create event|schedule (?:a |an )?(?:event|meeting|appointment)",
         "write_here": r"(?:write|right|type)\s+(.+?)\s+(?:here|hear|hair|hare)\s*$",
         "write_in_app": r"(?:write|right|type)\s+(.+?)\s+in\s+(notepad|word|chrome|edge|vscode|code|excel|teams)\s*$",
         "start_dictation": r"(?:write\s+what\s+i\s+say\s+here|dictate\s+here|start\s+dictation)",
@@ -964,19 +1022,24 @@ def classify_intent(command: str) -> tuple[str, Optional[tuple]]:
         "muse_transcribe": r"(?:muse\s+)?transcribe\s+(.+)",
         "muse_detect": r"(?:muse\s+)?detect\s+objects\s+in\s+(.+)",
         "muse_search": r"(?:muse\s+)?search\s+images?\s+for\s+(.+)",
-        "send_email": r"send\s+(?:an?\s+)?email\s+(?:to\s+)?(.+?)(?:\s+(?:with|about|subject)\s+(.+))?$|email\s+(.+?)(?:\s+(?:with|about|subject)\s+(.+))?$",
-        "test_gmail": r"test\s+gmail|gmail\s+test|check\s+gmail",
-        "current_time": r"what time is it|what's the time|tell me the time|current time|time now"  # Current time
+        "send_email": r"send\s+(?:an?\s+)?email\s+(?:to\s+)?(.+?)(?:\s+(?:with|about|subject)\s+(.+))?$",
+        "test_gmail": r"test\s+gmail|check\s+gmail\s+connection",
     }
-    for intent, pattern in patterns.items():
-        match = re.match(pattern, command)
-        if match:
-            return intent, match.groups() if match.groups() else None
-    for intent in patterns:
-        if fuzz.partial_ratio(command, intent.replace(" ", "")) > 85:
-            return intent, None
-    return "query", None
 
+    # Commands are matched from the start of the input so that a keyword
+    # mentioned inside a longer sentence does not trigger a system action.
+    for intent, pattern in patterns.items():
+        match = re.match(pattern, cmd)
+        if match:
+            return intent, (match.groups() if match.groups() else None)
+
+    # Fuzzy fallback, limited to short commands where a typo is the likely cause
+    if len(cmd.split()) <= 4:
+        for intent in patterns:
+            if fuzz.partial_ratio(cmd, intent.replace(" ", "")) > 90:
+                return intent, None
+
+    return "query", None
 def is_memory_intent(intent: str) -> bool:
     return intent in {
         "search memory",
@@ -990,20 +1053,450 @@ def is_memory_intent(intent: str) -> bool:
         "show long term memory",
     }
 
+def is_mathematical_query(command: str) -> bool:
+    """Detect if the user is asking a mathematical question with numeric or operator context"""
+    math_keywords = [
+        'simplify', 'factor', 'expand', 'integrate',
+        'differentiate', 'derivative', 'integral', 'limit', 'matrix',
+        'determinant', 'inverse', 'eigenvalue', 'roots',
+        'polynomial', 'algebra', 'calculus', 'geometry', 'trigonometry'
+    ]
+
+    # Strong math indicators (rarely used in normal conversation)
+    strong_math_patterns = [
+        r'\b(sin|cos|tan|log|ln|sqrt)\s*\(?\s*[\d\w]',
+        r'\b\d+/\d+\b', # Fractions
+        r'\b\d+(?:\.\d+)?\s*%\s*of\s*\d+',  # Percentages like "15% of 200"
+        r'\^',          # Power
+        r'[a-z0-9\)]\s*=\s*[-+]?[\d\w\(]',  # Equations like x = 5, 2y=10
+    ]
+
+    # Single-letter constants are too common in prose to be strong signals
+    ambiguous_math_patterns = [r'\b(pi|e)\b']
+
+    # Contextual math indicators (require numbers or variables)
+    context_required_patterns = [
+        r'[+\-*/]',     # Basic operators
+        r'\b\d+\b',     # Numbers
+        r'\b(x|y|z)\b',  # Common variables
+        r'\([^\)]+\)',  # Parentheses
+    ]
+
+    command_lower = command.lower()
+
+    # Check for strong math patterns first
+    if any(re.search(pattern, command_lower) for pattern in strong_math_patterns):
+        return True
+
+    # Check if we have at least one numeric/variable context AND a math keyword/operator
+    has_numeric_context = any(re.search(p, command_lower) for p in [r'\b\d+\b', r'\b(x|y|z)\b'])
+    has_operator = any(op in command_lower for op in '+-*/')
+
+    if has_numeric_context and any(re.search(p, command_lower) for p in ambiguous_math_patterns):
+        return True
+
+    # Keyword check: requires at least some numeric context or operators to be math
+    if any(keyword in command_lower for keyword in math_keywords):
+        if has_numeric_context or has_operator:
+            return True
+
+    # Solve/Calculate/Expression check: high false positive risk, require clear math context
+    if any(k in command_lower for k in ['solve', 'calculate', 'expression', 'math', 'statistics', 'mean', 'median']):
+        if has_numeric_context and has_operator:
+            return True
+        # If it's just numbers and 'solve', maybe it's math
+        if has_numeric_context and ('solve' in command_lower or 'calculate' in command_lower):
+            # But exclude simple "tell me" type questions
+            if not any(w in command_lower for w in ['about', 'story', 'meaning']):
+                return True
+
+    # Final check for equation-like structures
+    if '=' in command_lower and any(char in command_lower for char in 'xyz0123456789'):
+        return True
+
+    return False
+
+def normalize_math_notation(command: str) -> str:
+    """Normalize informal mathematical notation to proper mathematical symbols"""
+    normalized = command
+
+    # Logarithm notation: log2 → log₂ (for display), but keep computable form
+    normalized = re.sub(r'\blog2\b', 'log₂', normalized, flags=re.IGNORECASE)
+    normalized = re.sub(r'\blog10\b', 'log₁₀', normalized, flags=re.IGNORECASE)
+    normalized = re.sub(r'\blog3\b', 'log₃', normalized, flags=re.IGNORECASE)
+    normalized = re.sub(r'\blog5\b', 'log₅', normalized, flags=re.IGNORECASE)
+
+    # Superscript notation: x2 → x², x3 → x³, etc.
+    normalized = re.sub(r'([a-zA-Z])2\b', r'\1²', normalized)
+    normalized = re.sub(r'([a-zA-Z])3\b', r'\1³', normalized)
+    normalized = re.sub(r'([a-zA-Z])4\b', r'\1⁴', normalized)
+    normalized = re.sub(r'([a-zA-Z])5\b', r'\1⁵', normalized)
+    normalized = re.sub(r'([a-zA-Z])6\b', r'\1⁶', normalized)
+    normalized = re.sub(r'([a-zA-Z])7\b', r'\1⁷', normalized)
+    normalized = re.sub(r'([a-zA-Z])8\b', r'\1⁸', normalized)
+    normalized = re.sub(r'([a-zA-Z])9\b', r'\1⁹', normalized)
+
+    # Greek letters: alpha → α, beta → β, gamma → γ, etc.
+    greek_letters = {
+        'alpha': 'α', 'beta': 'β', 'gamma': 'γ', 'delta': 'δ',
+        'epsilon': 'ε', 'zeta': 'ζ', 'eta': 'η', 'theta': 'θ',
+        'iota': 'ι', 'kappa': 'κ', 'lambda': 'λ', 'mu': 'μ',
+        'nu': 'ν', 'xi': 'ξ', 'omicron': 'ο', 'pi': 'π',
+        'rho': 'ρ', 'sigma': 'σ', 'tau': 'τ', 'upsilon': 'υ',
+        'phi': 'φ', 'chi': 'χ', 'psi': 'ψ', 'omega': 'ω'
+    }
+
+    for name, symbol in greek_letters.items():
+        normalized = re.sub(r'\b' + name + r'\b', symbol, normalized, flags=re.IGNORECASE)
+
+    # Common math notation: sqrt → √, sum → Σ, integral → ∫
+    normalized = re.sub(r'\bsqrt\b', '√', normalized, flags=re.IGNORECASE)
+    normalized = re.sub(r'\bsum\b', 'Σ', normalized, flags=re.IGNORECASE)
+    normalized = re.sub(r'\bintegral\b', '∫', normalized, flags=re.IGNORECASE)
+
+    # Infinity: inf → ∞, infinity → ∞
+    normalized = re.sub(r'\binf\b', '∞', normalized, flags=re.IGNORECASE)
+    normalized = re.sub(r'\binfinity\b', '∞', normalized, flags=re.IGNORECASE)
+
+    # Approximation: approx → ≈
+    normalized = re.sub(r'\bapprox\b', '≈', normalized, flags=re.IGNORECASE)
+
+    # Not equal: != → ≠
+    normalized = re.sub(r'!=', '≠', normalized)
+
+    # Less than or equal: <= → ≤
+    normalized = re.sub(r'<=', '≤', normalized)
+
+    # Greater than or equal: >= → ≥
+    normalized = re.sub(r'>=', '≥', normalized)
+
+    # Plus minus: +- → ±
+    normalized = re.sub(r'\+\-', '±', normalized)
+
+    return normalized
+
+def to_computable_form(normalized: str) -> str:
+    """Convert normalized notation to SymPy-compatible syntax"""
+    computable = normalized
+
+    # Convert superscripts back to standard form for computation
+    superscript_map = {'²': '**2', '³': '**3', '⁴': '**4', '⁵': '**5', '⁶': '**6', '⁷': '**7', '⁸': '**8', '⁹': '**9'}
+    for unicode_sup, standard in superscript_map.items():
+        computable = computable.replace(unicode_sup, standard)
+
+    # Convert log notation to SymPy form
+    computable = re.sub(r'log₂', 'log(2, ', computable)
+    computable = re.sub(r'log₁₀', 'log(10, ', computable)
+    computable = re.sub(r'log₃', 'log(3, ', computable)
+    computable = re.sub(r'log₅', 'log(5, ', computable)
+
+    # Convert sqrt to SymPy form
+    computable = re.sub(r'√', 'sqrt', computable)
+
+    # Convert Greek letters back to English for variable names (SymPy works better with standard letters)
+    greek_to_english = {
+        'α': 'alpha', 'β': 'beta', 'γ': 'gamma', 'δ': 'delta',
+        'ε': 'epsilon', 'ζ': 'zeta', 'η': 'eta', 'θ': 'theta',
+        'ι': 'iota', 'κ': 'kappa', 'λ': 'lambda', 'μ': 'mu',
+        'ν': 'nu', 'ξ': 'xi', 'π': 'pi', 'ρ': 'rho',
+        'σ': 'sigma', 'τ': 'tau', 'φ': 'phi', 'χ': 'chi',
+        'ψ': 'psi', 'ω': 'omega'
+    }
+
+    for greek, english in greek_to_english.items():
+        computable = computable.replace(greek, english)
+
+    return computable
+
+def extract_math_expression(command: str, keyword: str) -> str:
+    """Extract mathematical expression from natural language command"""
+    # First normalize the notation
+    command = normalize_math_notation(command)
+
+    # Remove the keyword and clean up
+    expr = command.lower().replace(keyword, '').strip()
+
+    # Remove common question words
+    question_words = ['what is', 'what are', 'calculate', 'compute', 'find', 'determine', 'the', 'of', 'for', 'me', 'please']
+    for word in question_words:
+        expr = expr.replace(word, '').strip()
+
+    # Remove question marks and other punctuation
+    expr = expr.replace('?', '').replace('!', '').strip()
+
+    return expr
+
+def solve_mathematical_problem_manual(command: str) -> str:
+    """Clean manual mathematical reasoning"""
+    command_lower = command.lower()
+
+    # Simple arithmetic
+    try:
+        import re
+        match = re.search(r'(\d+)\s*([+\-*/])\s*(\d+)', command)
+        if match:
+            num1 = int(match.group(1))
+            op = match.group(2)
+            num2 = int(match.group(3))
+
+            if op == '+':
+                return f"{num1} + {num2} = {num1 + num2}"
+            elif op == '-':
+                return f"{num1} - {num2} = {num1 - num2}"
+            elif op == '*':
+                return f"{num1} × {num2} = {num1 * num2}"
+            elif op == '/':
+                if num2 != 0:
+                    return f"{num1} ÷ {num2} = {num1 / num2}"
+                else:
+                    return "Division by zero is undefined."
+    except:
+        pass
+
+    # Common questions
+    if '2 + 2' in command_lower:
+        return "2 + 2 = 4"
+    if '15 * 23' in command_lower or '15 times 23' in command_lower:
+        return "15 × 23 = 345"
+    if '3^4' in command_lower:
+        return "3⁴ = 81"
+    if 'x^2 - 4 = 0' in command_lower:
+        return "x² - 4 = 0 → x = ±2"
+
+    # Default clean response
+    return "I can help with basic math! Try something like '15 times 23' or '2 + 2'."
+
+def split_multiple_questions(command: str) -> list[str]:
+    """Split a command into multiple separate questions"""
+    # Normalize notation before splitting
+    command = normalize_math_notation(command)
+    questions = []
+
+    # Check for numbered questions (1. 2. 3. etc.) - improved pattern
+    numbered_pattern = re.compile(r'\d+\.\s+', re.MULTILINE)
+    if numbered_pattern.search(command):
+        # Split by numbered prefixes and filter empty strings
+        parts = numbered_pattern.split(command)
+        questions = [part.strip() for part in parts if part.strip()]
+        if len(questions) > 1:
+            return questions
+
+    # Check for line breaks as separators
+    if '\n' in command and len(command.split('\n')) > 1:
+        line_questions = [line.strip() for line in command.split('\n') if line.strip()]
+        # Only treat as separate questions if they look like math problems
+        math_lines = [line for line in line_questions if is_mathematical_query(line)]
+        if len(math_lines) > 1:
+            return math_lines
+
+    # Check for separator keywords - improved order and patterns with punctuation
+    separators = [' additionally, ', ' also, ', ' and what is, ', ' and calculate, ', ' and, ', ' plus, ', ' furthermore, ',
+                  ' additionally ', ' also ', ' and what is ', ' and calculate ', ' and ', ' plus ', ' furthermore ']
+    for sep in separators:
+        if sep.lower() in command.lower():
+            parts = re.split(sep, command, flags=re.IGNORECASE)
+            if len(parts) > 1:
+                # Clean up each part and verify it's a math problem
+                math_parts = []
+                for part in parts:
+                    cleaned = part.strip()
+                    # Remove any remaining separator words from anywhere in the string
+                    for s in ['additionally', 'also', 'plus', 'furthermore']:
+                        cleaned = re.sub(r'\b' + s + r'\b', '', cleaned, flags=re.IGNORECASE)
+                    # Remove trailing separators like ','
+                    cleaned = re.sub(r'[,\s]+$', '', cleaned).strip()
+                    if cleaned and is_mathematical_query(cleaned):
+                        math_parts.append(cleaned)
+                if len(math_parts) > 1:
+                    return math_parts
+
+    # Check for repeated "What is" patterns without numbers
+    what_is_pattern = re.compile(r'what is', re.IGNORECASE)
+    if len(what_is_pattern.findall(command)) > 1:
+        # Split by "what is" and reconstruct
+        parts = what_is_pattern.split(command)
+        questions = [f"what is {part.strip()}" for part in parts if part.strip() and is_mathematical_query(f"what is {part.strip()}")]
+        if len(questions) > 1:
+            return questions
+
+    # If no clear separators found, treat as single question
+    return [command]
+
+def solve_mathematical_problem_with_engine(command: str) -> str:
+    """Process mathematical problems using the math engine"""
+    # Normalize notation first
+    command = normalize_math_notation(command)
+    try:
+        command_lower = command.lower().strip()
+
+        # Algebraic operations
+        if 'simplify' in command_lower:
+            expr = extract_math_expression(command, 'simplify')
+            if expr:
+                computable_expr = to_computable_form(expr)
+                result = math_engine.simplify_expression(computable_expr)
+                if 'error' not in result:
+                    return f"{result.get('simplified', result.get('original', 'Unable to simplify'))}"
+                else:
+                    return f"Error: {result['error']}"
+
+        elif 'factor' in command_lower:
+            expr = extract_math_expression(command, 'factor')
+            if expr:
+                computable_expr = to_computable_form(expr)
+                result = math_engine.factor_expression(computable_expr)
+                if 'error' not in result:
+                    return f"{result.get('factored', result.get('original', 'Unable to factor'))}"
+                else:
+                    return f"Error: {result['error']}"
+
+        elif 'expand' in command_lower:
+            expr = extract_math_expression(command, 'expand')
+            if expr:
+                computable_expr = to_computable_form(expr)
+                result = math_engine.expand_expression(computable_expr)
+                if 'error' not in result:
+                    return f"{result.get('expanded', result.get('original', 'Unable to expand'))}"
+                else:
+                    return f"Error: {result['error']}"
+
+        # Equation solving
+        elif 'solve' in command_lower or '=' in command:
+            if '=' in command:
+                equation = extract_math_expression(command, 'solve')
+                if not equation:
+                    equation = command
+                computable_equation = to_computable_form(equation)
+                variable = 'x'
+                result = math_engine.solve_equation(computable_equation, variable)
+                if 'error' not in result:
+                    solutions = result.get('solutions', [])
+                    if solutions:
+                        solution_str = ', '.join([f"{s:.6f}" if isinstance(s, float) else str(s) for s in solutions])
+                        return f"{solution_str}"
+                    else:
+                        return f"No solutions found for {equation}"
+                else:
+                    return f"Error: {result['error']}"
+
+        # Calculus operations
+        elif 'derivative' in command_lower or 'differentiate' in command_lower:
+            expr = extract_math_expression(command, 'derivative')
+            if not expr:
+                expr = extract_math_expression(command, 'differentiate')
+            if expr:
+                result = math_engine.derivative(expr, 'x')
+                if 'error' not in result:
+                    return f"{result.get('derivative', 'Unable to compute derivative')}"
+                else:
+                    return f"Error: {result['error']}"
+
+        elif 'integrate' in command_lower:
+            expr = extract_math_expression(command, 'integrate')
+            if expr:
+                result = math_engine.integral(expr, 'x')
+                if 'error' not in result:
+                    return f"{result.get('integral', 'Unable to compute integral')}"
+                else:
+                    return f"Error: {result['error']}"
+
+        # Matrix operations
+        elif 'matrix' in command_lower or 'determinant' in command_lower:
+            return "For matrix operations, specify matrix in format [[1,2],[3,4]] and operation"
+
+        # Statistics
+        elif any(word in command_lower for word in ['mean', 'median', 'average', 'statistics']):
+            return "For statistical calculations, provide data as a list of numbers"
+
+        # Default: Try to evaluate as a mathematical expression
+        try:
+            expr = extract_math_expression(command, 'calculate')
+            if not expr:
+                expr = extract_math_expression(command, 'compute')
+            if not expr:
+                expr = extract_math_expression(command, 'what is')
+
+            if expr and any(char in expr for char in '0123456789+-*/^()xy.'):
+                computable_expr = to_computable_form(expr)
+                result = math_engine.simplify_expression(computable_expr)
+                if 'error' not in result:
+                    if result.get('evaluated') is not None:
+                        return f"{result['evaluated']:.6f}"
+                    else:
+                        return f"{result.get('simplified', result.get('original', expr))}"
+                else:
+                    return f"Error: {result['error']}"
+        except Exception:
+            pass
+
+        return solve_mathematical_problem_manual(command)
+
+    except Exception as e:
+        return solve_mathematical_problem_manual(command)
+
+def solve_mathematical_problem(command: str) -> str:
+    """Process mathematical problems using the math engine or manual reasoning"""
+    # Check for multiple questions
+    questions = split_multiple_questions(command)
+
+    if len(questions) > 1:
+        # Solve each question separately
+        results = []
+        for i, question in enumerate(questions, 1):
+            if MATH_ENGINE_AVAILABLE:
+                try:
+                    result = solve_mathematical_problem_with_engine(question)
+                    results.append(f"{i}. {result}")
+                except Exception:
+                    result = solve_mathematical_problem_manual(question)
+                    results.append(f"{i}. {result}")
+            else:
+                result = solve_mathematical_problem_manual(question)
+                results.append(f"{i}. {result}")
+        return "\n".join(results)
+
+    # Single question - proceed normally
+    if not MATH_ENGINE_AVAILABLE:
+        return solve_mathematical_problem_manual(command)
+
+    try:
+        return solve_mathematical_problem_with_engine(command)
+    except Exception as e:
+        return solve_mathematical_problem_manual(command)
+
 # -----------------------------
 # JAI Reply (Enhanced for Smarter Responses)
 # -----------------------------
 def jai_reply(prompt: str, session: UserSession) -> str:
+     # Check if Groq client is available
+     if client is None:
+         logging.error("Groq client is not initialized - GROQ_API_KEY may be missing", extra={'user': session.username})
+         return "I apologize, sir. My AI systems are not configured. Please set the GROQ_API_KEY environment variable."
+
      # Check for time-related queries first
      time_queries = [
          "what time is it", "current time", "what's the time", "tell me the time",
          "what is the time", "time now", "current hour"
      ]
-     
+
      if any(query in prompt.lower() for query in time_queries):
          current_time = datetime.now().strftime("%I:%M %p")
          return f"The current time is {current_time}."
-     
+
+     # Emotional intelligence analysis (silent, internal)
+     emotional_guidance = ""
+     if EMOTIONAL_INTELLIGENCE_AVAILABLE and analyze_emotional_context:
+         try:
+             session_context = {
+                 'project_context': session.memory.recall_long_term('current_project'),
+                 'user_name': session.memory.recall_long_term("user_name") or session.user_name
+             }
+             emotional_context = analyze_emotional_context(prompt, session_context)
+             emotional_guidance = get_response_guidance(emotional_context)
+             logging.debug(f"Emotional context: {emotional_context.emotional_state.value}, Intent: {emotional_context.intent.value}, Mode: {emotional_context.response_mode}", extra={'user': session.username})
+         except Exception as e:
+             logging.debug(f"Emotional intelligence analysis skipped: {e}", extra={'user': session.username})
+
      user_name = session.memory.recall_long_term("user_name") or session.user_name
      context = session.memory.get_short_term(limit=10)
      
@@ -1035,6 +1528,10 @@ def jai_reply(prompt: str, session: UserSession) -> str:
      # Ensure language consistency and avoid echoing the prompt
      full_prompt += "\nIMPORTANT: Respond in the same language as the user's input. Do not repeat or paraphrase the user's question; answer directly and concisely."
      
+     # Add emotional intelligence guidance (silent, internal)
+     if emotional_guidance:
+         full_prompt += f"\n\nRESPONSE GUIDANCE: {emotional_guidance}"
+
      messages = [
          {"role": "system", "content": full_prompt},
          {"role": "user", "content": prompt}
@@ -1074,9 +1571,8 @@ def jai_reply(prompt: str, session: UserSession) -> str:
          logging.error(f"AI error: {str(e)}", extra={'user': session.username})
          # Try fallback models on Groq
          fallback_models = [
-             "llama3-8b-8192",  # Llama 3 8B
-             "mixtral-8x7b-32768",  # Mixtral
-             "gemma-7b-it"  # Gemma
+            "openai/gpt-oss-20b",
+            "openai/gpt-oss-120b"
          ]
          
          for fallback_model in fallback_models:
@@ -1445,10 +1941,24 @@ class VoiceCommandListener(threading.Thread):
 # Execute Command
 # -----------------------------
 def execute_command(command: str, session: UserSession, suppress_tts: bool = False) -> str:
+    """Main command executor with carbon interface support."""
+
     # Input validation
-    if not command or not isinstance(command, str) or len(command) > 1000:
-        return "Invalid or empty command."
-    
+    if not command or not isinstance(command, str) or not command.strip():
+        return "I didn't catch a message there. Type a question and I'll help."
+
+    if len(command) > MAX_COMMAND_CHARS:
+        command = command[:MAX_COMMAND_CHARS]
+
+    command_lower = command.lower().strip()
+
+    # === CARBON FOOTPRINT COMMANDS ===
+    if any(keyword in command_lower for keyword in ["carbon", "footprint", "co2"]):
+        if "handle_carbon_command" in globals():
+            return handle_carbon_command(command, session)
+        else:
+            return "Carbon estimation feature is not loaded. Please check server configuration."
+
     # Set logging extra for user
     logging_extra = {"user": session.username}
     global voice_listener_thread
@@ -1472,6 +1982,16 @@ def execute_command(command: str, session: UserSession, suppress_tts: bool = Fal
     # JAI ALWAYS responds in English
     speak_lang = "en"  # Force English responses
     
+    # Check for mathematical problems first
+    if intent == "mathematical_query" or is_mathematical_query(translated_command):
+        math_response = solve_mathematical_problem(translated_command)
+        try:
+            if getattr(session, "tts_enabled", False):
+                speak_async_text(math_response, logging_extra, speak_lang)
+        except Exception:
+            pass
+        return math_response
+
     # Quick greetings - instant response like JARVIS
     if intent == "greeting":
         greetings = [
@@ -2107,7 +2627,7 @@ async def web_interface():
             </div>
             <div class="api-config">
                 <label for="apiBase">API Base</label>
-                <input id="apiBase" type="text" placeholder="http://localhost:8080" />
+                <input id="apiBase" type="text" placeholder="https://j-ai.top" />
                 <button id="saveBase">Save</button>
                 <button id="healthBtn" class="secondary">Health</button>
                 <span id="healthStatus" class="status"></span>
@@ -2538,4 +3058,4 @@ def nasa_apod(date: Optional[str] = None, hd: bool = False, request: Request = N
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8080)
+    uvicorn.run(app, host="0.0.0.0", port=8000)

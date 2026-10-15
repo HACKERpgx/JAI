@@ -1,12 +1,14 @@
-from fastapi import FastAPI, Request, UploadFile, File, Form
+﻿from fastapi import FastAPI, Request, UploadFile, File, Form
 from fastapi.responses import JSONResponse, HTMLResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 from datetime import datetime
-from typing import Optional, List
+from typing import Optional, List, Any, Union
+import time
 import uuid
 import os
+import logging
 from dotenv import load_dotenv
 import re
 from jai_assistant import execute_command, sessions as ja_sessions, UserSession as JAUserSession, request_id_ctx_var, detect_language as jai_detect_language
@@ -20,8 +22,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from io import BytesIO
 try:
     from PIL import Image
+    PIL_AVAILABLE = True
 except Exception:
     Image = None
+    PIL_AVAILABLE = False
 try:
     from openai import OpenAI
 except Exception:
@@ -38,6 +42,25 @@ try:
     import muse as muse_module
 except Exception:
     muse_module = None
+
+try:
+    from security.ids.integrations import init_ids, get_ids_instance
+except Exception as e:
+    init_ids = None
+    get_ids_instance = None
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# Import math engine
+try:
+    from jai_math_engine import math_engine
+    MATH_ENGINE_AVAILABLE = True
+except Exception as e:
+    math_engine = None
+    MATH_ENGINE_AVAILABLE = False
+
 
 # Import autonomous system components
 try:
@@ -62,7 +85,10 @@ try:
     load_dotenv('.env.local', override=True)
 except Exception:
     pass
-app = FastAPI(title="JAI Web API")
+app = FastAPI(
+    title="JAI Web API",
+    default_response_class=JSONResponse
+)
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 # Also load env files relative to server directory to avoid CWD issues
 try:
@@ -73,24 +99,193 @@ try:
     load_dotenv(os.path.join(BASE_DIR, '.env.local'), override=True)
 except Exception:
     pass
-templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "templates"))
-app.mount("/static", StaticFiles(directory=os.path.join(BASE_DIR, "static")), name="static")
+
+# Determine template directory - check multiple possible locations
+template_dirs = [
+    os.path.join(BASE_DIR, "JAI", "templates"),
+    os.path.join(BASE_DIR, "templates"),
+    os.path.join(BASE_DIR, "..", "JAI", "templates"),
+    os.path.join(BASE_DIR, "..", "templates"),
+]
+
+logger.info(f"BASE_DIR: {BASE_DIR}")
+logger.info("Looking for templates in:")
+for dir_path in template_dirs:
+    logger.info(f"  - {dir_path} (exists: {os.path.isdir(dir_path)})")
+
+templates_dir = None
+for dir_path in template_dirs:
+    if os.path.isdir(dir_path) and os.path.exists(os.path.join(dir_path, "index.html")):
+        templates_dir = dir_path
+        logger.info(f"Found templates at: {templates_dir}")
+        break
+
+if templates_dir is None:
+    # Fallback to original path if none found
+    templates_dir = os.path.join(BASE_DIR, "JAI", "templates")
+    logger.warning(f"Using fallback templates directory: {templates_dir}")
+
+templates = Jinja2Templates(directory=templates_dir)
+
+# Determine static directory - check multiple possible locations
+static_dirs = [
+    os.path.join(BASE_DIR, "JAI", "static"),
+    os.path.join(BASE_DIR, "static"),
+    os.path.join(BASE_DIR, "..", "JAI", "static"),
+    os.path.join(BASE_DIR, "..", "static"),
+]
+
+logger.info("Looking for static files in:")
+for dir_path in static_dirs:
+    logger.info(f"  - {dir_path} (exists: {os.path.isdir(dir_path)})")
+
+static_dir = None
+for dir_path in static_dirs:
+    if os.path.isdir(dir_path):
+        static_dir = dir_path
+        logger.info(f"Found static files at: {static_dir}")
+        break
+
+if static_dir is None:
+    # Fallback to original path if none found
+    static_dir = os.path.join(BASE_DIR, "JAI", "static")
+    logger.warning(f"Using fallback static directory: {static_dir}")
+
+app.mount("/static", StaticFiles(directory=static_dir), name="static")
+# Favicon directory - mount only if exists and not empty
+favicon_dir = os.path.join(BASE_DIR, "apps", "web_static", "favicon")
+if os.path.isdir(favicon_dir) and os.listdir(favicon_dir):
+    app.mount("/favicon", StaticFiles(directory=favicon_dir), name="favicon")
 
  
 
-# CORS (restrict in production by setting JAI_CORS_ORIGINS="https://your.domain")
-origins_env = os.environ.get("JAI_CORS_ORIGINS", "*")
-allow_origins = [o.strip() for o in origins_env.split(",") if o.strip()] or ["*"]
+# CORS uses explicit origins because credentialed wildcard origins are unsafe.
+from jai_auth import is_allowed_admin, verify_supabase_token
+
+default_cors_origins = ["https://j-ai.top", "https://www.j-ai.top"]
+origins_env = os.environ.get("JAI_CORS_ORIGINS", ",".join(default_cors_origins))
+allow_origins = [o.strip().rstrip("/") for o in origins_env.split(",") if o.strip() and o.strip() != "*"]
+if not allow_origins:
+    allow_origins = default_cors_origins
 app.add_middleware(
     CORSMiddleware,
     allow_origins=allow_origins,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
+    allow_headers=["Accept", "Authorization", "Content-Type", "X-Request-ID"],
 )
+
+# Add UTF-8 charset, authentication, and browser security headers.
+ADMIN_API_PREFIXES = (
+    "/api/autonomous",
+    "/api/email",
+    "/api/auto-reply",
+    "/api/integrations",
+    "/api/security",
+)
+
+@app.middleware("http")
+async def add_charset_header(request: Request, call_next):
+    path = request.url.path
+    admin_api = any(path == prefix or path.startswith(prefix + "/") for prefix in ADMIN_API_PREFIXES)
+    if admin_api and request.method != "OPTIONS":
+        scheme, _, token = request.headers.get("authorization", "").partition(" ")
+        claims = verify_supabase_token(token.strip()) if scheme.lower() == "bearer" and token.strip() else None
+        if not claims or not claims.get("sub"):
+            response = JSONResponse(
+                {"detail": "Authentication required"},
+                status_code=401,
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        elif not os.environ.get("JAI_ADMIN_USER_IDS", "").strip():
+            response = JSONResponse(
+                {"detail": "Privileged access is not configured"},
+                status_code=503,
+            )
+        elif not is_allowed_admin(claims):
+            response = JSONResponse({"detail": "Forbidden"}, status_code=403)
+        else:
+            request.state.authenticated_user = claims
+            response = await call_next(request)
+    else:
+        response = await call_next(request)
+
+    if "content-type" in response.headers:
+        content_type = response.headers["content-type"]
+        if "charset" not in content_type.lower():
+            if "text/" in content_type.lower() or "application/json" in content_type.lower():
+                response.headers["content-type"] = f"{content_type}; charset=utf-8"
+    response.headers.setdefault("X-Content-Type-Options", "nosniff")
+    response.headers.setdefault("X-Frame-Options", "DENY")
+    response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+    response.headers.setdefault("Permissions-Policy", "camera=(), microphone=(self), geolocation=()")
+    response.headers.setdefault("Content-Security-Policy", "frame-ancestors 'none'; base-uri 'self'; object-src 'none'")
+    response.headers.setdefault("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
+    if path.startswith("/api/"):
+        response.headers["Cache-Control"] = "no-store"
+    return response
+try:
+    if init_ids is not None:
+        _ids = init_ids(app)
+    else:
+        _ids = None
+except Exception:
+    _ids = None
+
 
 class WebTextRequest(BaseModel):
     text: str
+    persona: Optional[str] = "assistant"
+
+class MathSimplifyRequest(BaseModel):
+    expression: str
+
+class MathExpandRequest(BaseModel):
+    expression: str
+
+class MathFactorRequest(BaseModel):
+    expression: str
+
+class MathSolveRequest(BaseModel):
+    equation: str
+    variable: str = "x"
+
+class MathSystemRequest(BaseModel):
+    equations: List[str]
+    variables: List[str]
+
+class MathDerivativeRequest(BaseModel):
+    expression: str
+    variable: str = "x"
+    order: int = 1
+
+class MathIntegralRequest(BaseModel):
+    expression: str
+    variable: str = "x"
+
+class MathDefiniteIntegralRequest(BaseModel):
+    expression: str
+    variable: str
+    lower: Union[str, float]
+    upper: Union[str, float]
+
+class MathLimitRequest(BaseModel):
+    expression: str
+    variable: str
+    point: Union[str, float]
+    direction: str = "+"
+
+class MathMatrixRequest(BaseModel):
+    matrix: str  # JSON string representation
+    operation: str  # determinant, inverse, eigenvalues, transpose
+
+class MathNumericalRequest(BaseModel):
+    expression: str
+    variable: str = "x"
+    initial_guess: float = 0.0
+
+class MathStatisticsRequest(BaseModel):
+    data: List[float]
 
 class WebPersonaRequest(BaseModel):
     persona: str
@@ -103,56 +298,125 @@ async def health_check():
         "time": datetime.utcnow().isoformat() + "Z"
     }
 
+@app.post("/api/logout")
+async def logout(request: Request):
+    """Clear user session and message history"""
+    web_id = request.cookies.get("jai_web_id") or "anon"
+    username = f"web:{web_id}"
+
+    # Clear session from memory
+    if username in ja_sessions:
+        del ja_sessions[username]
+
+    # Create response with cleared cookie
+    response = JSONResponse({"message": "Logged out successfully"})
+    response.delete_cookie("jai_web_id", path="/", secure=True, httponly=True, samesite="lax")
+
+    return response
+
 
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
     web_id = request.cookies.get("jai_web_id") or str(uuid.uuid4())
     resp = templates.TemplateResponse("index.html", {"request": request})
     if request.cookies.get("jai_web_id") != web_id:
-        resp.set_cookie("jai_web_id", web_id, httponly=True, samesite="Lax")
+        resp.set_cookie("jai_web_id", web_id, path="/", httponly=True, secure=True, samesite="lax")
     return resp
+
+
+@app.get("/privacy", response_class=HTMLResponse)
+async def privacy_notice(request: Request):
+    return templates.TemplateResponse("privacy.html", {"request": request})
+
+
+@app.get("/terms", response_class=HTMLResponse)
+async def terms_of_use(request: Request):
+    return templates.TemplateResponse("terms.html", {"request": request})
 
 @app.get("/manifest.json")
 async def manifest():
-    path = os.path.join(BASE_DIR, "static", "manifest.json")
+    path = os.path.join(BASE_DIR, "JAI", "static", "manifest.json")
     return FileResponse(path)
 
 @app.get("/service-worker.js")
 async def service_worker():
-    path = os.path.join(BASE_DIR, "static", "service-worker.js")
+    path = os.path.join(BASE_DIR, "JAI", "static", "service-worker.js")
     return FileResponse(path, media_type="application/javascript")
+
+@app.get("/static/icon-192.png")
+async def icon_192():
+    path = os.path.join(BASE_DIR, "JAI", "static", "icon-192.png")
+    return FileResponse(path, media_type="image/png")
+
+@app.get("/static/icon-512.png")
+async def icon_512():
+    path = os.path.join(BASE_DIR, "JAI", "static", "icon-512.png")
+    return FileResponse(path, media_type="image/png")
+
+@app.get("/static/favicon.ico")
+async def favicon():
+    path = os.path.join(BASE_DIR, "JAI", "static", "favicon.ico")
+    return FileResponse(path, media_type="image/x-icon")
+
+# ... (other imports and setup at the top of main.py) ...
 
 @app.post("/api/text")
 async def api_text(req: WebTextRequest, request: Request):
     rid = request.headers.get("x-request-id") or str(uuid.uuid4())
     token = request_id_ctx_var.set(rid)
     try:
+        text = (req.text or "").strip()
+        if not text:
+            return {"response": "I didn't catch that. What would you like me to do?", "requestId": rid}
+
         web_id = request.cookies.get("jai_web_id") or "anon"
         username = f"web:{web_id}"
+
         if username not in ja_sessions:
             ja_sessions[username] = JAUserSession(username)
+
         session = ja_sessions[username]
-        # Force JAI WEBSITE to English-only responses
+
+        # ⬇️ THIS IS WHERE THE ROOT CAUSE CODE LIVES (Inside the session configuration)
         try:
             session.language_mode = "fixed"
             session.preferred_lang = "en"
             session.detected_lang = "en"
         except Exception:
             pass
-        desired_lang = "en"
-        special = _handle_special_qa(req.text)
+
+        # ⬇️ NEW IMPROVED HANDLING FOR PERSONAS & JOKES
+        lower_text = text.lower()
+
+        if any(x in lower_text for x in ["therapist mode", "storyteller", "trivia", "meditation", "motivation"]):
+            from jai_assistant import _normalize_persona
+            p = _normalize_persona(text)
+            if p:
+                session.persona = p
+                return {"response": f"✅ Activated {p.title()} mode, sir.", "requestId": rid}
+
+        if "joke" in lower_text:
+            from jai_assistant import HUMOROUS_QUIPS
+            import random
+            return {"response": random.choice(HUMOROUS_QUIPS), "requestId": rid}
+
+        # Normal command processing
+        special = _handle_special_qa(text)
         if special is not None:
             result = special
         else:
-            result = execute_command(req.text, session, suppress_tts=True)
-        result = _ensure_lang(result, desired_lang)
+            result = execute_command(text, session, suppress_tts=True)
+
         return {"response": result, "requestId": rid}
+
+    except Exception as e:
+        logging.error(f"Error in api_text: {e}", exc_info=True)
+        return {"response": f"DEBUG: {type(e).__name__}: {e}", "requestId": rid}
     finally:
         try:
             request_id_ctx_var.reset(token)
         except Exception:
             pass
-
 _PERSONA_ALIASES = {
     "story teller": "storyteller",
     "story-teller": "storyteller",
@@ -304,7 +568,9 @@ def _ensure_lang(text: str, desired_lang: str) -> str:
 
 
 
-def _load_and_convert(img: Image.Image, fmt_label: str) -> bytes:
+def _load_and_convert(img: Any, fmt_label: str) -> bytes:
+    if not PIL_AVAILABLE:
+        raise Exception("PIL not available for image processing")
     bio = BytesIO()
     try:
         # Ensure correct mode for JPEG
@@ -319,42 +585,426 @@ def _load_and_convert(img: Image.Image, fmt_label: str) -> bytes:
             pass
 
 
-def _analyze_image_bytes(data: bytes, mime: str, prompt: str) -> str:
+def _image_to_data_url(mime: str, data: bytes) -> str:
+    """Convert image bytes to base64 data URL for vision API."""
     try:
+        import base64
+        b64 = base64.b64encode(data).decode("utf-8")
+        # Ensure mime type is valid for images
+        if not mime or not mime.startswith("image/"):
+            mime = "image/jpeg"
+        return f"data:{mime};base64,{b64}"
+    except Exception as e:
+        print(f"[ERROR] _image_to_data_url failed: {e}")
+        return ""
+
+
+# Vision analysis prompt templates for different analysis types
+VISION_PROMPTS = {
+    "general": "Analyze this image thoroughly. Describe what you see in detail: the main subject, objects, people, setting, colors, layout, style, quality, and any visible text. Provide a comprehensive analysis.",
+    "ocr": "Extract and transcribe ALL visible text from this image. Quote text exactly as shown. Note any handwriting, printed text, signs, labels, or documents. Preserve formatting where possible.",
+    "diagram": "Analyze this diagram, chart, or technical drawing. Explain the structure, components, relationships, data presented, and any technical details. Describe what information it conveys.",
+    "code": "Analyze this code screenshot or code image. Identify the programming language, explain what the code does, note any issues or improvements, and transcribe the code if readable.",
+    "ui": "Analyze this UI/UX screenshot. Describe the interface elements, layout, design patterns, user flow, and any usability observations. Identify the app or website if recognizable.",
+    "math": "Analyze this mathematical content. Identify equations, formulas, or problems. Explain the mathematical concepts and solve or interpret if applicable.",
+    "object": "Identify and describe all objects in this image. For each object, note its type, approximate size relative to surroundings, color, condition, and any notable features.",
+    "document": "Analyze this document image. Extract all text, identify the document type, note any forms, tables, or structured data. Summarize the document's purpose and key information.",
+    "photo": "Analyze this photograph professionally. Describe the composition, lighting, subject matter, artistic elements, camera angle, and any notable photography techniques used.",
+    "screenshot": "Analyze this screenshot. Describe what application or website it shows, the current state, any visible data or content, and explain what action might have been captured.",
+}
+
+
+def _analyze_image_bytes(data: bytes, mime: str, prompt: str, analysis_type: str = "general") -> str:
+    """Analyze image using vision-capable AI model.
+
+    Args:
+        data: Raw image bytes
+        mime: MIME type of image
+        prompt: Custom user prompt (optional)
+        analysis_type: Type of analysis (general, ocr, diagram, code, ui, math, object, document, photo, screenshot)
+
+    Returns:
+        Analysis text response
+    """
+    try:
+        # Log debug info
+        print(f"[DEBUG] Analyzing image: mime={mime}, size={len(data)} bytes, type={analysis_type}")
+
         data_url = _image_to_data_url(mime, data)
         if not data_url:
             return "Could not read image data."
+
+        print(f"[DEBUG] Data URL created: {data_url[:100]}...")
+
+        # Try OpenAI first
         api_key = os.environ.get("OPENAI_API_KEY")
+        print(f"[DEBUG] API key available: {bool(api_key)}")
+        print(f"[DEBUG] OpenAI client available: {OpenAI is not None}")
+
         if OpenAI and api_key:
             try:
                 client = OpenAI(api_key=api_key)
                 user_prompt = (prompt or "").strip()
+
+                # Use analysis type prompt if no custom prompt provided
                 if not user_prompt:
-                    user_prompt = "Describe this image in detail and answer any implicit questions. Respond only in English."
+                    analysis_type_key = (analysis_type or "general").lower()
+                    base_prompt = VISION_PROMPTS.get(analysis_type_key, VISION_PROMPTS["general"])
+                    user_prompt = base_prompt + "\n\nIMPORTANT: Respond only in English."
                 else:
                     user_prompt = user_prompt + "\n\nIMPORTANT: Respond only in English."
+
+                print(f"[DEBUG] Using prompt: {user_prompt[:100]}...")
+
                 messages = [
+                    {
+                        "role": "system",
+                        "content": "You are JAI Vision, an advanced image analysis AI with native vision capabilities. You can see, analyze, and understand any image perfectly. You have direct access to the visual content. NEVER say you cannot view images or that you're a text-based AI. Always respond as if you clearly see the image. Be precise, detailed, and helpful. Read all text exactly as shown, note small details, and provide comprehensive analysis."
+                    },
                     {
                         "role": "user",
                         "content": [
                             {"type": "text", "text": user_prompt},
-                            {"type": "image_url", "image_url": {"url": data_url}},
+                            {"type": "image_url", "image_url": {"url": data_url, "detail": "high"}},
                         ],
                     }
                 ]
+
+                print(f"[DEBUG] Calling OpenAI API with model: {os.environ.get('JAI_VISION_MODEL', 'gpt-4o-mini')}")
+
                 resp = client.chat.completions.create(
                     model=os.environ.get("JAI_VISION_MODEL", "gpt-4o-mini"),
                     messages=messages,
-                    max_tokens=800,
-                    temperature=0.2,
+                    max_tokens=1500,
+                    temperature=0.3,
                 )
                 text = resp.choices[0].message.content
+                print(f"[DEBUG] Got response: {text[:100]}...")
                 return (text or "").strip() or "No description generated."
-            except Exception:
-                pass
-        return "Image analysis is not available on this server. Set OPENAI_API_KEY to enable vision analysis."
-    except Exception:
-        return "Image analysis failed."
+            except Exception as e:
+                error_msg = f"OpenAI error: {str(e)}"
+                print(f"[ERROR] {error_msg}")
+                # Check if it's a quota error and try fallback
+                if "quota" in str(e).lower() or "429" in str(e):
+                    print("[DEBUG] OpenAI quota exceeded, trying Gemini fallback...")
+                    gemini_result = _analyze_with_gemini(data, mime, prompt, analysis_type)
+                    if "failed" not in gemini_result.lower() and "unavailable" not in gemini_result.lower():
+                        return gemini_result
+                    print("[DEBUG] Gemini failed, trying Groq fallback...")
+                    return _analyze_with_groq(data, mime, prompt, analysis_type)
+                import traceback
+                traceback.print_exc()
+                return error_msg
+
+        # Fallback to Gemini if OpenAI not available
+        print("[DEBUG] OpenAI not available, trying Gemini...")
+        gemini_result = _analyze_with_gemini(data, mime, prompt, analysis_type)
+        if "failed" not in gemini_result.lower() and "unavailable" not in gemini_result.lower():
+            return gemini_result
+
+        # Fallback to Groq
+        print("[DEBUG] Gemini failed, trying Groq...")
+        return _analyze_with_groq(data, mime, prompt, analysis_type)
+
+    except Exception as e:
+        error_msg = f"Image analysis failed: {str(e)}"
+        print(f"[ERROR] {error_msg}")
+        import traceback
+        traceback.print_exc()
+        return error_msg
+
+
+def _analyze_with_groq(data: bytes, mime: str, prompt: str, analysis_type: str = "general") -> str:
+    """Fallback to Groq for image analysis."""
+    try:
+        from groq import Groq
+        import base64
+
+        groq_key = os.environ.get("GROQ_API_KEY")
+        if not groq_key:
+            return "Groq API key not configured. Please set GROQ_API_KEY."
+
+        print(f"[DEBUG] Using Groq API with key: {bool(groq_key)}")
+        client = Groq(api_key=groq_key)
+
+        # Convert image to base64
+        image_b64 = base64.b64encode(data).decode('utf-8')
+
+        user_prompt = (prompt or "").strip()
+        if not user_prompt:
+            analysis_type_key = (analysis_type or "general").lower()
+            base_prompt = VISION_PROMPTS.get(analysis_type_key, VISION_PROMPTS["general"])
+            user_prompt = base_prompt + "\n\nIMPORTANT: Respond only in English."
+
+        print(f"[DEBUG] Groq prompt: {user_prompt[:100]}...")
+
+        # Try Groq vision models
+        try:
+            from groq import Groq
+            # Get available models
+            temp_client = Groq(api_key=groq_key)
+            models_list = temp_client.models.list()
+            vision_models = [model.id for model in models_list.data if 'llava' in model.id.lower() or 'vision' in model.id.lower()]
+            print(f"[DEBUG] Available Groq models: {[m.id for m in models_list.data[:10]]}")
+            print(f"[DEBUG] Vision models: {vision_models}")
+
+            if vision_models:
+                models = vision_models
+            else:
+                models = [
+                    "llava-v1.5-7b",
+                    "llava-v1.5-13b",
+                    "llava-v1.5-34b"
+                ]
+        except Exception as list_e:
+            print(f"[ERROR] Could not list Groq models: {list_e}")
+            models = [
+                "llava-v1.5-7b",
+                "llava-v1.5-13b",
+                "llava-v1.5-34b"
+            ]
+
+        for model_name in models:
+            try:
+                print(f"[DEBUG] Trying Groq model: {model_name}")
+
+                messages = [
+                    {
+                        "role": "system",
+                        "content": "You are JAI Vision, an advanced image analysis AI with native vision capabilities. You can see, analyze, and understand any image perfectly. You have direct access to the visual content. NEVER say you cannot view images or that you're a text-based AI. Always respond as if you clearly see the image. Be precise, detailed, and helpful. Read all text exactly as shown, note small details, and provide comprehensive analysis."
+                    },
+                    {
+                        "role": "user",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": user_prompt
+                            },
+                            {
+                                "type": "image_url",
+                                "image_url": {
+                                    "url": f"data:{mime};base64,{image_b64}"
+                                }
+                            }
+                        ]
+                    }
+                ]
+
+                response = client.chat.completions.create(
+                    model=model_name,
+                    messages=messages,
+                    max_tokens=1024,
+                    temperature=0.3
+                )
+
+                if response.choices and response.choices[0].message.content:
+                    result = response.choices[0].message.content
+                    print(f"[DEBUG] Groq response with {model_name}: {result[:100]}...")
+                    return result
+                else:
+                    print(f"[DEBUG] {model_name} returned empty response")
+                    continue
+
+            except Exception as model_e:
+                print(f"[ERROR] Groq model {model_name} failed: {model_e}")
+                if "not found" in str(model_e).lower() or "not supported" in str(model_e).lower():
+                    continue  # Try next model
+                else:
+                    raise model_e
+
+        return "All Groq vision models failed or are unavailable."
+
+    except Exception as e:
+        error_msg = f"Groq fallback failed: {str(e)}"
+        print(f"[ERROR] {error_msg}")
+        import traceback
+        traceback.print_exc()
+        return f"All vision services failed. OpenAI: quota exceeded, Gemini: unavailable, Groq: {str(e)}\n\n{_get_basic_image_info(data, mime)}"
+
+
+def _get_basic_image_info(data: bytes, mime: str) -> str:
+    """Provide basic image information when all vision APIs fail."""
+    try:
+        from PIL import Image as PILImage
+        import io
+        from datetime import datetime
+
+        image = PILImage.open(io.BytesIO(data))
+
+        info = []
+        info.append("📷 Basic Image Information:")
+        info.append(f"• Format: {image.format or 'Unknown'}")
+        info.append(f"• Size: {image.size[0]} × {image.size[1]} pixels")
+        info.append(f"• Mode: {image.mode}")
+        info.append(f"• File size: {len(data):,} bytes ({len(data)/1024:.1f} KB)")
+
+        if hasattr(image, 'info') and image.info:
+            if 'dpi' in image.info:
+                info.append(f"• DPI: {image.info['dpi']}")
+            if 'comment' in image.info:
+                info.append(f"• Comment: {image.info['comment'][:100]}...")
+
+        # Add basic analysis based on image properties
+        info.append("\n🔍 Basic Analysis:")
+
+        # Analyze aspect ratio
+        width, height = image.size
+        aspect_ratio = width / height
+        if 0.9 <= aspect_ratio <= 1.1:
+            info.append("• Shape: Square image")
+        elif aspect_ratio > 1.5:
+            info.append("• Shape: Wide/landscape image")
+        elif aspect_ratio < 0.7:
+            info.append("• Shape: Tall/portrait image")
+        else:
+            info.append("• Shape: Standard rectangle")
+
+        # Analyze color mode
+        if image.mode == 'RGB':
+            info.append("• Color: Full color image")
+        elif image.mode == 'RGBA':
+            info.append("• Color: Full color with transparency")
+        elif image.mode == 'L':
+            info.append("• Color: Grayscale/monochrome")
+        elif image.mode == 'CMYK':
+            info.append("• Color: CMYK (print format)")
+        else:
+            info.append(f"• Color: {image.mode} format")
+
+        # Estimate image type based on size and format
+        if image.format == 'JPEG':
+            if width >= 1920 or height >= 1080:
+                info.append("• Likely: High-resolution photograph")
+            elif width >= 800:
+                info.append("• Likely: Standard web image")
+            else:
+                info.append("• Likely: Thumbnail or small image")
+        elif image.format == 'PNG':
+            if image.mode == 'RGBA':
+                info.append("• Likely: Graphic with transparency")
+            else:
+                info.append("• Likely: Web graphic or screenshot")
+        elif image.format == 'GIF':
+            info.append("• Likely: Animated image or simple graphic")
+
+        info.append("\n⚠️ Vision analysis services are currently unavailable due to API quota limits.")
+        info.append("Please try again later or upload a different image.")
+
+        return "\n".join(info)
+
+    except Exception as e:
+        return f"Unable to process image. Error: {str(e)}"
+
+
+def _analyze_with_gemini(data: bytes, mime: str, prompt: str, analysis_type: str = "general") -> str:
+    """Fallback to Google Gemini Vision for image analysis."""
+    try:
+        import google.generativeai as genai
+        from PIL import Image as PILImage
+        import io
+
+        gemini_key = os.environ.get("GEMINI_API_KEY")
+        if not gemini_key:
+            return "Gemini API key not configured. Please set GEMINI_API_KEY."
+
+        print(f"[DEBUG] Using Gemini API with key: {bool(gemini_key)}")
+        genai.configure(api_key=gemini_key)
+
+        # Validate and fix image data
+        try:
+            image = PILImage.open(io.BytesIO(data))
+            # Verify image can be loaded
+            image.verify()
+            # Reload after verify (verify() closes the image)
+            image = PILImage.open(io.BytesIO(data))
+
+            # Convert to RGB if needed (Gemini works best with RGB)
+            if image.mode not in ['RGB', 'L']:
+                image = image.convert('RGB')
+
+            print(f"[DEBUG] Image loaded successfully: {image.size}, mode={image.mode}")
+        except Exception as img_e:
+            print(f"[ERROR] Image validation failed: {img_e}")
+            # Try to fix common image issues
+            try:
+                # Try with PIL's error handling
+                image = PILImage.open(io.BytesIO(data))
+                image = image.convert('RGB')
+                print(f"[DEBUG] Image converted to RGB successfully")
+            except Exception as fix_e:
+                return f"Image file appears corrupted or truncated. Please upload a valid image file. Error: {str(img_e)}"
+
+        user_prompt = (prompt or "").strip()
+        if not user_prompt:
+            analysis_type_key = (analysis_type or "general").lower()
+            base_prompt = VISION_PROMPTS.get(analysis_type_key, VISION_PROMPTS["general"])
+            user_prompt = base_prompt + "\n\nIMPORTANT: Respond only in English."
+
+        print(f"[DEBUG] Gemini prompt: {user_prompt[:100]}...")
+
+        # First, list available models to find the correct ones
+        try:
+            models = genai.list_models()
+            vision_models = [m.name for m in models if 'vision' in m.name.lower() or 'image' in m.name.lower() or 'gemini' in m.name.lower()]
+            print(f"[DEBUG] Available models: {[m.name for m in models[:10]]}")  # Show first 10
+            print(f"[DEBUG] Vision-capable models: {vision_models}")
+        except Exception as list_e:
+            print(f"[ERROR] Could not list models: {list_e}")
+            vision_models = []
+
+        # Try different model names based on what's actually available
+        model_names = []
+
+        # If we found vision models, use them
+        if vision_models:
+            model_names = [name.replace('models/', '') for name in vision_models]
+        else:
+            # Fallback to common model names
+            model_names = [
+                'gemini-1.5-flash-latest',
+                'gemini-1.5-pro-latest',
+                'gemini-1.0-pro-latest',
+                'gemini-pro-latest',
+                'gemini-pro-vision'
+            ]
+
+        for model_name in model_names:
+            try:
+                print(f"[DEBUG] Trying model: {model_name}")
+                model = genai.GenerativeModel(model_name)
+
+                # Generate content
+                response = model.generate_content([user_prompt, image])
+
+                if response.text:
+                    print(f"[DEBUG] Gemini response with {model_name}: {response.text[:100]}...")
+                    return response.text
+                else:
+                    print(f"[DEBUG] {model_name} returned empty response")
+                    continue
+
+            except Exception as model_e:
+                print(f"[ERROR] Model {model_name} failed: {model_e}")
+                if "not found" in str(model_e).lower() or "not supported" in str(model_e).lower():
+                    continue  # Try next model
+                else:
+                    raise model_e  # Re-raise if it's not a model not found error
+
+        return "All Gemini models failed or are unavailable for vision tasks."
+
+    except Exception as e:
+        error_msg = f"Gemini fallback failed: {str(e)}"
+        print(f"[ERROR] {error_msg}")
+        import traceback
+        traceback.print_exc()
+
+        # Check if it's still a quota issue
+        if "quota" in str(e).lower() or "billing" in str(e).lower():
+            return f"Both OpenAI and Gemini have quota issues. Please check API billing."
+
+        # Try Groq as last resort
+        print("[DEBUG] All vision APIs failed, trying Groq...")
+        return _analyze_with_groq(data, mime, prompt, analysis_type)
 
 def _handle_special_qa(user_text: str) -> Optional[str]:
     try:
@@ -366,7 +1016,7 @@ def _handle_special_qa(user_text: str) -> Optional[str]:
         return None
 
 @app.post("/api/image")
-async def api_image(request: Request, file: UploadFile = File(...), prompt: str = Form("")):
+async def api_image(request: Request, file: UploadFile = File(...), prompt: str = Form(""), analysis_type: str = Form("general")):
     rid = request.headers.get("x-request-id") or str(uuid.uuid4())
     token = request_id_ctx_var.set(rid)
     try:
@@ -390,14 +1040,85 @@ async def api_image(request: Request, file: UploadFile = File(...), prompt: str 
         if not mime.startswith("image/"):
             return JSONResponse({"error": "Unsupported file type. Please upload an image."}, status_code=400)
 
-        analysis = _analyze_image_bytes(data, mime, prompt)
+        # Validate image data before processing
+        if len(data) < 100:  # Images should be at least 100 bytes
+            return JSONResponse({"error": "Image file is too small or corrupted. Please upload a valid image."}, status_code=400)
+
+        if len(data) > 20 * 1024 * 1024:  # 20MB limit
+            return JSONResponse({"error": "Image file is too large. Please upload an image smaller than 20MB."}, status_code=400)
+
+        # Quick validation with PIL
+        try:
+            from PIL import Image as PILImage
+            import io
+            test_img = PILImage.open(io.BytesIO(data))
+            test_img.verify()  # Just verify, don't load fully
+            print(f"[DEBUG] Image validation passed: {file.filename}, size={len(data)} bytes")
+        except Exception as img_e:
+            print(f"[ERROR] Image validation failed: {img_e}")
+            return JSONResponse({"error": f"Image file appears corrupted or invalid: {str(img_e)}"}, status_code=400)
+
+        analysis = _analyze_image_bytes(data, mime, prompt, analysis_type)
         analysis = _ensure_lang(analysis, "en")
-        return {"response": analysis, "requestId": rid}
+        return {"response": analysis, "requestId": rid, "analysis_type": analysis_type}
     finally:
         try:
             request_id_ctx_var.reset(token)
         except Exception:
             pass
+
+
+class MultiImageRequest(BaseModel):
+    prompt: str = ""
+    analysis_type: str = "general"
+
+
+@app.post("/api/image/analyze-multi")
+async def api_image_multi(request: Request, files: List[UploadFile] = File(...), prompt: str = Form(""), analysis_type: str = Form("general")):
+    """Analyze multiple images in a single request."""
+    rid = request.headers.get("x-request-id") or str(uuid.uuid4())
+    token = request_id_ctx_var.set(rid)
+    try:
+        web_id = request.cookies.get("jai_web_id") or "anon"
+        username = f"web:{web_id}"
+        if username not in ja_sessions:
+            ja_sessions[username] = JAUserSession(username)
+
+        if not files or len(files) == 0:
+            return JSONResponse({"error": "No images provided."}, status_code=400)
+
+        results = []
+        for i, file in enumerate(files):
+            data = await file.read()
+            mime = (getattr(file, "content_type", None) or mimetypes.guess_type(file.filename or "")[0] or "application/octet-stream")
+            if not isinstance(mime, str):
+                mime = "application/octet-stream"
+            if not mime.startswith("image/"):
+                results.append({"index": i, "filename": file.filename, "error": "Unsupported file type"})
+                continue
+
+            analysis = _analyze_image_bytes(data, mime, prompt, analysis_type)
+            results.append({
+                "index": i,
+                "filename": file.filename,
+                "analysis": analysis
+            })
+
+        return {"results": results, "requestId": rid, "total_images": len(files)}
+    finally:
+        try:
+            request_id_ctx_var.reset(token)
+        except Exception:
+            pass
+
+
+@app.get("/api/image/types")
+async def get_analysis_types():
+    """Get available analysis types for image analysis."""
+    return {
+        "types": list(VISION_PROMPTS.keys()),
+        "descriptions": VISION_PROMPTS
+    }
 
 @app.post("/api/voice")
 async def api_voice(request: Request, file: UploadFile = File(...), lang: str = Form("en-US")):
@@ -527,6 +1248,15 @@ async def email_categorizer_interface(request: Request):
     else:
         return HTMLResponse("<h1>Email categorizer interface not found</h1>", status_code=404)
 
+@app.get("/space-tracker", response_class=HTMLResponse)
+async def space_tracker_interface(request: Request):
+    """Serve the space tracker interface"""
+    path = os.path.join(BASE_DIR, "JAI", "templates", "space-tracker.html")
+    if os.path.exists(path):
+        return FileResponse(path)
+    else:
+        return HTMLResponse("<h1>Space tracker interface not found</h1>", status_code=404)
+
 @app.post("/api/autonomous/process")
 async def autonomous_process(req: AutonomousRequest, request: Request):
     """Process request using autonomous system"""
@@ -534,8 +1264,8 @@ async def autonomous_process(req: AutonomousRequest, request: Request):
         return {"success": False, "message": "Autonomous system not available"}
     
     try:
-        web_id = request.cookies.get("jai_web_id") or "anon"
-        context = {"user_id": web_id, **req.context}
+        claims = request.state.authenticated_user
+        context = {**req.context, "user_id": claims["sub"]}
         
         result = await jai_autonomous.process_request(req.text, context)
         return result
@@ -710,7 +1440,7 @@ async def chrome_devtools_json():
     return JSONResponse({
         "protocol_version": "1.1",
         "allowed_origins": ["*"],
-        "url": "http://localhost:8080"
+        "url": "https://j-ai.top"
     })
 
 @app.post("/api/email/categorize")
@@ -1284,18 +2014,191 @@ async def get_integration_status():
     except Exception as e:
         return {"error": f"Error: {str(e)}"}
 
+try:
+    _ = get_security_config and validate_api_scopes and check_content_security
+    SECURITY_AVAILABLE = True
+except Exception:
+    SECURITY_AVAILABLE = False
+
+
+# Mathematical Computation API Endpoints
+@app.post("/api/math/simplify")
+async def math_simplify(req: MathSimplifyRequest):
+    """Simplify algebraic expression"""
+    if not MATH_ENGINE_AVAILABLE:
+        return {"error": "Math engine not available"}
+    try:
+        result = math_engine.simplify_expression(req.expression)
+        return result
+    except Exception as e:
+        return {"error": str(e)}
+
+@app.post("/api/math/expand")
+async def math_expand(req: MathExpandRequest):
+    """Expand algebraic expression"""
+    if not MATH_ENGINE_AVAILABLE:
+        return {"error": "Math engine not available"}
+    try:
+        result = math_engine.expand_expression(req.expression)
+        return result
+    except Exception as e:
+        return {"error": str(e)}
+
+@app.post("/api/math/factor")
+async def math_factor(req: MathFactorRequest):
+    """Factor algebraic expression"""
+    if not MATH_ENGINE_AVAILABLE:
+        return {"error": "Math engine not available"}
+    try:
+        result = math_engine.factor_expression(req.expression)
+        return result
+    except Exception as e:
+        return {"error": str(e)}
+
+@app.post("/api/math/solve")
+async def math_solve(req: MathSolveRequest):
+    """Solve equation for variable"""
+    if not MATH_ENGINE_AVAILABLE:
+        return {"error": "Math engine not available"}
+    try:
+        result = math_engine.solve_equation(req.equation, req.variable)
+        return result
+    except Exception as e:
+        return {"error": str(e)}
+
+@app.post("/api/math/system")
+async def math_system(req: MathSystemRequest):
+    """Solve system of equations"""
+    if not MATH_ENGINE_AVAILABLE:
+        return {"error": "Math engine not available"}
+    try:
+        result = math_engine.solve_system(req.equations, req.variables)
+        return result
+    except Exception as e:
+        return {"error": str(e)}
+
+@app.post("/api/math/derivative")
+async def math_derivative(req: MathDerivativeRequest):
+    """Calculate derivative"""
+    if not MATH_ENGINE_AVAILABLE:
+        return {"error": "Math engine not available"}
+    try:
+        result = math_engine.derivative(req.expression, req.variable, req.order)
+        return result
+    except Exception as e:
+        return {"error": str(e)}
+
+@app.post("/api/math/integral")
+async def math_integral(req: MathIntegralRequest):
+    """Calculate indefinite integral"""
+    if not MATH_ENGINE_AVAILABLE:
+        return {"error": "Math engine not available"}
+    try:
+        result = math_engine.integral(req.expression, req.variable)
+        return result
+    except Exception as e:
+        return {"error": str(e)}
+
+@app.post("/api/math/definite-integral")
+async def math_definite_integral(req: MathDefiniteIntegralRequest):
+    """Calculate definite integral"""
+    if not MATH_ENGINE_AVAILABLE:
+        return {"error": "Math engine not available"}
+    try:
+        result = math_engine.definite_integral(req.expression, req.variable, req.lower, req.upper)
+        return result
+    except Exception as e:
+        return {"error": str(e)}
+
+@app.post("/api/math/limit")
+async def math_limit(req: MathLimitRequest):
+    """Calculate limit"""
+    if not MATH_ENGINE_AVAILABLE:
+        return {"error": "Math engine not available"}
+    try:
+        result = math_engine.limit(req.expression, req.variable, req.point, req.direction)
+        return result
+    except Exception as e:
+        return {"error": str(e)}
+
+@app.post("/api/math/matrix")
+async def math_matrix(req: MathMatrixRequest):
+    """Perform matrix operations"""
+    if not MATH_ENGINE_AVAILABLE:
+        return {"error": "Math engine not available"}
+    try:
+        result = math_engine.matrix_operations(req.matrix, req.operation)
+        return result
+    except Exception as e:
+        return {"error": str(e)}
+
+@app.post("/api/math/numerical")
+async def math_numerical(req: MathNumericalRequest):
+    """Numerical root finding"""
+    if not MATH_ENGINE_AVAILABLE:
+        return {"error": "Math engine not available"}
+    try:
+        result = math_engine.numerical_solve(req.expression, req.variable, req.initial_guess)
+        return result
+    except Exception as e:
+        return {"error": str(e)}
+
+@app.post("/api/math/statistics")
+async def math_statistics(req: MathStatisticsRequest):
+    """Calculate statistics"""
+    if not MATH_ENGINE_AVAILABLE:
+        return {"error": "Math engine not available"}
+    try:
+        result = math_engine.statistics(req.data)
+        return result
+    except Exception as e:
+        return {"error": str(e)}
+
+# Auth endpoints for Supabase integration
+from fastapi import Depends
+from jai_auth import (
+    get_current_user, require_auth, User,
+    AuthResponse, LoginRequest, SignupRequest,
+    SUPABASE_URL, SUPABASE_ANON_KEY
+)
+
+@app.get("/api/auth/session")
+async def get_session(user: Optional[User] = Depends(get_current_user)):
+    """Get current user session info"""
+    if user:
+        return {
+            "authenticated": True,
+            "user": {
+                "id": user.id,
+                "email": user.email,
+                "user_metadata": user.user_metadata
+            }
+        }
+    return {"authenticated": False, "user": None}
+
+@app.get("/api/auth/config")
+async def get_auth_config():
+    """Get Supabase configuration for frontend"""
+    return {
+        "supabase_url": SUPABASE_URL,
+        "supabase_anon_key": SUPABASE_ANON_KEY,
+        "enabled": bool(SUPABASE_URL and SUPABASE_ANON_KEY)
+    }
+
+
 if __name__ == "__main__":
     import uvicorn
     print("🚀 JAI Assistant Server Starting...")
     print("📧 Available Features:")
-    print("   ✅ Web Interface: http://localhost:8080")
+    print("   ✅ Web Interface: https://j-ai.top")
     print("   ✅ Email Categorizer: /email-categorizer")
     print("   ✅ Auto-Reply System: /auto-reply")
     print("   ✅ Gmail Integration: Available")
     print("   ✅ Voice Recognition: Available")
     print("   ✅ AI Responses: English Only (Auto-Translation)")
+    print("   ✅ User Authentication: Supabase Auth")
     print("\n🔧 Server Configuration:")
-    print("   🌐 Host: http://localhost:8080")
+    print("   🌐 Host: https://j-ai.top")
     print("   📝 Logs: jai_assistant.log")
     print("   🔊 TTS: English responses only")
     print("\n🎯 Starting server...")
@@ -1303,6 +2206,6 @@ if __name__ == "__main__":
     uvicorn.run(
         "main:app",
         host="0.0.0.0",
-        port=8080,
+        port=8000,
         log_level="info"
     )

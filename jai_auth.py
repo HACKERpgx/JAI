@@ -65,6 +65,15 @@ def verify_supabase_token(token: str) -> Optional[Dict[str, Any]]:
         return None
 
 
+def is_allowed_admin(payload: Optional[Dict[str, Any]], allowed_user_ids: Optional[str] = None) -> bool:
+    """Return true only for Supabase subjects explicitly configured as JAI admins."""
+    if not payload or not isinstance(payload.get("sub"), str):
+        return False
+    configured = os.environ.get("JAI_ADMIN_USER_IDS", "") if allowed_user_ids is None else allowed_user_ids
+    allowed = {item.strip() for item in configured.split(",") if item.strip()}
+    return bool(allowed and payload["sub"] in allowed)
+
+
 async def get_current_user(
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(security)
 ) -> Optional[User]:

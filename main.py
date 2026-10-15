@@ -160,7 +160,7 @@ if os.path.isdir(favicon_dir) and os.listdir(favicon_dir):
  
 
 # CORS uses explicit origins because credentialed wildcard origins are unsafe.
-from jai_auth import verify_supabase_token
+from jai_auth import is_allowed_admin, verify_supabase_token
 
 default_cors_origins = ["https://j-ai.top", "https://www.j-ai.top"]
 origins_env = os.environ.get("JAI_CORS_ORIGINS", ",".join(default_cors_origins))
@@ -176,7 +176,7 @@ app.add_middleware(
 )
 
 # Add UTF-8 charset, authentication, and browser security headers.
-SENSITIVE_API_PREFIXES = (
+ADMIN_API_PREFIXES = (
     "/api/autonomous",
     "/api/email",
     "/api/auto-reply",
@@ -187,8 +187,8 @@ SENSITIVE_API_PREFIXES = (
 @app.middleware("http")
 async def add_charset_header(request: Request, call_next):
     path = request.url.path
-    protected = any(path == prefix or path.startswith(prefix + "/") for prefix in SENSITIVE_API_PREFIXES)
-    if protected and request.method != "OPTIONS":
+    admin_api = any(path == prefix or path.startswith(prefix + "/") for prefix in ADMIN_API_PREFIXES)
+    if admin_api and request.method != "OPTIONS":
         scheme, _, token = request.headers.get("authorization", "").partition(" ")
         claims = verify_supabase_token(token.strip()) if scheme.lower() == "bearer" and token.strip() else None
         if not claims or not claims.get("sub"):
@@ -197,6 +197,13 @@ async def add_charset_header(request: Request, call_next):
                 status_code=401,
                 headers={"WWW-Authenticate": "Bearer"},
             )
+        elif not os.environ.get("JAI_ADMIN_USER_IDS", "").strip():
+            response = JSONResponse(
+                {"detail": "Privileged access is not configured"},
+                status_code=503,
+            )
+        elif not is_allowed_admin(claims):
+            response = JSONResponse({"detail": "Forbidden"}, status_code=403)
         else:
             request.state.authenticated_user = claims
             response = await call_next(request)
@@ -1257,8 +1264,8 @@ async def autonomous_process(req: AutonomousRequest, request: Request):
         return {"success": False, "message": "Autonomous system not available"}
     
     try:
-        web_id = request.cookies.get("jai_web_id") or "anon"
-        context = {"user_id": web_id, **req.context}
+        claims = request.state.authenticated_user
+        context = {**req.context, "user_id": claims["sub"]}
         
         result = await jai_autonomous.process_request(req.text, context)
         return result

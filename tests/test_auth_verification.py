@@ -53,5 +53,22 @@ class SupabaseTokenVerificationTests(unittest.TestCase):
         self.assertIsNone(self.verify(self.token(sub="")))
 
 
+class AdminAllowlistTests(unittest.TestCase):
+    def test_blank_allowlist_denies_access(self):
+        self.assertFalse(jai_auth.is_allowed_admin({"sub": "user-123"}, ""))
+
+    def test_exact_subject_is_allowed(self):
+        self.assertTrue(jai_auth.is_allowed_admin({"sub": "user-123"}, "user-123"))
+
+    def test_other_subject_is_denied(self):
+        self.assertFalse(jai_auth.is_allowed_admin({"sub": "user-123"}, "user-456"))
+
+    def test_comma_separated_allowlist_trims_whitespace(self):
+        self.assertTrue(jai_auth.is_allowed_admin({"sub": "user-123"}, " user-456, user-123 "))
+
+    def test_missing_subject_is_denied(self):
+        self.assertFalse(jai_auth.is_allowed_admin({}, "user-123"))
+
+
 if __name__ == "__main__":
     unittest.main()

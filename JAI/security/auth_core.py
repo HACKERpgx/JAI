@@ -20,7 +20,9 @@ logger = logging.getLogger("jai.auth")
 
 class AuthConfig:
     def __init__(self) -> None:
-        self.secret_key = os.getenv("JAI_SECRET_KEY", "dev_secret_change_me")
+        # Configure JAI_SECRET_KEY in production to keep signed tokens valid across restarts.
+        # A process-local random fallback is safer than a published, predictable key.
+        self.secret_key = os.getenv("JAI_SECRET_KEY") or secrets.token_urlsafe(48)
         self.db_path = os.getenv("AUTH_DB_PATH", "./.secure/auth.db")
         self.bcrypt_rounds = int(os.getenv("BCRYPT_ROUNDS", "12"))
         self.password_min_len = int(os.getenv("PASSWORD_MIN_LEN", "12"))
@@ -33,7 +35,7 @@ class AuthConfig:
         self.session_idle_timeout = int(os.getenv("SESSION_IDLE_TIMEOUT_SEC", "900"))
         self.session_absolute_timeout = int(os.getenv("SESSION_ABSOLUTE_TIMEOUT_SEC", "86400"))
         self.session_cookie_name = os.getenv("SESSION_COOKIE_NAME", "jai_session")
-        self.session_secure_cookies = os.getenv("SESSION_SECURE_COOKIES", "false").lower() == "true"
+        self.session_secure_cookies = os.getenv("SESSION_SECURE_COOKIES", "true").lower() == "true"
         self.require_mfa = os.getenv("REQUIRE_MFA", "false").lower() == "true"
         self.mfa_enc_key = os.getenv("MFA_ENC_KEY", None)
         self.recovery_code_count = int(os.getenv("RECOVERY_CODE_COUNT", "10"))

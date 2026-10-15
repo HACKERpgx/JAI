@@ -159,26 +159,63 @@ if os.path.isdir(favicon_dir) and os.listdir(favicon_dir):
 
  
 
-# CORS (restrict in production by setting JAI_CORS_ORIGINS="https://your.domain")
-origins_env = os.environ.get("JAI_CORS_ORIGINS", "*")
-allow_origins = [o.strip() for o in origins_env.split(",") if o.strip()] or ["*"]
+# CORS uses explicit origins because credentialed wildcard origins are unsafe.
+from jai_auth import verify_supabase_token
+
+default_cors_origins = ["https://j-ai.top", "https://www.j-ai.top"]
+origins_env = os.environ.get("JAI_CORS_ORIGINS", ",".join(default_cors_origins))
+allow_origins = [o.strip().rstrip("/") for o in origins_env.split(",") if o.strip() and o.strip() != "*"]
+if not allow_origins:
+    allow_origins = default_cors_origins
 app.add_middleware(
     CORSMiddleware,
     allow_origins=allow_origins,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
+    allow_headers=["Accept", "Authorization", "Content-Type", "X-Request-ID"],
 )
 
-# Add UTF-8 charset middleware
+# Add UTF-8 charset, authentication, and browser security headers.
+SENSITIVE_API_PREFIXES = (
+    "/api/autonomous",
+    "/api/email",
+    "/api/auto-reply",
+    "/api/integrations",
+    "/api/security",
+)
+
 @app.middleware("http")
 async def add_charset_header(request: Request, call_next):
-    response = await call_next(request)
+    path = request.url.path
+    protected = any(path == prefix or path.startswith(prefix + "/") for prefix in SENSITIVE_API_PREFIXES)
+    if protected and request.method != "OPTIONS":
+        scheme, _, token = request.headers.get("authorization", "").partition(" ")
+        claims = verify_supabase_token(token.strip()) if scheme.lower() == "bearer" and token.strip() else None
+        if not claims or not claims.get("sub"):
+            response = JSONResponse(
+                {"detail": "Authentication required"},
+                status_code=401,
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        else:
+            request.state.authenticated_user = claims
+            response = await call_next(request)
+    else:
+        response = await call_next(request)
+
     if "content-type" in response.headers:
         content_type = response.headers["content-type"]
         if "charset" not in content_type.lower():
             if "text/" in content_type.lower() or "application/json" in content_type.lower():
                 response.headers["content-type"] = f"{content_type}; charset=utf-8"
+    response.headers.setdefault("X-Content-Type-Options", "nosniff")
+    response.headers.setdefault("X-Frame-Options", "DENY")
+    response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+    response.headers.setdefault("Permissions-Policy", "camera=(), microphone=(self), geolocation=()")
+    response.headers.setdefault("Content-Security-Policy", "frame-ancestors 'none'; base-uri 'self'; object-src 'none'")
+    response.headers.setdefault("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
+    if path.startswith("/api/"):
+        response.headers["Cache-Control"] = "no-store"
     return response
 try:
     if init_ids is not None:
@@ -266,7 +303,7 @@ async def logout(request: Request):
     
     # Create response with cleared cookie
     response = JSONResponse({"message": "Logged out successfully"})
-    response.delete_cookie("jai_web_id")
+    response.delete_cookie("jai_web_id", path="/", secure=True, httponly=True, samesite="lax")
     
     return response
 
@@ -276,7 +313,7 @@ async def index(request: Request):
     web_id = request.cookies.get("jai_web_id") or str(uuid.uuid4())
     resp = templates.TemplateResponse("index.html", {"request": request})
     if request.cookies.get("jai_web_id") != web_id:
-        resp.set_cookie("jai_web_id", web_id, httponly=True, samesite="Lax")
+        resp.set_cookie("jai_web_id", web_id, path="/", httponly=True, secure=True, samesite="lax")
     return resp
 
 

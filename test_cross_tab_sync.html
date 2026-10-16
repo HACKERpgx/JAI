@@ -63,7 +63,7 @@
 </head>
 <body>
     <h1>🔄 Cross-Tab Synchronization Test</h1>
-    
+
     <div class="test-container">
         <h2>Test Instructions</h2>
         <ol>
@@ -110,17 +110,17 @@
         // Initialize test
         function initializeTest() {
             logSync('Initializing cross-tab sync test...');
-            
+
             // Initialize session
             sessionId = localStorage.getItem(SESSION_KEY) || generateSessionId();
             localStorage.setItem(SESSION_KEY, sessionId);
-            
+
             // Set up storage event listener
             window.addEventListener('storage', handleStorageEvent);
-            
+
             // Test health
             testHealth();
-            
+
             logSync(`Test initialized with session: ${sessionId}`);
             updateStatus('Test ready - open another tab to test sync', 'success');
         }
@@ -177,10 +177,10 @@
                 message: `Test sync event ${Date.now()}`,
                 timestamp: Date.now()
             };
-            
+
             localStorage.setItem(SYNC_CHANNEL, JSON.stringify(testData));
             localStorage.removeItem(SYNC_CHANNEL);
-            
+
             logSync('Test sync event sent');
         }
 
@@ -189,7 +189,7 @@
                 try {
                     const syncData = JSON.parse(event.newValue);
                     logSync(`Received sync event: ${syncData.type}`);
-                    
+
                     if (syncData.type === 'message_added' && syncData.sessionId === sessionId) {
                         addMessage(syncData.message.role, syncData.message.content);
                         logSync(`Synced message: ${syncData.message.role} - ${syncData.message.content.substring(0, 50)}...`);
@@ -206,34 +206,34 @@
             const input = document.getElementById('testInput');
             const text = input.value.trim();
             if (!text) return;
-            
+
             input.value = '';
             addMessage('user', text);
-            
+
             try {
                 const response = await fetch((localStorage.getItem(LS_KEY) || 'https://j-ai.top') + '/api/text', {
                     method: 'POST',
-                    headers: { 
+                    headers: {
                         'Content-Type': 'application/json',
                         'X-Session-ID': sessionId
                     },
                     body: JSON.stringify({ text })
                 });
-                
+
                 if (response.ok) {
                     const data = await response.json();
                     addMessage('assistant', data.response || 'No response');
-                    
+
                     // Trigger sync event
                     const syncData = {
                         type: 'message_added',
                         sessionId: sessionId,
                         message: { role: 'user', content: text, timestamp: Date.now() }
                     };
-                    
+
                     localStorage.setItem(SYNC_CHANNEL, JSON.stringify(syncData));
                     localStorage.removeItem(SYNC_CHANNEL);
-                    
+
                     setTimeout(() => {
                         const assistantSync = {
                             type: 'message_added',
@@ -243,7 +243,7 @@
                         localStorage.setItem(SYNC_CHANNEL, JSON.stringify(assistantSync));
                         localStorage.removeItem(SYNC_CHANNEL);
                     }, 100);
-                    
+
                     logSync('Test message sent and sync triggered');
                 } else {
                     logSync(`Failed to send message: ${response.status}`);

@@ -17,7 +17,7 @@
       margin: 0 auto;
       padding: 20px;
     }
-    
+
     .header {
       background: linear-gradient(135deg, var(--accent), var(--accent-2));
       color: white;
@@ -26,7 +26,7 @@
       margin-bottom: 20px;
       text-align: center;
     }
-    
+
     .feedback-form {
       background: var(--card);
       border: 1px solid #1f2a44;
@@ -34,18 +34,18 @@
       padding: 20px;
       margin-bottom: 20px;
     }
-    
+
     .form-group {
       margin-bottom: 15px;
     }
-    
+
     .form-group label {
       display: block;
       margin-bottom: 5px;
       color: var(--muted);
       font-weight: 500;
     }
-    
+
     .form-group input,
     .form-group select,
     .form-group textarea {
@@ -57,12 +57,12 @@
       color: var(--text);
       font-family: inherit;
     }
-    
+
     .form-group textarea {
       min-height: 120px;
       resize: vertical;
     }
-    
+
     .btn {
       padding: 10px 20px;
       border: none;
@@ -72,23 +72,23 @@
       transition: all 0.2s ease;
       margin-right: 10px;
     }
-    
+
     .btn-primary {
       background: linear-gradient(135deg, var(--accent), var(--accent-2));
       color: white;
     }
-    
+
     .btn-secondary {
       background: #0b1426;
       color: var(--text);
       border: 1px solid #2b3a5e;
     }
-    
+
     .btn:hover {
       transform: translateY(-1px);
       box-shadow: 0 4px 12px rgba(90, 160, 255, 0.3);
     }
-    
+
     .feedback-list {
       background: var(--card);
       border: 1px solid #1f2a44;
@@ -96,7 +96,7 @@
       padding: 20px;
       margin-bottom: 20px;
     }
-    
+
     .feedback-item {
       background: #0e1830;
       border: 1px solid #223055;
@@ -105,32 +105,32 @@
       margin-bottom: 15px;
       transition: transform 0.2s ease;
     }
-    
+
     .feedback-item:hover {
       transform: translateY(-2px);
       box-shadow: 0 4px 12px rgba(90, 160, 255, 0.2);
     }
-    
+
     .feedback-header {
       display: flex;
       justify-content: space-between;
       align-items: center;
       margin-bottom: 10px;
     }
-    
+
     .feedback-title {
       font-weight: bold;
       color: var(--accent);
       margin: 0;
     }
-    
+
     .feedback-meta {
       display: flex;
       gap: 15px;
       font-size: 0.9em;
       color: var(--muted);
     }
-    
+
     .feedback-category {
       background: var(--accent);
       color: white;
@@ -139,25 +139,25 @@
       font-size: 0.8em;
       font-weight: 500;
     }
-    
+
     .feedback-content {
       margin: 10px 0;
       line-height: 1.5;
     }
-    
+
     .feedback-actions {
       display: flex;
       gap: 10px;
       margin-top: 10px;
     }
-    
+
     .stats-grid {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
       gap: 20px;
       margin-bottom: 30px;
     }
-    
+
     .stat-card {
       background: var(--card);
       border: 1px solid #1f2a44;
@@ -165,25 +165,25 @@
       padding: 20px;
       text-align: center;
     }
-    
+
     .stat-value {
       font-size: 2em;
       font-weight: bold;
       color: var(--accent);
       margin-bottom: 5px;
     }
-    
+
     .stat-label {
       color: var(--muted);
       font-size: 0.9em;
     }
-    
+
     .loading {
       text-align: center;
       padding: 40px;
       color: var(--muted);
     }
-    
+
     .error {
       background: rgba(255, 107, 107, 0.1);
       border: 1px solid var(--danger);
@@ -192,7 +192,7 @@
       border-radius: 6px;
       margin: 20px 0;
     }
-    
+
     .success {
       background: rgba(124, 240, 255, 0.1);
       border: 1px solid var(--accent-2);
@@ -201,12 +201,12 @@
       border-radius: 6px;
       margin: 20px 0;
     }
-    
+
     @media (max-width: 768px) {
       .feedback-container {
         padding: 10px;
       }
-      
+
       .stats-grid {
         grid-template-columns: 1fr;
       }
@@ -235,22 +235,22 @@
               <option value="experience">User Experience</option>
             </select>
           </div>
-          
+
           <div class="form-group">
             <label for="feedbackTitle">Title</label>
             <input type="text" id="feedbackTitle" name="title" placeholder="Brief summary of your feedback..." required>
           </div>
-          
+
           <div class="form-group">
             <label for="feedbackContent">Your Feedback</label>
             <textarea id="feedbackContent" name="content" placeholder="Share your detailed feedback, suggestions, or report issues..." required></textarea>
           </div>
-          
+
           <div class="form-group">
             <label for="feedbackEmail">Email (optional)</label>
             <input type="email" id="feedbackEmail" name="email" placeholder="your.email@example.com">
           </div>
-          
+
           <div class="form-group">
             <label for="feedbackCategory">Category</label>
             <select id="feedbackCategory" name="category">
@@ -263,7 +263,7 @@
               <option value="other">Other</option>
             </select>
           </div>
-          
+
           <div style="margin-top: 20px;">
             <button type="submit" class="btn btn-primary">Submit Feedback</button>
             <button type="button" class="btn btn-secondary" onclick="clearForm()">Clear</button>
@@ -331,7 +331,7 @@
         category: formData.get('category'),
         timestamp: new Date().toISOString()
       };
-      
+
       try {
         const response = await fetch(`${apiBase}/api/feedback`, {
           method: 'POST',
@@ -340,9 +340,9 @@
           },
           body: JSON.stringify(feedback)
         });
-        
+
         const result = await response.json();
-        
+
         if (result.success) {
           showSuccess('Feedback submitted successfully! Thank you for your contribution.');
           clearForm();
@@ -361,7 +361,7 @@
       try {
         const response = await fetch(`${apiBase}/api/feedback`);
         const data = await response.json();
-        
+
         if (data.success && data.feedback) {
           displayFeedback(data.feedback);
         } else {
@@ -375,12 +375,12 @@
     // Display feedback
     function displayFeedback(feedback) {
       const feedbackList = document.getElementById('feedbackList');
-      
+
       if (feedback.length === 0) {
         feedbackList.innerHTML = '<p style="text-align: center; color: var(--muted);">No feedback submitted yet. Be the first to share your thoughts!</p>';
         return;
       }
-      
+
       feedbackList.innerHTML = feedback.map(item => `
         <div class="feedback-item">
           <div class="feedback-header">
@@ -404,7 +404,7 @@
       try {
         const response = await fetch(`${apiBase}/api/feedback/stats`);
         const data = await response.json();
-        
+
         if (data.success && data.stats) {
           document.getElementById('totalFeedback').textContent = data.stats.total || 0;
           document.getElementById('thisWeek').textContent = data.stats.this_week || 0;
@@ -429,7 +429,7 @@
         const response = await fetch(`${apiBase}/api/feedback/${feedbackId}/like`, {
           method: 'POST'
         });
-        
+
         const result = await response.json();
         if (result.success) {
           showSuccess('Feedback liked!');
@@ -459,7 +459,7 @@
           },
           body: JSON.stringify({ reply })
         });
-        
+
         const result = await response.json();
         if (result.success) {
           showSuccess('Reply submitted!');
@@ -490,7 +490,7 @@
       errorDiv.className = 'error';
       errorDiv.textContent = '❌ ' + message;
       document.querySelector('.feedback-container').insertBefore(errorDiv, document.querySelector('.main'));
-      
+
       setTimeout(() => errorDiv.remove(), 5000);
     }
 
@@ -499,7 +499,7 @@
       successDiv.className = 'success';
       successDiv.textContent = '✅ ' + message;
       document.querySelector('.feedback-container').insertBefore(successDiv, document.querySelector('.main'));
-      
+
       setTimeout(() => successDiv.remove(), 3000);
     }
 

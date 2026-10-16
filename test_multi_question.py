@@ -13,7 +13,7 @@ def test_multi_question():
     """Test handling of multiple mathematical questions in one message"""
     print("Testing JAI Multi-Question Mathematical Problem Solving")
     print("=" * 60)
-    
+
     # Test cases with multiple questions
     test_cases = [
         "1. What is 2 + 2? 2. What is 3 * 4? 3. What is 10 / 2?",
@@ -23,17 +23,17 @@ def test_multi_question():
         "What is 3^4? Additionally, what is 2^3?",
         "What is 2 + 2? What is 3 * 3? What is 10 / 5?"
     ]
-    
+
     for i, test_case in enumerate(test_cases, 1):
         print(f"\nTest {i}: {test_case}")
         print("-" * 40)
-        
+
         try:
             response = solve_mathematical_problem(test_case)
             print(f"JAI Response:\n{response}")
         except Exception as e:
             print(f"Error: {e}")
-    
+
     print("\n" + "=" * 60)
     print("Multi-question math testing completed!")
 

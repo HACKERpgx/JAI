@@ -1,7 +1,7 @@
 import { db } from "../../server/db";
-import { 
+import {
   personas, lorebooks, lorebookEntries, chatSessions, chatMessages,
-  type Persona, type Lorebook, type LorebookEntry, type ChatSession, type ChatMessage 
+  type Persona, type Lorebook, type LorebookEntry, type ChatSession, type ChatMessage
 } from "../../shared/memorySchema";
 import { eq, and, desc, sql } from "drizzle-orm";
 import { openai } from "@ai-sdk/openai";
@@ -161,9 +161,9 @@ export class MemoryService {
   }
 
   // Message handling with context assembly
-  async sendMessage(sessionId: number, userMessage: string): Promise<{ 
-    assistantMessage: ChatMessage; 
-    contextTokens: number; 
+  async sendMessage(sessionId: number, userMessage: string): Promise<{
+    assistantMessage: ChatMessage;
+    contextTokens: number;
     activeLoreCount: number;
   }> {
     const session = await this.getSession(sessionId);
@@ -191,7 +191,7 @@ export class MemoryService {
 
     // Build context
     const chatHistory = session.messages?.slice(-20).reverse().map((m: ChatMessage) => ({ role: m.role, content: m.content })) || [];
-    
+
     const assembly = this.contextAssembler.assembleContext({
       persona,
       pinnedLore: pinnedEntries,
@@ -298,7 +298,7 @@ export class MemoryService {
         }
 
         // Check for overlapping trigger keywords
-        const sharedTriggers = e1.triggerKeywords.filter((k: any) => 
+        const sharedTriggers = e1.triggerKeywords.filter((k: any) =>
           e2.triggerKeywords.some((k2: any) => k.toLowerCase() === k2.toLowerCase())
         );
         if (sharedTriggers.length > 0) {

@@ -303,15 +303,15 @@ async def logout(request: Request):
     """Clear user session and message history"""
     web_id = request.cookies.get("jai_web_id") or "anon"
     username = f"web:{web_id}"
-    
+
     # Clear session from memory
     if username in ja_sessions:
         del ja_sessions[username]
-    
+
     # Create response with cleared cookie
     response = JSONResponse({"message": "Logged out successfully"})
     response.delete_cookie("jai_web_id", path="/", secure=True, httponly=True, samesite="lax")
-    
+
     return response
 
 
@@ -371,10 +371,10 @@ async def api_text(req: WebTextRequest, request: Request):
 
         web_id = request.cookies.get("jai_web_id") or "anon"
         username = f"web:{web_id}"
-        
+
         if username not in ja_sessions:
             ja_sessions[username] = JAUserSession(username)
-        
+
         session = ja_sessions[username]
 
         # ⬇️ THIS IS WHERE THE ROOT CAUSE CODE LIVES (Inside the session configuration)
@@ -387,7 +387,7 @@ async def api_text(req: WebTextRequest, request: Request):
 
         # ⬇️ NEW IMPROVED HANDLING FOR PERSONAS & JOKES
         lower_text = text.lower()
-        
+
         if any(x in lower_text for x in ["therapist mode", "storyteller", "trivia", "meditation", "motivation"]):
             from jai_assistant import _normalize_persona
             p = _normalize_persona(text)
@@ -616,36 +616,36 @@ VISION_PROMPTS = {
 
 def _analyze_image_bytes(data: bytes, mime: str, prompt: str, analysis_type: str = "general") -> str:
     """Analyze image using vision-capable AI model.
-    
+
     Args:
         data: Raw image bytes
         mime: MIME type of image
         prompt: Custom user prompt (optional)
         analysis_type: Type of analysis (general, ocr, diagram, code, ui, math, object, document, photo, screenshot)
-    
+
     Returns:
         Analysis text response
     """
     try:
         # Log debug info
         print(f"[DEBUG] Analyzing image: mime={mime}, size={len(data)} bytes, type={analysis_type}")
-        
+
         data_url = _image_to_data_url(mime, data)
         if not data_url:
             return "Could not read image data."
-        
+
         print(f"[DEBUG] Data URL created: {data_url[:100]}...")
-        
+
         # Try OpenAI first
         api_key = os.environ.get("OPENAI_API_KEY")
         print(f"[DEBUG] API key available: {bool(api_key)}")
         print(f"[DEBUG] OpenAI client available: {OpenAI is not None}")
-        
+
         if OpenAI and api_key:
             try:
                 client = OpenAI(api_key=api_key)
                 user_prompt = (prompt or "").strip()
-                
+
                 # Use analysis type prompt if no custom prompt provided
                 if not user_prompt:
                     analysis_type_key = (analysis_type or "general").lower()
@@ -653,9 +653,9 @@ def _analyze_image_bytes(data: bytes, mime: str, prompt: str, analysis_type: str
                     user_prompt = base_prompt + "\n\nIMPORTANT: Respond only in English."
                 else:
                     user_prompt = user_prompt + "\n\nIMPORTANT: Respond only in English."
-                
+
                 print(f"[DEBUG] Using prompt: {user_prompt[:100]}...")
-                
+
                 messages = [
                     {
                         "role": "system",
@@ -669,9 +669,9 @@ def _analyze_image_bytes(data: bytes, mime: str, prompt: str, analysis_type: str
                         ],
                     }
                 ]
-                
+
                 print(f"[DEBUG] Calling OpenAI API with model: {os.environ.get('JAI_VISION_MODEL', 'gpt-4o-mini')}")
-                
+
                 resp = client.chat.completions.create(
                     model=os.environ.get("JAI_VISION_MODEL", "gpt-4o-mini"),
                     messages=messages,
@@ -695,17 +695,17 @@ def _analyze_image_bytes(data: bytes, mime: str, prompt: str, analysis_type: str
                 import traceback
                 traceback.print_exc()
                 return error_msg
-        
+
         # Fallback to Gemini if OpenAI not available
         print("[DEBUG] OpenAI not available, trying Gemini...")
         gemini_result = _analyze_with_gemini(data, mime, prompt, analysis_type)
         if "failed" not in gemini_result.lower() and "unavailable" not in gemini_result.lower():
             return gemini_result
-        
+
         # Fallback to Groq
         print("[DEBUG] Gemini failed, trying Groq...")
         return _analyze_with_groq(data, mime, prompt, analysis_type)
-        
+
     except Exception as e:
         error_msg = f"Image analysis failed: {str(e)}"
         print(f"[ERROR] {error_msg}")
@@ -719,25 +719,25 @@ def _analyze_with_groq(data: bytes, mime: str, prompt: str, analysis_type: str =
     try:
         from groq import Groq
         import base64
-        
+
         groq_key = os.environ.get("GROQ_API_KEY")
         if not groq_key:
             return "Groq API key not configured. Please set GROQ_API_KEY."
-        
+
         print(f"[DEBUG] Using Groq API with key: {bool(groq_key)}")
         client = Groq(api_key=groq_key)
-        
+
         # Convert image to base64
         image_b64 = base64.b64encode(data).decode('utf-8')
-        
+
         user_prompt = (prompt or "").strip()
         if not user_prompt:
             analysis_type_key = (analysis_type or "general").lower()
             base_prompt = VISION_PROMPTS.get(analysis_type_key, VISION_PROMPTS["general"])
             user_prompt = base_prompt + "\n\nIMPORTANT: Respond only in English."
-        
+
         print(f"[DEBUG] Groq prompt: {user_prompt[:100]}...")
-        
+
         # Try Groq vision models
         try:
             from groq import Groq
@@ -747,27 +747,27 @@ def _analyze_with_groq(data: bytes, mime: str, prompt: str, analysis_type: str =
             vision_models = [model.id for model in models_list.data if 'llava' in model.id.lower() or 'vision' in model.id.lower()]
             print(f"[DEBUG] Available Groq models: {[m.id for m in models_list.data[:10]]}")
             print(f"[DEBUG] Vision models: {vision_models}")
-            
+
             if vision_models:
                 models = vision_models
             else:
                 models = [
                     "llava-v1.5-7b",
-                    "llava-v1.5-13b", 
+                    "llava-v1.5-13b",
                     "llava-v1.5-34b"
                 ]
         except Exception as list_e:
             print(f"[ERROR] Could not list Groq models: {list_e}")
             models = [
                 "llava-v1.5-7b",
-                "llava-v1.5-13b", 
+                "llava-v1.5-13b",
                 "llava-v1.5-34b"
             ]
-        
+
         for model_name in models:
             try:
                 print(f"[DEBUG] Trying Groq model: {model_name}")
-                
+
                 messages = [
                     {
                         "role": "system",
@@ -789,14 +789,14 @@ def _analyze_with_groq(data: bytes, mime: str, prompt: str, analysis_type: str =
                         ]
                     }
                 ]
-                
+
                 response = client.chat.completions.create(
                     model=model_name,
                     messages=messages,
                     max_tokens=1024,
                     temperature=0.3
                 )
-                
+
                 if response.choices and response.choices[0].message.content:
                     result = response.choices[0].message.content
                     print(f"[DEBUG] Groq response with {model_name}: {result[:100]}...")
@@ -804,16 +804,16 @@ def _analyze_with_groq(data: bytes, mime: str, prompt: str, analysis_type: str =
                 else:
                     print(f"[DEBUG] {model_name} returned empty response")
                     continue
-                    
+
             except Exception as model_e:
                 print(f"[ERROR] Groq model {model_name} failed: {model_e}")
                 if "not found" in str(model_e).lower() or "not supported" in str(model_e).lower():
                     continue  # Try next model
                 else:
                     raise model_e
-        
+
         return "All Groq vision models failed or are unavailable."
-            
+
     except Exception as e:
         error_msg = f"Groq fallback failed: {str(e)}"
         print(f"[ERROR] {error_msg}")
@@ -828,25 +828,25 @@ def _get_basic_image_info(data: bytes, mime: str) -> str:
         from PIL import Image as PILImage
         import io
         from datetime import datetime
-        
+
         image = PILImage.open(io.BytesIO(data))
-        
+
         info = []
         info.append("📷 Basic Image Information:")
         info.append(f"• Format: {image.format or 'Unknown'}")
         info.append(f"• Size: {image.size[0]} × {image.size[1]} pixels")
         info.append(f"• Mode: {image.mode}")
         info.append(f"• File size: {len(data):,} bytes ({len(data)/1024:.1f} KB)")
-        
+
         if hasattr(image, 'info') and image.info:
             if 'dpi' in image.info:
                 info.append(f"• DPI: {image.info['dpi']}")
             if 'comment' in image.info:
                 info.append(f"• Comment: {image.info['comment'][:100]}...")
-        
+
         # Add basic analysis based on image properties
         info.append("\n🔍 Basic Analysis:")
-        
+
         # Analyze aspect ratio
         width, height = image.size
         aspect_ratio = width / height
@@ -858,7 +858,7 @@ def _get_basic_image_info(data: bytes, mime: str) -> str:
             info.append("• Shape: Tall/portrait image")
         else:
             info.append("• Shape: Standard rectangle")
-        
+
         # Analyze color mode
         if image.mode == 'RGB':
             info.append("• Color: Full color image")
@@ -870,7 +870,7 @@ def _get_basic_image_info(data: bytes, mime: str) -> str:
             info.append("• Color: CMYK (print format)")
         else:
             info.append(f"• Color: {image.mode} format")
-        
+
         # Estimate image type based on size and format
         if image.format == 'JPEG':
             if width >= 1920 or height >= 1080:
@@ -886,12 +886,12 @@ def _get_basic_image_info(data: bytes, mime: str) -> str:
                 info.append("• Likely: Web graphic or screenshot")
         elif image.format == 'GIF':
             info.append("• Likely: Animated image or simple graphic")
-        
+
         info.append("\n⚠️ Vision analysis services are currently unavailable due to API quota limits.")
         info.append("Please try again later or upload a different image.")
-        
+
         return "\n".join(info)
-        
+
     except Exception as e:
         return f"Unable to process image. Error: {str(e)}"
 
@@ -902,14 +902,14 @@ def _analyze_with_gemini(data: bytes, mime: str, prompt: str, analysis_type: str
         import google.generativeai as genai
         from PIL import Image as PILImage
         import io
-        
+
         gemini_key = os.environ.get("GEMINI_API_KEY")
         if not gemini_key:
             return "Gemini API key not configured. Please set GEMINI_API_KEY."
-        
+
         print(f"[DEBUG] Using Gemini API with key: {bool(gemini_key)}")
         genai.configure(api_key=gemini_key)
-        
+
         # Validate and fix image data
         try:
             image = PILImage.open(io.BytesIO(data))
@@ -917,11 +917,11 @@ def _analyze_with_gemini(data: bytes, mime: str, prompt: str, analysis_type: str
             image.verify()
             # Reload after verify (verify() closes the image)
             image = PILImage.open(io.BytesIO(data))
-            
+
             # Convert to RGB if needed (Gemini works best with RGB)
             if image.mode not in ['RGB', 'L']:
                 image = image.convert('RGB')
-            
+
             print(f"[DEBUG] Image loaded successfully: {image.size}, mode={image.mode}")
         except Exception as img_e:
             print(f"[ERROR] Image validation failed: {img_e}")
@@ -933,15 +933,15 @@ def _analyze_with_gemini(data: bytes, mime: str, prompt: str, analysis_type: str
                 print(f"[DEBUG] Image converted to RGB successfully")
             except Exception as fix_e:
                 return f"Image file appears corrupted or truncated. Please upload a valid image file. Error: {str(img_e)}"
-        
+
         user_prompt = (prompt or "").strip()
         if not user_prompt:
             analysis_type_key = (analysis_type or "general").lower()
             base_prompt = VISION_PROMPTS.get(analysis_type_key, VISION_PROMPTS["general"])
             user_prompt = base_prompt + "\n\nIMPORTANT: Respond only in English."
-        
+
         print(f"[DEBUG] Gemini prompt: {user_prompt[:100]}...")
-        
+
         # First, list available models to find the correct ones
         try:
             models = genai.list_models()
@@ -951,10 +951,10 @@ def _analyze_with_gemini(data: bytes, mime: str, prompt: str, analysis_type: str
         except Exception as list_e:
             print(f"[ERROR] Could not list models: {list_e}")
             vision_models = []
-        
+
         # Try different model names based on what's actually available
         model_names = []
-        
+
         # If we found vision models, use them
         if vision_models:
             model_names = [name.replace('models/', '') for name in vision_models]
@@ -967,41 +967,41 @@ def _analyze_with_gemini(data: bytes, mime: str, prompt: str, analysis_type: str
                 'gemini-pro-latest',
                 'gemini-pro-vision'
             ]
-        
+
         for model_name in model_names:
             try:
                 print(f"[DEBUG] Trying model: {model_name}")
                 model = genai.GenerativeModel(model_name)
-                
+
                 # Generate content
                 response = model.generate_content([user_prompt, image])
-                
+
                 if response.text:
                     print(f"[DEBUG] Gemini response with {model_name}: {response.text[:100]}...")
                     return response.text
                 else:
                     print(f"[DEBUG] {model_name} returned empty response")
                     continue
-                    
+
             except Exception as model_e:
                 print(f"[ERROR] Model {model_name} failed: {model_e}")
                 if "not found" in str(model_e).lower() or "not supported" in str(model_e).lower():
                     continue  # Try next model
                 else:
                     raise model_e  # Re-raise if it's not a model not found error
-        
+
         return "All Gemini models failed or are unavailable for vision tasks."
-            
+
     except Exception as e:
         error_msg = f"Gemini fallback failed: {str(e)}"
         print(f"[ERROR] {error_msg}")
         import traceback
         traceback.print_exc()
-        
+
         # Check if it's still a quota issue
         if "quota" in str(e).lower() or "billing" in str(e).lower():
             return f"Both OpenAI and Gemini have quota issues. Please check API billing."
-        
+
         # Try Groq as last resort
         print("[DEBUG] All vision APIs failed, trying Groq...")
         return _analyze_with_groq(data, mime, prompt, analysis_type)
@@ -1039,14 +1039,14 @@ async def api_image(request: Request, file: UploadFile = File(...), prompt: str 
             mime = "application/octet-stream"
         if not mime.startswith("image/"):
             return JSONResponse({"error": "Unsupported file type. Please upload an image."}, status_code=400)
-        
+
         # Validate image data before processing
         if len(data) < 100:  # Images should be at least 100 bytes
             return JSONResponse({"error": "Image file is too small or corrupted. Please upload a valid image."}, status_code=400)
-        
+
         if len(data) > 20 * 1024 * 1024:  # 20MB limit
             return JSONResponse({"error": "Image file is too large. Please upload an image smaller than 20MB."}, status_code=400)
-        
+
         # Quick validation with PIL
         try:
             from PIL import Image as PILImage
@@ -1083,10 +1083,10 @@ async def api_image_multi(request: Request, files: List[UploadFile] = File(...),
         username = f"web:{web_id}"
         if username not in ja_sessions:
             ja_sessions[username] = JAUserSession(username)
-        
+
         if not files or len(files) == 0:
             return JSONResponse({"error": "No images provided."}, status_code=400)
-        
+
         results = []
         for i, file in enumerate(files):
             data = await file.read()
@@ -1096,14 +1096,14 @@ async def api_image_multi(request: Request, files: List[UploadFile] = File(...),
             if not mime.startswith("image/"):
                 results.append({"index": i, "filename": file.filename, "error": "Unsupported file type"})
                 continue
-            
+
             analysis = _analyze_image_bytes(data, mime, prompt, analysis_type)
             results.append({
                 "index": i,
                 "filename": file.filename,
                 "analysis": analysis
             })
-        
+
         return {"results": results, "requestId": rid, "total_images": len(files)}
     finally:
         try:
@@ -2157,7 +2157,7 @@ async def math_statistics(req: MathStatisticsRequest):
 # Auth endpoints for Supabase integration
 from fastapi import Depends
 from jai_auth import (
-    get_current_user, require_auth, User, 
+    get_current_user, require_auth, User,
     AuthResponse, LoginRequest, SignupRequest,
     SUPABASE_URL, SUPABASE_ANON_KEY
 )

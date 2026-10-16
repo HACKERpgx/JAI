@@ -38,7 +38,7 @@ export default function MathPage() {
   const handleMathOperation = async (operation: string, params: any = {}) => {
     setLoading(true)
     setResult(null)
-    
+
     try {
       const response = await fetch(`/api/math/${operation}`, {
         method: 'POST',
@@ -47,7 +47,7 @@ export default function MathPage() {
         },
         body: JSON.stringify(params),
       })
-      
+
       const data = await response.json()
       setResult(data)
     } catch (error) {
@@ -67,7 +67,7 @@ export default function MathPage() {
 
   const renderResult = () => {
     if (!result) return null
-    
+
     if (result.error) {
       return (
         <Alert variant="destructive">
@@ -91,7 +91,7 @@ export default function MathPage() {
               <p className="font-mono text-sm">{result.original}</p>
             </div>
           )}
-          
+
           {result.simplified && (
             <div>
               <Label className="text-sm font-medium">Simplified</Label>
@@ -104,7 +104,7 @@ export default function MathPage() {
               )}
             </div>
           )}
-          
+
           {result.expanded && (
             <div>
               <Label className="text-sm font-medium">Expanded</Label>
@@ -112,7 +112,7 @@ export default function MathPage() {
               {result.latex && renderLatex(result.latex)}
             </div>
           )}
-          
+
           {result.factored && (
             <div>
               <Label className="text-sm font-medium">Factored</Label>
@@ -120,7 +120,7 @@ export default function MathPage() {
               {result.latex && renderLatex(result.latex)}
             </div>
           )}
-          
+
           {result.solutions && (
             <div>
               <Label className="text-sm font-medium">Solutions</Label>
@@ -133,7 +133,7 @@ export default function MathPage() {
               </div>
             </div>
           )}
-          
+
           {result.evaluated !== undefined && (
             <div>
               <Label className="text-sm font-medium">Numerical Value</Label>
@@ -196,21 +196,21 @@ export default function MathPage() {
                   onChange={(e) => setExpression(e.target.value)}
                 />
               </div>
-              
+
               <div className="flex flex-wrap gap-2">
-                <Button 
+                <Button
                   onClick={() => handleMathOperation('simplify', { expression })}
                   disabled={loading || !expression}
                 >
                   Simplify
                 </Button>
-                <Button 
+                <Button
                   onClick={() => handleMathOperation('expand', { expression })}
                   disabled={loading || !expression}
                 >
                   Expand
                 </Button>
-                <Button 
+                <Button
                   onClick={() => handleMathOperation('factor', { expression })}
                   disabled={loading || !expression}
                 >
@@ -234,7 +234,7 @@ export default function MathPage() {
                   onChange={(e) => setEquation(e.target.value)}
                 />
               </div>
-              
+
               <div>
                 <Label htmlFor="variable">Variable</Label>
                 <Input
@@ -243,8 +243,8 @@ export default function MathPage() {
                   onChange={(e) => setVariable(e.target.value)}
                 />
               </div>
-              
-              <Button 
+
+              <Button
                 onClick={() => handleMathOperation('solve', { equation, variable })}
                 disabled={loading || !equation}
               >
@@ -272,7 +272,7 @@ export default function MathPage() {
                   onChange={(e) => setExpression(e.target.value)}
                 />
               </div>
-              
+
               <div>
                 <Label htmlFor="calc-variable">Variable</Label>
                 <Input
@@ -281,15 +281,15 @@ export default function MathPage() {
                   onChange={(e) => setVariable(e.target.value)}
                 />
               </div>
-              
+
               <div className="flex flex-wrap gap-2">
-                <Button 
+                <Button
                   onClick={() => handleMathOperation('derivative', { expression, variable })}
                   disabled={loading || !expression}
                 >
                   Derivative
                 </Button>
-                <Button 
+                <Button
                   onClick={() => handleMathOperation('integral', { expression, variable })}
                   disabled={loading || !expression}
                 >
@@ -318,27 +318,27 @@ export default function MathPage() {
                   onChange={(e) => setMatrix(e.target.value)}
                 />
               </div>
-              
+
               <div className="flex flex-wrap gap-2">
-                <Button 
+                <Button
                   onClick={() => handleMathOperation('matrix', { matrix, operation: 'determinant' })}
                   disabled={loading || !matrix}
                 >
                   Determinant
                 </Button>
-                <Button 
+                <Button
                   onClick={() => handleMathOperation('matrix', { matrix, operation: 'inverse' })}
                   disabled={loading || !matrix}
                 >
                   Inverse
                 </Button>
-                <Button 
+                <Button
                   onClick={() => handleMathOperation('matrix', { matrix, operation: 'transpose' })}
                   disabled={loading || !matrix}
                 >
                   Transpose
                 </Button>
-                <Button 
+                <Button
                   onClick={() => handleMathOperation('matrix', { matrix, operation: 'eigenvalues' })}
                   disabled={loading || !matrix}
                 >
@@ -367,10 +367,10 @@ export default function MathPage() {
                   onChange={(e) => setData(e.target.value)}
                 />
               </div>
-              
-              <Button 
-                onClick={() => handleMathOperation('statistics', { 
-                  data: data.split(',').map(d => parseFloat(d.trim())).filter(d => !isNaN(d)) 
+
+              <Button
+                onClick={() => handleMathOperation('statistics', {
+                  data: data.split(',').map(d => parseFloat(d.trim())).filter(d => !isNaN(d))
                 })}
                 disabled={loading || !data}
               >
@@ -398,7 +398,7 @@ export default function MathPage() {
                   onChange={(e) => setExpression(e.target.value)}
                 />
               </div>
-              
+
               <div>
                 <Label htmlFor="initial-guess">Initial Guess</Label>
                 <Input
@@ -408,12 +408,12 @@ export default function MathPage() {
                   onChange={(e) => setVariable(e.target.value)}
                 />
               </div>
-              
-              <Button 
-                onClick={() => handleMathOperation('numerical', { 
-                  expression, 
-                  variable: 'x', 
-                  initial_guess: 0 
+
+              <Button
+                onClick={() => handleMathOperation('numerical', {
+                  expression,
+                  variable: 'x',
+                  initial_guess: 0
                 })}
                 disabled={loading || !expression}
               >

@@ -448,19 +448,19 @@ def _get_calendar():
 def create_event(title: str, date: str = None, time: str = None, description: str = "") -> dict:
     """
     Create a calendar event.
-    
+
     Args:
         title: Event title
         date: Date string (optional)
         time: Time string (optional)
         description: Event description (optional)
-        
+
     Returns:
         dict: Event details including id
     """
     try:
         cal = _get_calendar()
-        
+
         # Parse date and time if provided
         start_time = datetime.now()
         if date:
@@ -479,7 +479,7 @@ def create_event(title: str, date: str = None, time: str = None, description: st
                     start_time = start_time.replace(hour=hour, minute=minute, second=0, microsecond=0)
             except:
                 pass
-        
+
         event_id = cal.add_event(title, start_time, description=description)
         return {'success': True, 'id': event_id, 'title': title, 'start_time': start_time.isoformat()}
     except Exception as e:
@@ -490,10 +490,10 @@ def create_event(title: str, date: str = None, time: str = None, description: st
 def get_events(days: int = 7) -> list:
     """
     Get upcoming calendar events.
-    
+
     Args:
         days: Number of days to look ahead
-        
+
     Returns:
         list: List of event dictionaries
     """
@@ -509,10 +509,10 @@ def get_events(days: int = 7) -> list:
 def delete_event(event_id: int = None) -> dict:
     """
     Delete a calendar event by ID.
-    
+
     Args:
         event_id: ID of event to delete
-        
+
     Returns:
         dict: Result of deletion
     """

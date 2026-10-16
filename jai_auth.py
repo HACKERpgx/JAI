@@ -80,11 +80,11 @@ async def get_current_user(
     """Dependency to get current authenticated user"""
     if not credentials:
         return None
-    
+
     payload = verify_supabase_token(credentials.credentials)
     if not payload:
         return None
-    
+
     return User(
         id=payload.get("sub", ""),
         email=payload.get("email", ""),
@@ -102,7 +102,7 @@ async def require_auth(
             detail="Authentication required",
             headers={"WWW-Authenticate": "Bearer"}
         )
-    
+
     payload = verify_supabase_token(credentials.credentials)
     if not payload:
         raise HTTPException(
@@ -110,7 +110,7 @@ async def require_auth(
             detail="Invalid or expired token",
             headers={"WWW-Authenticate": "Bearer"}
         )
-    
+
     return User(
         id=payload.get("sub", ""),
         email=payload.get("email", ""),
@@ -120,18 +120,18 @@ async def require_auth(
 
 class AuthMiddleware:
     """Middleware to handle auth context for all requests"""
-    
+
     def __init__(self, app):
         self.app = app
-    
+
     async def __call__(self, scope, receive, send):
         if scope["type"] == "http":
             request = Request(scope, receive)
-            
+
             # Extract token from Authorization header
             auth_header = request.headers.get("authorization", "")
             user = None
-            
+
             if auth_header.startswith("Bearer "):
                 token = auth_header[7:]
                 payload = verify_supabase_token(token)
@@ -141,11 +141,11 @@ class AuthMiddleware:
                         email=payload.get("email", ""),
                         user_metadata=payload.get("user_metadata", {})
                     )
-            
+
             # Store user in request state
             request.state.user = user
             request.state.authenticated = user is not None
-        
+
         await self.app(scope, receive, send)
 
 
@@ -153,7 +153,7 @@ def get_supabase_js_html() -> str:
     """Generate HTML for Supabase client initialization"""
     if not SUPABASE_URL or not SUPABASE_ANON_KEY:
         return ""
-    
+
     return f"""
     <!-- Supabase JS Client -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.47.10/dist/umd/supabase.min.js"></script>

@@ -84,7 +84,6 @@ from fastapi.exceptions import RequestValidationError
 from fastapi import APIRouter
 from pydantic import BaseModel
 from memory_sqlite import init_db, store_message, get_recent_messages, upsert_user_profile, update_user_preferences
-
 # Import emotional intelligence
 try:
     from jai_emotional_intelligence import analyze_emotional_context, get_response_guidance
@@ -395,7 +394,7 @@ def handle_carbon_command(command: str, session) -> str:
         return "Eating beef has a high carbon footprint — about 60 kg CO2 per kg of beef, much higher than vegetables."
     else:
         return "I can help estimate carbon footprints for activities like driving, flying, or diet. Try asking something specific like 'carbon footprint of driving a car for 100 km'."
-        
+
 # Initialize TTS with comprehensive error handling
 tts = None
 TTS_VOICE = TTS_VOICE
@@ -950,7 +949,7 @@ def is_likely_math(text: str) -> bool:
 # -----------------------------
 def classify_intent(command: str) -> Tuple[str, Dict[str, Any]]:
     cmd = command.lower().strip()
-    
+
     # === PRIORITY 1: MATH DETECTION (Put this FIRST) ===
     math_patterns = [
         r'\b(\d+)\s*(times|multiply|multiplied by|\*|\+)\s*(\d+)\b',           # "15 times 27"
@@ -959,11 +958,11 @@ def classify_intent(command: str) -> Tuple[str, Dict[str, Any]]:
         r'\b(solve|simplify|factor|expand|integrate|derivative)\b',           # math keywords
         r'\b(\d+)%\s*of\s*(\d+)\b',                                            # "15% of 200"
     ]
-    
+
     for pattern in math_patterns:
         if re.search(pattern, cmd):
             return "mathematical_query", (command,)  # Keep original casing
-    
+
     # === PRIORITY 2: Specific high-confidence patterns ===
     patterns = {
         "activate aj": r"act(?:iv|ic)?ate\s+(?:aj|jai|ai|assistant)",
@@ -1026,20 +1025,20 @@ def classify_intent(command: str) -> Tuple[str, Dict[str, Any]]:
         "send_email": r"send\s+(?:an?\s+)?email\s+(?:to\s+)?(.+?)(?:\s+(?:with|about|subject)\s+(.+))?$",
         "test_gmail": r"test\s+gmail|check\s+gmail\s+connection",
     }
-    
+
     # Commands are matched from the start of the input so that a keyword
     # mentioned inside a longer sentence does not trigger a system action.
     for intent, pattern in patterns.items():
         match = re.match(pattern, cmd)
         if match:
             return intent, (match.groups() if match.groups() else None)
-    
+
     # Fuzzy fallback, limited to short commands where a typo is the likely cause
     if len(cmd.split()) <= 4:
         for intent in patterns:
             if fuzz.partial_ratio(cmd, intent.replace(" ", "")) > 90:
                 return intent, None
-    
+
     return "query", None
 def is_memory_intent(intent: str) -> bool:
     return intent in {
@@ -1057,12 +1056,12 @@ def is_memory_intent(intent: str) -> bool:
 def is_mathematical_query(command: str) -> bool:
     """Detect if the user is asking a mathematical question with numeric or operator context"""
     math_keywords = [
-        'simplify', 'factor', 'expand', 'integrate', 
+        'simplify', 'factor', 'expand', 'integrate',
         'differentiate', 'derivative', 'integral', 'limit', 'matrix',
         'determinant', 'inverse', 'eigenvalue', 'roots',
         'polynomial', 'algebra', 'calculus', 'geometry', 'trigonometry'
     ]
-    
+
     # Strong math indicators (rarely used in normal conversation)
     strong_math_patterns = [
         r'\b(sin|cos|tan|log|ln|sqrt)\s*\(?\s*[\d\w]',
@@ -1074,7 +1073,7 @@ def is_mathematical_query(command: str) -> bool:
 
     # Single-letter constants are too common in prose to be strong signals
     ambiguous_math_patterns = [r'\b(pi|e)\b']
-    
+
     # Contextual math indicators (require numbers or variables)
     context_required_patterns = [
         r'[+\-*/]',     # Basic operators
@@ -1082,9 +1081,9 @@ def is_mathematical_query(command: str) -> bool:
         r'\b(x|y|z)\b',  # Common variables
         r'\([^\)]+\)',  # Parentheses
     ]
-    
+
     command_lower = command.lower()
-    
+
     # Check for strong math patterns first
     if any(re.search(pattern, command_lower) for pattern in strong_math_patterns):
         return True
@@ -1095,12 +1094,12 @@ def is_mathematical_query(command: str) -> bool:
 
     if has_numeric_context and any(re.search(p, command_lower) for p in ambiguous_math_patterns):
         return True
-    
+
     # Keyword check: requires at least some numeric context or operators to be math
     if any(keyword in command_lower for keyword in math_keywords):
         if has_numeric_context or has_operator:
             return True
-            
+
     # Solve/Calculate/Expression check: high false positive risk, require clear math context
     if any(k in command_lower for k in ['solve', 'calculate', 'expression', 'math', 'statistics', 'mean', 'median']):
         if has_numeric_context and has_operator:
@@ -1114,19 +1113,19 @@ def is_mathematical_query(command: str) -> bool:
     # Final check for equation-like structures
     if '=' in command_lower and any(char in command_lower for char in 'xyz0123456789'):
         return True
-    
+
     return False
 
 def normalize_math_notation(command: str) -> str:
     """Normalize informal mathematical notation to proper mathematical symbols"""
     normalized = command
-    
+
     # Logarithm notation: log2 → log₂ (for display), but keep computable form
     normalized = re.sub(r'\blog2\b', 'log₂', normalized, flags=re.IGNORECASE)
     normalized = re.sub(r'\blog10\b', 'log₁₀', normalized, flags=re.IGNORECASE)
     normalized = re.sub(r'\blog3\b', 'log₃', normalized, flags=re.IGNORECASE)
     normalized = re.sub(r'\blog5\b', 'log₅', normalized, flags=re.IGNORECASE)
-    
+
     # Superscript notation: x2 → x², x3 → x³, etc.
     normalized = re.sub(r'([a-zA-Z])2\b', r'\1²', normalized)
     normalized = re.sub(r'([a-zA-Z])3\b', r'\1³', normalized)
@@ -1136,7 +1135,7 @@ def normalize_math_notation(command: str) -> str:
     normalized = re.sub(r'([a-zA-Z])7\b', r'\1⁷', normalized)
     normalized = re.sub(r'([a-zA-Z])8\b', r'\1⁸', normalized)
     normalized = re.sub(r'([a-zA-Z])9\b', r'\1⁹', normalized)
-    
+
     # Greek letters: alpha → α, beta → β, gamma → γ, etc.
     greek_letters = {
         'alpha': 'α', 'beta': 'β', 'gamma': 'γ', 'delta': 'δ',
@@ -1146,54 +1145,54 @@ def normalize_math_notation(command: str) -> str:
         'rho': 'ρ', 'sigma': 'σ', 'tau': 'τ', 'upsilon': 'υ',
         'phi': 'φ', 'chi': 'χ', 'psi': 'ψ', 'omega': 'ω'
     }
-    
+
     for name, symbol in greek_letters.items():
         normalized = re.sub(r'\b' + name + r'\b', symbol, normalized, flags=re.IGNORECASE)
-    
+
     # Common math notation: sqrt → √, sum → Σ, integral → ∫
     normalized = re.sub(r'\bsqrt\b', '√', normalized, flags=re.IGNORECASE)
     normalized = re.sub(r'\bsum\b', 'Σ', normalized, flags=re.IGNORECASE)
     normalized = re.sub(r'\bintegral\b', '∫', normalized, flags=re.IGNORECASE)
-    
+
     # Infinity: inf → ∞, infinity → ∞
     normalized = re.sub(r'\binf\b', '∞', normalized, flags=re.IGNORECASE)
     normalized = re.sub(r'\binfinity\b', '∞', normalized, flags=re.IGNORECASE)
-    
+
     # Approximation: approx → ≈
     normalized = re.sub(r'\bapprox\b', '≈', normalized, flags=re.IGNORECASE)
-    
+
     # Not equal: != → ≠
     normalized = re.sub(r'!=', '≠', normalized)
-    
+
     # Less than or equal: <= → ≤
     normalized = re.sub(r'<=', '≤', normalized)
-    
+
     # Greater than or equal: >= → ≥
     normalized = re.sub(r'>=', '≥', normalized)
-    
+
     # Plus minus: +- → ±
     normalized = re.sub(r'\+\-', '±', normalized)
-    
+
     return normalized
 
 def to_computable_form(normalized: str) -> str:
     """Convert normalized notation to SymPy-compatible syntax"""
     computable = normalized
-    
+
     # Convert superscripts back to standard form for computation
     superscript_map = {'²': '**2', '³': '**3', '⁴': '**4', '⁵': '**5', '⁶': '**6', '⁷': '**7', '⁸': '**8', '⁹': '**9'}
     for unicode_sup, standard in superscript_map.items():
         computable = computable.replace(unicode_sup, standard)
-    
+
     # Convert log notation to SymPy form
     computable = re.sub(r'log₂', 'log(2, ', computable)
     computable = re.sub(r'log₁₀', 'log(10, ', computable)
     computable = re.sub(r'log₃', 'log(3, ', computable)
     computable = re.sub(r'log₅', 'log(5, ', computable)
-    
+
     # Convert sqrt to SymPy form
     computable = re.sub(r'√', 'sqrt', computable)
-    
+
     # Convert Greek letters back to English for variable names (SymPy works better with standard letters)
     greek_to_english = {
         'α': 'alpha', 'β': 'beta', 'γ': 'gamma', 'δ': 'delta',
@@ -1203,34 +1202,34 @@ def to_computable_form(normalized: str) -> str:
         'σ': 'sigma', 'τ': 'tau', 'φ': 'phi', 'χ': 'chi',
         'ψ': 'psi', 'ω': 'omega'
     }
-    
+
     for greek, english in greek_to_english.items():
         computable = computable.replace(greek, english)
-    
+
     return computable
 
 def extract_math_expression(command: str, keyword: str) -> str:
     """Extract mathematical expression from natural language command"""
     # First normalize the notation
     command = normalize_math_notation(command)
-    
+
     # Remove the keyword and clean up
     expr = command.lower().replace(keyword, '').strip()
-    
+
     # Remove common question words
     question_words = ['what is', 'what are', 'calculate', 'compute', 'find', 'determine', 'the', 'of', 'for', 'me', 'please']
     for word in question_words:
         expr = expr.replace(word, '').strip()
-    
+
     # Remove question marks and other punctuation
     expr = expr.replace('?', '').replace('!', '').strip()
-    
+
     return expr
 
 def solve_mathematical_problem_manual(command: str) -> str:
     """Clean manual mathematical reasoning"""
     command_lower = command.lower()
-    
+
     # Simple arithmetic
     try:
         import re
@@ -1239,7 +1238,7 @@ def solve_mathematical_problem_manual(command: str) -> str:
             num1 = int(match.group(1))
             op = match.group(2)
             num2 = int(match.group(3))
-            
+
             if op == '+':
                 return f"{num1} + {num2} = {num1 + num2}"
             elif op == '-':
@@ -1253,7 +1252,7 @@ def solve_mathematical_problem_manual(command: str) -> str:
                     return "Division by zero is undefined."
     except:
         pass
-    
+
     # Common questions
     if '2 + 2' in command_lower:
         return "2 + 2 = 4"
@@ -1263,16 +1262,16 @@ def solve_mathematical_problem_manual(command: str) -> str:
         return "3⁴ = 81"
     if 'x^2 - 4 = 0' in command_lower:
         return "x² - 4 = 0 → x = ±2"
-    
+
     # Default clean response
     return "I can help with basic math! Try something like '15 times 23' or '2 + 2'."
-    
+
 def split_multiple_questions(command: str) -> list[str]:
     """Split a command into multiple separate questions"""
     # Normalize notation before splitting
     command = normalize_math_notation(command)
     questions = []
-    
+
     # Check for numbered questions (1. 2. 3. etc.) - improved pattern
     numbered_pattern = re.compile(r'\d+\.\s+', re.MULTILINE)
     if numbered_pattern.search(command):
@@ -1281,7 +1280,7 @@ def split_multiple_questions(command: str) -> list[str]:
         questions = [part.strip() for part in parts if part.strip()]
         if len(questions) > 1:
             return questions
-    
+
     # Check for line breaks as separators
     if '\n' in command and len(command.split('\n')) > 1:
         line_questions = [line.strip() for line in command.split('\n') if line.strip()]
@@ -1289,7 +1288,7 @@ def split_multiple_questions(command: str) -> list[str]:
         math_lines = [line for line in line_questions if is_mathematical_query(line)]
         if len(math_lines) > 1:
             return math_lines
-    
+
     # Check for separator keywords - improved order and patterns with punctuation
     separators = [' additionally, ', ' also, ', ' and what is, ', ' and calculate, ', ' and, ', ' plus, ', ' furthermore, ',
                   ' additionally ', ' also ', ' and what is ', ' and calculate ', ' and ', ' plus ', ' furthermore ']
@@ -1310,7 +1309,7 @@ def split_multiple_questions(command: str) -> list[str]:
                         math_parts.append(cleaned)
                 if len(math_parts) > 1:
                     return math_parts
-    
+
     # Check for repeated "What is" patterns without numbers
     what_is_pattern = re.compile(r'what is', re.IGNORECASE)
     if len(what_is_pattern.findall(command)) > 1:
@@ -1319,7 +1318,7 @@ def split_multiple_questions(command: str) -> list[str]:
         questions = [f"what is {part.strip()}" for part in parts if part.strip() and is_mathematical_query(f"what is {part.strip()}")]
         if len(questions) > 1:
             return questions
-    
+
     # If no clear separators found, treat as single question
     return [command]
 
@@ -1329,7 +1328,7 @@ def solve_mathematical_problem_with_engine(command: str) -> str:
     command = normalize_math_notation(command)
     try:
         command_lower = command.lower().strip()
-        
+
         # Algebraic operations
         if 'simplify' in command_lower:
             expr = extract_math_expression(command, 'simplify')
@@ -1340,7 +1339,7 @@ def solve_mathematical_problem_with_engine(command: str) -> str:
                     return f"{result.get('simplified', result.get('original', 'Unable to simplify'))}"
                 else:
                     return f"Error: {result['error']}"
-        
+
         elif 'factor' in command_lower:
             expr = extract_math_expression(command, 'factor')
             if expr:
@@ -1350,7 +1349,7 @@ def solve_mathematical_problem_with_engine(command: str) -> str:
                     return f"{result.get('factored', result.get('original', 'Unable to factor'))}"
                 else:
                     return f"Error: {result['error']}"
-        
+
         elif 'expand' in command_lower:
             expr = extract_math_expression(command, 'expand')
             if expr:
@@ -1360,7 +1359,7 @@ def solve_mathematical_problem_with_engine(command: str) -> str:
                     return f"{result.get('expanded', result.get('original', 'Unable to expand'))}"
                 else:
                     return f"Error: {result['error']}"
-        
+
         # Equation solving
         elif 'solve' in command_lower or '=' in command:
             if '=' in command:
@@ -1379,7 +1378,7 @@ def solve_mathematical_problem_with_engine(command: str) -> str:
                         return f"No solutions found for {equation}"
                 else:
                     return f"Error: {result['error']}"
-        
+
         # Calculus operations
         elif 'derivative' in command_lower or 'differentiate' in command_lower:
             expr = extract_math_expression(command, 'derivative')
@@ -1391,7 +1390,7 @@ def solve_mathematical_problem_with_engine(command: str) -> str:
                     return f"{result.get('derivative', 'Unable to compute derivative')}"
                 else:
                     return f"Error: {result['error']}"
-        
+
         elif 'integrate' in command_lower:
             expr = extract_math_expression(command, 'integrate')
             if expr:
@@ -1400,15 +1399,15 @@ def solve_mathematical_problem_with_engine(command: str) -> str:
                     return f"{result.get('integral', 'Unable to compute integral')}"
                 else:
                     return f"Error: {result['error']}"
-        
+
         # Matrix operations
         elif 'matrix' in command_lower or 'determinant' in command_lower:
             return "For matrix operations, specify matrix in format [[1,2],[3,4]] and operation"
-        
+
         # Statistics
         elif any(word in command_lower for word in ['mean', 'median', 'average', 'statistics']):
             return "For statistical calculations, provide data as a list of numbers"
-        
+
         # Default: Try to evaluate as a mathematical expression
         try:
             expr = extract_math_expression(command, 'calculate')
@@ -1416,7 +1415,7 @@ def solve_mathematical_problem_with_engine(command: str) -> str:
                 expr = extract_math_expression(command, 'compute')
             if not expr:
                 expr = extract_math_expression(command, 'what is')
-            
+
             if expr and any(char in expr for char in '0123456789+-*/^()xy.'):
                 computable_expr = to_computable_form(expr)
                 result = math_engine.simplify_expression(computable_expr)
@@ -1429,9 +1428,9 @@ def solve_mathematical_problem_with_engine(command: str) -> str:
                     return f"Error: {result['error']}"
         except Exception:
             pass
-        
+
         return solve_mathematical_problem_manual(command)
-        
+
     except Exception as e:
         return solve_mathematical_problem_manual(command)
 
@@ -1439,7 +1438,7 @@ def solve_mathematical_problem(command: str) -> str:
     """Process mathematical problems using the math engine or manual reasoning"""
     # Check for multiple questions
     questions = split_multiple_questions(command)
-    
+
     if len(questions) > 1:
         # Solve each question separately
         results = []
@@ -1455,11 +1454,11 @@ def solve_mathematical_problem(command: str) -> str:
                 result = solve_mathematical_problem_manual(question)
                 results.append(f"{i}. {result}")
         return "\n".join(results)
-    
+
     # Single question - proceed normally
     if not MATH_ENGINE_AVAILABLE:
         return solve_mathematical_problem_manual(command)
-    
+
     try:
         return solve_mathematical_problem_with_engine(command)
     except Exception as e:
@@ -1532,7 +1531,7 @@ def jai_reply(prompt: str, session: UserSession) -> str:
      # Add emotional intelligence guidance (silent, internal)
      if emotional_guidance:
          full_prompt += f"\n\nRESPONSE GUIDANCE: {emotional_guidance}"
-     
+
      messages = [
          {"role": "system", "content": full_prompt},
          {"role": "user", "content": prompt}
@@ -1943,7 +1942,7 @@ class VoiceCommandListener(threading.Thread):
 # -----------------------------
 def execute_command(command: str, session: UserSession, suppress_tts: bool = False) -> str:
     """Main command executor with carbon interface support."""
-  
+
     # Input validation
     if not command or not isinstance(command, str) or not command.strip():
         return "I didn't catch a message there. Type a question and I'll help."
@@ -1952,7 +1951,7 @@ def execute_command(command: str, session: UserSession, suppress_tts: bool = Fal
         command = command[:MAX_COMMAND_CHARS]
 
     command_lower = command.lower().strip()
-  
+
     # === CARBON FOOTPRINT COMMANDS ===
     if any(keyword in command_lower for keyword in ["carbon", "footprint", "co2"]):
         if "handle_carbon_command" in globals():
@@ -1992,7 +1991,7 @@ def execute_command(command: str, session: UserSession, suppress_tts: bool = Fal
         except Exception:
             pass
         return math_response
-    
+
     # Quick greetings - instant response like JARVIS
     if intent == "greeting":
         greetings = [

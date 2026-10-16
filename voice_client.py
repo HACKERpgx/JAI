@@ -67,7 +67,7 @@ class JAIVoiceClient:
         except Exception as e:
             logging.error("Open brightness settings failed: %s", e)
             return False
-    
+
     def _set_brightness(self, level: int) -> str:
         try:
             level = max(0, min(100, int(level)))
@@ -88,7 +88,7 @@ class JAIVoiceClient:
         except Exception as e:
             logging.error("Brightness set failed: %s", e)
             return "Failed to set brightness."
-    
+
     def send_command(self, command: str) -> str:
         """
         Send command to JAI server and get response.
@@ -182,7 +182,7 @@ class JAIVoiceClient:
                 except Exception as e2:
                     logging.error("TTS failed: %s", e2)
                 return True
-        
+
         # Send to JAI server
         response = self.send_command(command)
         logging.info("Response: %s", response)

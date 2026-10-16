@@ -10,7 +10,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!text) {
         return res.status(400).json({ error: "Missing text" });
       }
-      
+
       // Get or create default session
       let sessionId = parseInt(req.headers['x-session-id'] as string) || 1;
       try {
@@ -19,9 +19,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const session = await memoryService.createSession();
         sessionId = session.id;
       }
-      
+
       const result = await memoryService.sendMessage(sessionId, text);
-      res.json({ 
+      res.json({
         response: result.assistantMessage.content,
         sessionId: sessionId
       });
@@ -35,13 +35,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const sessionId = parseInt(req.params.sessionId);
       const session = await memoryService.getSession(sessionId);
       if (!session) return res.status(404).json({ error: "Session not found" });
-      
+
       const messages = session.messages.reverse().map(msg => ({
         role: msg.role,
         content: msg.content,
         timestamp: msg.createdAt
       }));
-      
+
       res.json({ messages, sessionId });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
@@ -106,7 +106,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // For now, just return a placeholder response
       // In a real implementation, this would process the audio file
       const transcript = "Voice message received (placeholder transcript)";
-      
+
       // Get or create default session
       let sessionId = parseInt(req.headers['x-session-id'] as string) || 1;
       try {
@@ -115,9 +115,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const session = await memoryService.createSession();
         sessionId = session.id;
       }
-      
+
       const result = await memoryService.sendMessage(sessionId, transcript);
-      res.json({ 
+      res.json({
         transcript: transcript,
         response: result.assistantMessage.content,
         sessionId: sessionId
@@ -130,8 +130,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Health check endpoint
   app.get("/api/health", async (_req, res) => {
     try {
-      res.json({ 
-        ok: true, 
+      res.json({
+        ok: true,
         time: new Date().toISOString(),
         version: "1.0.0"
       });

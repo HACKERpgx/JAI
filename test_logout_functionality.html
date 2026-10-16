@@ -73,7 +73,7 @@
 </head>
 <body>
     <h1>🚪 Logout Functionality Test</h1>
-    
+
     <div class="test-container">
         <h2>Test Instructions</h2>
         <div class="test-step" id="step1">
@@ -181,23 +181,23 @@
         async function testLogout() {
             logTest('Testing logout functionality...');
             updateStepStatus('step2', 'completed');
-            
+
             try {
                 // Clear UI messages
                 document.getElementById('messages').innerHTML = '';
                 logTest('Cleared UI messages');
-                
+
                 // Clear localStorage
                 localStorage.removeItem(SESSION_KEY);
                 localStorage.removeItem(MESSAGES_KEY);
                 logTest('Cleared localStorage');
-                
+
                 // Call logout endpoint
                 const response = await fetch((localStorage.getItem(LS_KEY) || 'https://j-ai.top') + '/api/logout', {
                     method: 'POST',
                     credentials: 'include'
                 });
-                
+
                 if (response.ok) {
                     logTest('Server logout successful');
                     updateStatus('sessionStatus', '✅ Logout successful - session cleared', 'success');
@@ -206,11 +206,11 @@
                     logTest(`Server logout failed: ${response.status}`);
                     updateStatus('sessionStatus', '⚠️ Local logout completed, server may still have session', 'warning');
                 }
-                
+
                 // Reset session
                 sessionId = null;
                 messageCount = 0;
-                
+
                 // Start new session after delay
                 setTimeout(() => {
                     sessionId = 'test_' + Date.now();
@@ -219,7 +219,7 @@
                     addMessage('system', 'New session started after logout');
                     updateStatus('sessionStatus', '🆕 New session created', 'success');
                 }, 1500);
-                
+
             } catch (e) {
                 logTest(`Logout error: ${e.message}`);
                 updateStatus('sessionStatus', '❌ Logout failed', 'error');
@@ -229,16 +229,16 @@
 
         function testCrossTabLogout() {
             logTest('Testing cross-tab logout synchronization...');
-            
+
             const logoutData = {
                 type: 'logout',
                 sessionId: sessionId,
                 timestamp: Date.now()
             };
-            
+
             localStorage.setItem(SYNC_CHANNEL, JSON.stringify(logoutData));
             localStorage.removeItem(SYNC_CHANNEL);
-            
+
             logTest('Cross-tab logout event triggered');
             updateStepStatus('step4', 'completed');
         }
@@ -246,7 +246,7 @@
         function checkSession() {
             sessionId = localStorage.getItem(SESSION_KEY);
             const messages = localStorage.getItem(MESSAGES_KEY);
-            
+
             if (sessionId) {
                 updateStatus('sessionStatus', `✅ Active session: ${sessionId}`, 'success');
                 logTest(`Found existing session: ${sessionId}`);
@@ -254,7 +254,7 @@
                 updateStatus('sessionStatus', '⚠️ No active session', 'warning');
                 logTest('No existing session found');
             }
-            
+
             if (messages) {
                 logTest(`Found ${messages.length} characters of stored messages`);
             } else {
@@ -268,7 +268,7 @@
                 const key = localStorage.key(i);
                 storage[key] = localStorage.getItem(key);
             }
-            
+
             const storageText = JSON.stringify(storage, null, 2);
             updateStatus('storageStatus', `Storage keys: ${Object.keys(storage).join(', ')}`, 'info');
             logTest(`Storage contains ${Object.keys(storage).length} items`);
@@ -286,21 +286,21 @@
             const input = document.getElementById('testInput');
             const text = input.value.trim();
             if (!text) return;
-            
+
             input.value = '';
             addMessage('user', text);
             updateStepStatus('step1', 'completed');
-            
+
             try {
                 const response = await fetch((localStorage.getItem(LS_KEY) || 'https://j-ai.top') + '/api/text', {
                     method: 'POST',
-                    headers: { 
+                    headers: {
                         'Content-Type': 'application/json',
                         'X-Session-ID': sessionId || 'test_session'
                     },
                     body: JSON.stringify({ text })
                 });
-                
+
                 if (response.ok) {
                     const data = await response.json();
                     addMessage('assistant', data.response || 'No response');

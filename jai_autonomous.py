@@ -194,7 +194,7 @@ class TaskPlanner:
         """Plan for email tasks"""
         plan = []
         text_lower = intent.text.lower()
-        
+
         if 'send' in text_lower:
             plan.append({
                 'action': 'send_email',
@@ -206,14 +206,14 @@ class TaskPlanner:
                 },
                 'description': 'Send email'
             })
-        
+
         return plan
 
     def _plan_calendar_task(self, intent: Intent) -> List[Dict[str, Any]]:
         """Plan for calendar tasks"""
         plan = []
         text_lower = intent.text.lower()
-        
+
         if 'create' in text_lower or 'add' in text_lower or 'schedule' in text_lower:
             if 'event' in text_lower or 'meeting' in text_lower or 'reminder' in text_lower:
                 plan.append({
@@ -230,9 +230,9 @@ class TaskPlanner:
                     'params': {'days': 7},
                     'description': 'Get upcoming events'
                 })
-        
+
         return plan
-    
+
     def _plan_query_task(self, intent: Intent) -> List[Dict[str, Any]]:
         """Plan for query intents"""
         plan = []

@@ -10,7 +10,7 @@
   const SYNC_CHANNEL = 'jai_sync_channel';
   const EMPTY_MESSAGE_TEXT = "Type a message first and I'll help.";
   const SEND_ERROR_TEXT = "I had trouble sending that. Please try again in a moment.";
-  
+
   // Cross-tab sync variables
   let currentSessionId = null;
   let lastMessageTimestamp = null;
@@ -95,7 +95,7 @@
       message: messageData,
       timestamp: Date.now()
     };
-    
+
     localStorage.setItem(SYNC_CHANNEL, JSON.stringify(syncData));
     // Remove the item to trigger the storage event in other tabs
     localStorage.removeItem(SYNC_CHANNEL);
@@ -120,7 +120,7 @@
 
   async function fetchLatestMessages() {
     if (!currentSessionId) return;
-    
+
     try {
       const response = await fetch(getBase() + '/api/messages/' + currentSessionId);
       if (response.ok) {
@@ -137,10 +137,10 @@
 
   function updateMessagesDisplay(serverMessages) {
     if (!serverMessages || !Array.isArray(serverMessages)) return;
-    
+
     // Clear current messages
     messages.innerHTML = '';
-    
+
     // Add messages from server
     serverMessages.forEach(msg => {
       const who = msg.role === 'user' ? 'You' : 'JAI';
@@ -153,7 +153,7 @@
     if (syncPollingInterval) {
       clearInterval(syncPollingInterval);
     }
-    
+
     syncPollingInterval = setInterval(() => {
       fetchLatestMessages();
     }, 5000);
@@ -210,32 +210,32 @@
     try {
       // Stop sync polling
       stopSyncPolling();
-      
+
       // Clear UI messages
       if (messages) {
         messages.innerHTML = '';
       }
-      
+
       // Clear localStorage
       localStorage.removeItem(SESSION_KEY);
       localStorage.removeItem(MESSAGES_KEY);
-      
+
       // Reset session variables
       currentSessionId = null;
       lastMessageTimestamp = null;
-      
+
       // Notify server
       const response = await fetch(getBase() + '/api/logout', {
         method: 'POST',
         credentials: 'include'
       });
-      
+
       if (response.ok) {
         addMsg('System', '👋 You have been logged out. Session cleared successfully.');
-        
+
         // Trigger logout sync event for other tabs
         triggerLogoutSync();
-        
+
         // Generate new session ID for fresh start
         setTimeout(() => {
           initializeSession();
@@ -258,7 +258,7 @@
       sessionId: currentSessionId,
       timestamp: Date.now()
     };
-    
+
     localStorage.setItem(SYNC_CHANNEL, JSON.stringify(logoutData));
     localStorage.removeItem(SYNC_CHANNEL);
   }
@@ -266,22 +266,22 @@
   function handleLogoutSync() {
     // Handle logout event from other tabs
     stopSyncPolling();
-    
+
     // Clear UI
     if (messages) {
       messages.innerHTML = '';
     }
-    
+
     // Clear localStorage
     localStorage.removeItem(SESSION_KEY);
     localStorage.removeItem(MESSAGES_KEY);
-    
+
     // Reset variables
     currentSessionId = null;
     lastMessageTimestamp = null;
-    
+
     addMsg('System', '🔄 Session synchronized from another tab. Starting fresh session...');
-    
+
     // Reinitialize after delay
     setTimeout(() => {
       initializeSession();
@@ -330,18 +330,18 @@
       addMsg('JAI', EMPTY_MESSAGE_TEXT);
       return;
     }
-    
+
     if (!currentSessionId) {
       initializeSession();
     }
-    
+
     addMsg('You', text);
     textInput.value = '';
-    
+
     try{
       const res = await fetch(getBase() + '/api/text', {
         method: 'POST',
-        headers: { 
+        headers: {
           'Content-Type': 'application/json',
           'X-Session-ID': currentSessionId
         },
@@ -349,22 +349,22 @@
       });
       const data = await res.json();
       if(!res.ok) throw new Error(data.error || data.detail || 'send_failed');
-      
+
       // Update session ID if server returned a new one
       if (data.sessionId && data.sessionId !== currentSessionId) {
         currentSessionId = data.sessionId;
         localStorage.setItem(SESSION_KEY, currentSessionId);
       }
-      
+
       addMsg('JAI', data.response || SEND_ERROR_TEXT);
-      
+
       // Trigger sync event for other tabs
       triggerSyncEvent({
         role: 'user',
         content: text,
         timestamp: Date.now()
       });
-      
+
       // Also trigger for the assistant response
       setTimeout(() => {
         triggerSyncEvent({
@@ -373,7 +373,7 @@
           timestamp: Date.now()
         });
       }, 100);
-      
+
     }catch(e){
       addMsg('JAI', SEND_ERROR_TEXT);
     }
@@ -507,7 +507,7 @@
       if (!currentSessionId) {
         initializeSession();
       }
-      
+
       const fd = new FormData();
       const fname = (blob.type && blob.type.includes('ogg')) ? 'voice.ogg' : 'voice.webm';
       fd.append('file', blob, fname);
@@ -534,11 +534,11 @@
         currentSessionId = data.sessionId;
         localStorage.setItem(SESSION_KEY, currentSessionId);
       }
-      
+
       if(data && (data.transcript || data.response)){
         if(data.transcript){ 
           addMsg('You', data.transcript);
-          
+
           // Trigger sync event for transcript
           triggerSyncEvent({
             role: 'user',
@@ -548,14 +548,14 @@
         }
         if(data.response){ 
           addMsg('JAI', data.response); 
-          
+
           // Trigger sync event for response
           triggerSyncEvent({
             role: 'assistant',
             content: data.response,
             timestamp: Date.now()
           });
-          
+
           // Trigger text-to-speech if available
           if(window.speechSynthesis && data.response) {
             speakResponse(data.response);
@@ -788,10 +788,10 @@
     
     // Initialize session and cross-tab sync
     initializeSession();
-    
+
     // Set up storage event listener for cross-tab sync
     window.addEventListener('storage', handleStorageEvent);
-    
+
     // Load existing messages from storage or server
     const storedMessages = loadMessagesFromStorage();
     if (storedMessages.length > 0) {
@@ -800,10 +800,10 @@
       // Try to fetch from server if we have a session
       fetchLatestMessages();
     }
-    
+
     // Start polling for new messages
     startSyncPolling();
-    
+
     // Initialize event listeners
     initializeEventListeners();
     

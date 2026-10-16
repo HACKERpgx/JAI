@@ -114,11 +114,11 @@
     <div class="test-container">
         <h1>Authentication Modal Fix Test</h1>
         <p>This test verifies that the Sign Up/Sign In buttons reset properly when the modal is closed and reopened.</p>
-        
+
         <button class="test-btn" onclick="openModal()">Open Auth Modal</button>
         <button class="test-btn" onclick="simulateSignUp()">Simulate Sign Up (sets disabled state)</button>
         <button class="test-btn" onclick="checkButtonState()">Check Button State</button>
-        
+
         <div id="testResult" class="test-result" style="display: none;"></div>
     </div>
 
@@ -127,12 +127,12 @@
         <div class="auth-panel">
             <button class="close-btn" onclick="hideAuthModal()">×</button>
             <h2>Authentication</h2>
-            
+
             <div class="auth-tabs">
                 <button class="auth-tab active" id="tabSignin" onclick="switchAuthTab('signin')">Sign In</button>
                 <button class="auth-tab" id="tabSignup" onclick="switchAuthTab('signup')">Sign Up</button>
             </div>
-            
+
             <form class="auth-form" onsubmit="return false;">
                 <input type="email" class="auth-input" placeholder="Email" required>
                 <input type="password" class="auth-input" placeholder="Password" required>
@@ -150,13 +150,13 @@
         function hideAuthModal() {
             document.getElementById('authModal').classList.remove('active');
             document.querySelector('.auth-form').reset();
-            
+
             // Reset button state (THE FIX)
             const submit = document.getElementById('authSubmit');
             submit.disabled = false;
             const isSignup = document.getElementById('tabSignup').classList.contains('active');
             submit.textContent = isSignup ? 'Sign Up' : 'Sign In';
-            
+
             showResult('Modal closed. Button state should be reset.');
         }
 
@@ -164,7 +164,7 @@
             const tabSignin = document.getElementById('tabSignin');
             const tabSignup = document.getElementById('tabSignup');
             const submit = document.getElementById('authSubmit');
-            
+
             if (tab === 'signin') {
                 tabSignin.classList.add('active');
                 tabSignup.classList.remove('active');

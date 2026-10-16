@@ -2,7 +2,7 @@
 def handle_carbon_command(command: str, session) -> str:
     """Simple carbon footprint handler"""
     cmd = command.lower()
-    
+
     if "driving" in cmd or "car" in cmd:
         return "Driving a car for 100 km produces approximately 20-25 kg of CO2 (depending on the car type)."
     elif "flight" in cmd or "flying" in cmd:

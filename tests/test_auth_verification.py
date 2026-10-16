@@ -40,7 +40,9 @@ class SupabaseTokenVerificationTests(unittest.TestCase):
 
     def test_rejects_tampered_token(self):
         token = self.token()
-        token = token[:-1] + ("A" if token[-1] != "A" else "B")
+        header, payload, signature = token.split(".")
+        tampered_first_char = "A" if signature[0] != "A" else "B"
+        token = f"{header}.{payload}.{tampered_first_char}{signature[1:]}"
         self.assertIsNone(self.verify(token))
 
     def test_rejects_wrong_issuer(self):

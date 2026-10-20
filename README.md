@@ -258,6 +258,7 @@ Built with:
 - pyttsx3
 
 <img width="1366" height="730" alt="image" src="https://github.com/user-attachments/assets/e1af0035-3df0-4c75-8261-593e377963b3" />
+<img width="1366" height="725" alt="image" src="https://github.com/user-attachments/assets/ac6a3638-52aa-4695-a427-f24e0642bafb" />
 
 - SpeechRecognition
 - deep-translator

@@ -256,6 +256,9 @@ Built with:
 - OpenAI GPT-4o-mini (via OpenRouter)
 - FastAPI
 - pyttsx3
+
+<img width="1366" height="730" alt="image" src="https://github.com/user-attachments/assets/e1af0035-3df0-4c75-8261-593e377963b3" />
+
 - SpeechRecognition
 - deep-translator
 

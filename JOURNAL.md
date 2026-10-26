@@ -21,7 +21,7 @@ For **Week 4 (Displays Week)** of the Half-Life Hackathon, we are expanding JAI'
 *Caption: Primary workspace layout showing the display mat location and local system running the JAI core.*
 
 ### Setup Photo 2: Spatial HUD Interface Prototype
-![HUD Interface Preview](https://via.placeholder.com/600x400.png?text=Add+Photo+2:+JAI+HUD+UI+Preview+Here)
+<img width="1366" height="768" alt="image" src="https://github.com/user-attachments/assets/c7a7d16a-0706-4531-8a19-6841cdf05b09" />
 *Caption: Initial software render of the JAI HUD telemetry display and visual feedback widgets.*
 
 ---

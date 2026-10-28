@@ -1,7 +1,12 @@
 import tkinter as tk
 import random
 import time
-import psutil  # If psutil is installed; fallback handles standard math if not
+
+try:
+    import psutil
+    PSUTIL_AVAILABLE = True
+except ImportError:
+    PSUTIL_AVAILABLE = False
 
 class JAIHUD(tk.Tk):
     def __init__(self):
@@ -88,19 +93,23 @@ class JAIHUD(tk.Tk):
         self.animate_waveform()
 
     def update_telemetry(self):
-        try:
-            cpu = psutil.cpu_percent()
-            ram = psutil.virtual_memory()
-            ram_used = round(ram.used / (1024**3), 1)
-            ram_total = round(ram.total / (1024**3), 1)
-            ram_pct = ram.percent
-            self.cpu_label.config(text=f"CPU LOAD: {cpu}%")
-            self.ram_label.config(text=f"MEMORY ALLOCATION: {ram_used} / {ram_total} GB ({ram_pct}%)")
-        except Exception:
-            # Fallback if psutil is not installed
+        if PSUTIL_AVAILABLE:
+            try:
+                cpu = psutil.cpu_percent()
+                ram = psutil.virtual_memory()
+                ram_used = round(ram.used / (1024**3), 1)
+                ram_total = round(ram.total / (1024**3), 1)
+                ram_pct = ram.percent
+                self.cpu_label.config(text=f"CPU LOAD: {cpu}%")
+                self.ram_label.config(text=f"MEMORY ALLOCATION: {ram_used} / {ram_total} GB ({ram_pct}%)")
+            except Exception:
+                cpu = round(random.uniform(15.0, 35.0), 1)
+                self.cpu_label.config(text=f"CPU LOAD: {cpu}%")
+                self.ram_label.config(text=f"MEMORY ALLOCATION: 4.8 / 16.0 GB (30%)")
+        else:
             cpu = round(random.uniform(15.0, 35.0), 1)
             self.cpu_label.config(text=f"CPU LOAD: {cpu}%")
-            self.ram_label.config(text=f"MEMORY ALLOCATION: 4.8 / 16.0 GB (30%)")
+            self.ram_label.config(text=f"MEMORY ALLOCATION: 4.8 / 16.0 GB (30%) (Simulated)")
             
         self.after(1000, self.update_telemetry)
 

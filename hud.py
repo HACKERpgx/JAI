@@ -105,6 +105,21 @@ class JAIHUD(tk.Tk):
         self.update_telemetry()
         self.animate_waveform()
 
+    # Bind F11 for Fullscreen Holographic Mode toggle
+        self.bind("<F11>", self.toggle_fullscreen)
+        self.bind("<Escape>", self.end_fullscreen)
+        self.is_fullscreen = False
+
+    def toggle_fullscreen(self, event=None):
+        self.is_fullscreen = not self.is_fullscreen
+        self.attributes("-fullscreen", self.is_fullscreen)
+        self.status_label.config(text=f"STATUS: HOLOGRAPHIC PROJECTION MODE // FULLSCREEN: {self.is_fullscreen}")
+
+    def end_fullscreen(self, event=None):
+        self.is_fullscreen = False
+        self.attributes("-fullscreen", False)
+        self.status_label.config(text="STATUS: HOLOGRAPHIC PROJECTION MODE // WINDOWED")
+
     def update_telemetry(self):
         if PSUTIL_AVAILABLE:
             try:

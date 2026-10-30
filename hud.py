@@ -11,14 +11,14 @@ except ImportError:
 class JAIHUD(tk.Tk):
     def __init__(self):
         super().__init__()
-        self.title("J.A.I. Spatial HUD Interface - v2.0")
-        self.geometry("850x580")
+        self.title("J.A.I. Spatial HUD Interface - v3.0")
+        self.geometry("850x640")
         self.configure(bg="#050b14")
         
         # Header Title
         title_label = tk.Label(
             self, 
-            text="J.A.I. // SPATIAL HUD SYSTEM v2.0", 
+            text="J.A.I. // SPATIAL HUD SYSTEM v3.0", 
             font=("Courier", 18, "bold"), 
             fg="#00f3ff", 
             bg="#050b14"
@@ -31,7 +31,7 @@ class JAIHUD(tk.Tk):
         
         self.status_label = tk.Label(
             status_frame, 
-            text="STATUS: LIVE TELEMETRY BUS ACTIVE // LISTENING FOR VOICE & GESTURE", 
+            text="STATUS: INTERACTIVE CONTROL BUS ACTIVE // WAITING FOR INPUT", 
             font=("Courier", 10, "bold"), 
             fg="#00ff66", 
             bg="#0a192f"
@@ -72,16 +72,29 @@ class JAIHUD(tk.Tk):
         )
         self.net_label.pack(fill="x", pady=4)
 
-        # Audio Waveform Visualizer Canvas (Voice Waveform)
+        # Audio Waveform Visualizer Canvas
         tk.Label(telemetry_frame, text="AUDIO / VOICE INPUT SPECTRUM:", font=("Courier", 9, "bold"), fg="#8892b0", bg="#050b14", anchor="w").pack(fill="x", pady=(10, 2))
         
-        self.canvas = tk.Canvas(telemetry_frame, height=80, bg="#02070f", highlightthickness=1, highlightbackground="#00f3ff")
+        self.canvas = tk.Canvas(telemetry_frame, height=70, bg="#02070f", highlightthickness=1, highlightbackground="#00f3ff")
         self.canvas.pack(fill="x", pady=5)
+
+        # Action Buttons Frame (Simulating Touch/Gesture Interaction)
+        button_frame = tk.Frame(telemetry_frame, bg="#050b14")
+        button_frame.pack(fill="x", pady=15)
+        
+        btn_1 = tk.Button(button_frame, text="[ LAUNCH JAI CORE ]", bg="#0a192f", fg="#00f3ff", font=("Courier", 10, "bold"), relief="solid", bd=1, padx=10, pady=5)
+        btn_1.pack(side="left", padx=5)
+        
+        btn_2 = tk.Button(button_frame, text="[ TOGGLE HOLO-MAT ]", bg="#0a192f", fg="#00ff66", font=("Courier", 10, "bold"), relief="solid", bd=1, padx=10, pady=5)
+        btn_2.pack(side="left", padx=5)
+        
+        btn_3 = tk.Button(button_frame, text="[ SYSTEM DIAGNOSTIC ]", bg="#0a192f", fg="#ff0055", font=("Courier", 10, "bold"), relief="solid", bd=1, padx=10, pady=5)
+        btn_3.pack(side="left", padx=5)
         
         # Footer
         footer_label = tk.Label(
             self, 
-            text="[HALF-LIFE HACKATHON // WEEK 4 ENTRY 2: REAL-TIME TELEMETRY & AUDIO WAVEFORM]", 
+            text="[HALF-LIFE HACKATHON // WEEK 4 ENTRY 3: INTERACTIVE HUD BUTTONS]", 
             font=("Courier", 9), 
             fg="#8892b0", 
             bg="#050b14"
@@ -131,18 +144,6 @@ class JAIHUD(tk.Tk):
                 self.canvas.create_rectangle(x0, y0, x1, y1, fill=color, outline="")
                 
         self.after(150, self.animate_waveform)
-# Action Buttons Frame (Simulating Touch/Gesture Interaction)
-        button_frame = tk.Frame(telemetry_frame, bg="#050b14")
-        button_frame.pack(fill="x", pady=15)
-        
-        btn_1 = tk.Button(button_frame, text="[ LAUNCH JAI CORE ]", bg="#0a192f", fg="#00f3ff", font=("Courier", 10, "bold"), relief="solid", bd=1, padx=10, pady=5)
-        btn_1.pack(side="left", padx=5)
-        
-        btn_2 = tk.Button(button_frame, text="[ TOGGLE HOLO-MAT ]", bg="#0a192f", fg="#00ff66", font=("Courier", 10, "bold"), relief="solid", bd=1, padx=10, pady=5)
-        btn_2.pack(side="left", padx=5)
-        
-        btn_3 = tk.Button(button_frame, text="[ SYSTEM DIAGNOSTIC ]", bg="#0a192f", fg="#ff0055", font=("Courier", 10, "bold"), relief="solid", bd=1, padx=10, pady=5)
-        btn_3.pack(side="left", padx=5)
 
 if __name__ == "__main__":
     app = JAIHUD()

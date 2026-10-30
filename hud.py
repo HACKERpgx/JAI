@@ -131,6 +131,18 @@ class JAIHUD(tk.Tk):
                 self.canvas.create_rectangle(x0, y0, x1, y1, fill=color, outline="")
                 
         self.after(150, self.animate_waveform)
+# Action Buttons Frame (Simulating Touch/Gesture Interaction)
+        button_frame = tk.Frame(telemetry_frame, bg="#050b14")
+        button_frame.pack(fill="x", pady=15)
+        
+        btn_1 = tk.Button(button_frame, text="[ LAUNCH JAI CORE ]", bg="#0a192f", fg="#00f3ff", font=("Courier", 10, "bold"), relief="solid", bd=1, padx=10, pady=5)
+        btn_1.pack(side="left", padx=5)
+        
+        btn_2 = tk.Button(button_frame, text="[ TOGGLE HOLO-MAT ]", bg="#0a192f", fg="#00ff66", font=("Courier", 10, "bold"), relief="solid", bd=1, padx=10, pady=5)
+        btn_2.pack(side="left", padx=5)
+        
+        btn_3 = tk.Button(button_frame, text="[ SYSTEM DIAGNOSTIC ]", bg="#0a192f", fg="#ff0055", font=("Courier", 10, "bold"), relief="solid", bd=1, padx=10, pady=5)
+        btn_3.pack(side="left", padx=5)
 
 if __name__ == "__main__":
     app = JAIHUD()

@@ -11,14 +11,14 @@ except ImportError:
 class JAIHUD(tk.Tk):
     def __init__(self):
         super().__init__()
-        self.title("J.A.I. Spatial HUD Interface - v3.0")
+        self.title("J.A.I. Spatial HUD Interface - v3.5")
         self.geometry("850x640")
         self.configure(bg="#050b14")
         
         # Header Title
         title_label = tk.Label(
             self, 
-            text="J.A.I. // SPATIAL HUD SYSTEM v3.0", 
+            text="J.A.I. // SPATIAL HUD SYSTEM v3.5", 
             font=("Courier", 18, "bold"), 
             fg="#00f3ff", 
             bg="#050b14"
@@ -38,7 +38,7 @@ class JAIHUD(tk.Tk):
         )
         self.status_label.pack(padx=20, pady=12)
         
-        # Telemetry Frame (MUST be defined here first!)
+        # Telemetry Frame
         telemetry_frame = tk.Frame(self, bg="#050b14")
         telemetry_frame.pack(fill="both", expand=True, padx=40, pady=10)
         
@@ -78,33 +78,7 @@ class JAIHUD(tk.Tk):
         self.canvas = tk.Canvas(telemetry_frame, height=70, bg="#02070f", highlightthickness=1, highlightbackground="#00f3ff")
         self.canvas.pack(fill="x", pady=5)
 
-        # Action Buttons Frame (Correctly placed inside __init__)
-        button_frame = tk.Frame(telemetry_frame, bg="#050b14")
-        button_frame.pack(fill="x", pady=15)
-        
-        btn_1 = tk.Button(button_frame, text="[ LAUNCH JAI CORE ]", bg="#0a192f", fg="#00f3ff", font=("Courier", 10, "bold"), relief="solid", bd=1, padx=10, pady=5)
-        btn_1.pack(side="left", padx=5)
-        
-        btn_2 = tk.Button(button_frame, text="[ TOGGLE HOLO-MAT ]", bg="#0a192f", fg="#00ff66", font=("Courier", 10, "bold"), relief="solid", bd=1, padx=10, pady=5)
-        btn_2.pack(side="left", padx=5)
-        
-        btn_3 = tk.Button(button_frame, text="[ SYSTEM DIAGNOSTIC ]", bg="#0a192f", fg="#ff0055", font=("Courier", 10, "bold"), relief="solid", bd=1, padx=10, pady=5)
-        btn_3.pack(side="left", padx=5)
-        
-        # Footer
-        footer_label = tk.Label(
-            self, 
-            text="[HALF-LIFE HACKATHON // WEEK 4 ENTRY 3: INTERACTIVE HUD BUTTONS]", 
-            font=("Courier", 9), 
-            fg="#8892b0", 
-            bg="#050b14"
-        )
-        footer_label.pack(side="bottom", pady=10)
-        
-        # Start loops
-        self.update_telemetry()
-        self.animate_waveform()
-# Action Buttons Frame (With Working Click Commands)
+        # Action Buttons Frame (With Working Click Commands)
         button_frame = tk.Frame(telemetry_frame, bg="#050b14")
         button_frame.pack(fill="x", pady=15)
         
@@ -116,7 +90,27 @@ class JAIHUD(tk.Tk):
         
         btn_3 = tk.Button(button_frame, text="[ SYSTEM DIAGNOSTIC ]", bg="#0a192f", fg="#ff0055", font=("Courier", 10, "bold"), relief="solid", bd=1, padx=10, pady=5, command=self.run_diagnostic)
         btn_3.pack(side="left", padx=5)
-        def launch_core(self):
+        
+        # Footer
+        footer_label = tk.Label(
+            self, 
+            text="[HALF-LIFE HACKATHON // WEEK 4 ENTRY 5: INTERACTIVE COMMAND BUTTONS]", 
+            font=("Courier", 9), 
+            fg="#8892b0", 
+            bg="#050b14"
+        )
+        footer_label.pack(side="bottom", pady=10)
+        
+        # Bind F11 for Fullscreen Holographic Mode toggle
+        self.bind("<F11>", self.toggle_fullscreen)
+        self.bind("<Escape>", self.end_fullscreen)
+        self.is_fullscreen = False
+
+        # Start loops
+        self.update_telemetry()
+        self.animate_waveform()
+
+    def launch_core(self):
         self.status_label.config(text="STATUS: J.A.I. CORE ENGAGED // NEURAL MODULES ONLINE")
 
     def toggle_holo(self, event=None):
@@ -130,11 +124,6 @@ class JAIHUD(tk.Tk):
 
     def run_diagnostic(self):
         self.status_label.config(text="STATUS: DIAGNOSTIC COMPLETE // ALL SUBSYSTEMS NOMINAL")
-        
-    # Bind F11 for Fullscreen Holographic Mode toggle
-        self.bind("<F11>", self.toggle_fullscreen)
-        self.bind("<Escape>", self.end_fullscreen)
-        self.is_fullscreen = False
 
     def toggle_fullscreen(self, event=None):
         self.is_fullscreen = not self.is_fullscreen

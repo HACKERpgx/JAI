@@ -11,14 +11,14 @@ except ImportError:
 class JAIHUD(tk.Tk):
     def __init__(self):
         super().__init__()
-        self.title("J.A.I. Spatial HUD Interface - v3.5")
-        self.geometry("850x640")
+        self.title("J.A.I. Spatial HUD Interface - v4.0")
+        self.geometry("920x640")
         self.configure(bg="#050b14")
         
         # Header Title
         title_label = tk.Label(
             self, 
-            text="J.A.I. // SPATIAL HUD SYSTEM v3.5", 
+            text="J.A.I. // SPATIAL HUD SYSTEM v4.0", 
             font=("Courier", 18, "bold"), 
             fg="#00f3ff", 
             bg="#050b14"
@@ -78,23 +78,26 @@ class JAIHUD(tk.Tk):
         self.canvas = tk.Canvas(telemetry_frame, height=70, bg="#02070f", highlightthickness=1, highlightbackground="#00f3ff")
         self.canvas.pack(fill="x", pady=5)
 
-        # Action Buttons Frame (With Working Click Commands)
+        # Action Buttons Frame (Expanded with Reset Logs Feature)
         button_frame = tk.Frame(telemetry_frame, bg="#050b14")
         button_frame.pack(fill="x", pady=15)
         
-        btn_1 = tk.Button(button_frame, text="[ LAUNCH JAI CORE ]", bg="#0a192f", fg="#00f3ff", font=("Courier", 10, "bold"), relief="solid", bd=1, padx=10, pady=5, command=self.launch_core)
-        btn_1.pack(side="left", padx=5)
+        btn_1 = tk.Button(button_frame, text="[ LAUNCH JAI CORE ]", bg="#0a192f", fg="#00f3ff", font=("Courier", 9, "bold"), relief="solid", bd=1, padx=8, pady=5, command=self.launch_core)
+        btn_1.pack(side="left", padx=4)
         
-        btn_2 = tk.Button(button_frame, text="[ TOGGLE HOLO-MAT ]", bg="#0a192f", fg="#00ff66", font=("Courier", 10, "bold"), relief="solid", bd=1, padx=10, pady=5, command=self.toggle_holo)
-        btn_2.pack(side="left", padx=5)
+        btn_2 = tk.Button(button_frame, text="[ TOGGLE HOLO-MAT ]", bg="#0a192f", fg="#00ff66", font=("Courier", 9, "bold"), relief="solid", bd=1, padx=8, pady=5, command=self.toggle_holo)
+        btn_2.pack(side="left", padx=4)
         
-        btn_3 = tk.Button(button_frame, text="[ SYSTEM DIAGNOSTIC ]", bg="#0a192f", fg="#ff0055", font=("Courier", 10, "bold"), relief="solid", bd=1, padx=10, pady=5, command=self.run_diagnostic)
-        btn_3.pack(side="left", padx=5)
+        btn_3 = tk.Button(button_frame, text="[ SYSTEM DIAGNOSTIC ]", bg="#0a192f", fg="#ff0055", font=("Courier", 9, "bold"), relief="solid", bd=1, padx=8, pady=5, command=self.run_diagnostic)
+        btn_3.pack(side="left", padx=4)
+        
+        btn_4 = tk.Button(button_frame, text="[ RESET LOGS ]", bg="#0a192f", fg="#ffaa00", font=("Courier", 9, "bold"), relief="solid", bd=1, padx=8, pady=5, command=self.reset_logs)
+        btn_4.pack(side="left", padx=4)
         
         # Footer
         footer_label = tk.Label(
             self, 
-            text="[HALF-LIFE HACKATHON // WEEK 4 ENTRY 5: INTERACTIVE COMMAND BUTTONS]", 
+            text="[HALF-LIFE HACKATHON // WEEK 4 ENTRY 6: TELEMETRY BUFFER EXPANSION]", 
             font=("Courier", 9), 
             fg="#8892b0", 
             bg="#050b14"
@@ -124,6 +127,9 @@ class JAIHUD(tk.Tk):
 
     def run_diagnostic(self):
         self.status_label.config(text="STATUS: DIAGNOSTIC COMPLETE // ALL SUBSYSTEMS NOMINAL")
+
+    def reset_logs(self):
+        self.status_label.config(text="STATUS: TELEMETRY BUFFER CLEARED // RE-CALIBRATING FEED")
 
     def toggle_fullscreen(self, event=None):
         self.is_fullscreen = not self.is_fullscreen

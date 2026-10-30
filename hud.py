@@ -104,7 +104,33 @@ class JAIHUD(tk.Tk):
         # Start loops
         self.update_telemetry()
         self.animate_waveform()
+# Action Buttons Frame (With Working Click Commands)
+        button_frame = tk.Frame(telemetry_frame, bg="#050b14")
+        button_frame.pack(fill="x", pady=15)
+        
+        btn_1 = tk.Button(button_frame, text="[ LAUNCH JAI CORE ]", bg="#0a192f", fg="#00f3ff", font=("Courier", 10, "bold"), relief="solid", bd=1, padx=10, pady=5, command=self.launch_core)
+        btn_1.pack(side="left", padx=5)
+        
+        btn_2 = tk.Button(button_frame, text="[ TOGGLE HOLO-MAT ]", bg="#0a192f", fg="#00ff66", font=("Courier", 10, "bold"), relief="solid", bd=1, padx=10, pady=5, command=self.toggle_holo)
+        btn_2.pack(side="left", padx=5)
+        
+        btn_3 = tk.Button(button_frame, text="[ SYSTEM DIAGNOSTIC ]", bg="#0a192f", fg="#ff0055", font=("Courier", 10, "bold"), relief="solid", bd=1, padx=10, pady=5, command=self.run_diagnostic)
+        btn_3.pack(side="left", padx=5)
+        def launch_core(self):
+        self.status_label.config(text="STATUS: J.A.I. CORE ENGAGED // NEURAL MODULES ONLINE")
 
+    def toggle_holo(self, event=None):
+        current_bg = self.cget("bg")
+        if current_bg == "#050b14":
+            self.configure(bg="#021024")
+            self.status_label.config(text="STATUS: HOLO-MAT OVERLAY ACTIVATED (HIGH CONTRAST)")
+        else:
+            self.configure(bg="#050b14")
+            self.status_label.config(text="STATUS: HOLO-MAT OVERLAY STANDARD")
+
+    def run_diagnostic(self):
+        self.status_label.config(text="STATUS: DIAGNOSTIC COMPLETE // ALL SUBSYSTEMS NOMINAL")
+        
     # Bind F11 for Fullscreen Holographic Mode toggle
         self.bind("<F11>", self.toggle_fullscreen)
         self.bind("<Escape>", self.end_fullscreen)

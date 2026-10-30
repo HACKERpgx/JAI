@@ -38,7 +38,7 @@ class JAIHUD(tk.Tk):
         )
         self.status_label.pack(padx=20, pady=12)
         
-        # Telemetry Frame
+        # Telemetry Frame (MUST be defined here first!)
         telemetry_frame = tk.Frame(self, bg="#050b14")
         telemetry_frame.pack(fill="both", expand=True, padx=40, pady=10)
         
@@ -78,7 +78,7 @@ class JAIHUD(tk.Tk):
         self.canvas = tk.Canvas(telemetry_frame, height=70, bg="#02070f", highlightthickness=1, highlightbackground="#00f3ff")
         self.canvas.pack(fill="x", pady=5)
 
-        # Action Buttons Frame (Simulating Touch/Gesture Interaction)
+        # Action Buttons Frame (Correctly placed inside __init__)
         button_frame = tk.Frame(telemetry_frame, bg="#050b14")
         button_frame.pack(fill="x", pady=15)
         

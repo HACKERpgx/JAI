@@ -12,6 +12,12 @@ import logging
 from dotenv import load_dotenv
 import re
 from jai_assistant import execute_command, sessions as ja_sessions, UserSession as JAUserSession, request_id_ctx_var, detect_language as jai_detect_language
+from byok_service import (
+    ByokError, PROVIDERS, STORE as BYOK_STORE, active_subscription, billing_ready,
+    gemini_generate_content, get_model_request_config,
+    model_request_context, request_model_config_from_headers, stripe_configuration,
+    validate_provider_key,
+)
 import tempfile
 import pathlib
 import shutil
@@ -172,7 +178,7 @@ app.add_middleware(
     allow_origins=allow_origins,
     allow_credentials=True,
     allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
-    allow_headers=["Accept", "Authorization", "Content-Type", "X-Request-ID"],
+    allow_headers=["Accept", "Authorization", "Content-Type", "X-Request-ID", "X-JAI-Provider", "X-JAI-Model", "X-JAI-API-Key"],
 )
 
 # Add UTF-8 charset, authentication, and browser security headers.
@@ -183,6 +189,15 @@ ADMIN_API_PREFIXES = (
     "/api/integrations",
     "/api/security",
 )
+
+def subscription_required_for_request(path: str, method: str) -> bool:
+    if os.environ.get("JAI_REQUIRE_ACTIVE_SUBSCRIPTION", "false").lower() not in {"1", "true", "yes", "on"}:
+        return False
+    if not path.startswith("/api/") or path.startswith(ADMIN_API_PREFIXES):
+        return False
+    if path in {"/api/health", "/api/logout", "/api/byok/settings"} or path.startswith("/api/auth/") or path.startswith("/api/billing/"):
+        return False
+    return True
 
 @app.middleware("http")
 async def add_charset_header(request: Request, call_next):
@@ -207,6 +222,28 @@ async def add_charset_header(request: Request, call_next):
         else:
             request.state.authenticated_user = claims
             response = await call_next(request)
+    elif subscription_required_for_request(path, request.method) and request.method != "OPTIONS":
+        scheme, _, token = request.headers.get("authorization", "").partition(" ")
+        claims = verify_supabase_token(token.strip()) if scheme.lower() == "bearer" and token.strip() else None
+        if not claims or not claims.get("sub"):
+            response = JSONResponse(
+                {"code": "authentication_required", "detail": "Sign in to use JAI."},
+                status_code=401,
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        else:
+            try:
+                subscription = await BYOK_STORE.get_subscription(claims["sub"])
+                if not active_subscription(subscription):
+                    response = JSONResponse(
+                        {"code": "subscription_required", "detail": "An active JAI subscription is required to use this feature."},
+                        status_code=402,
+                    )
+                else:
+                    request.state.authenticated_user = claims
+                    response = await call_next(request)
+            except ByokError as exc:
+                response = JSONResponse({"code": exc.code, "detail": exc.message}, status_code=exc.status_code)
     else:
         response = await call_next(request)
 
@@ -236,6 +273,12 @@ except Exception:
 class WebTextRequest(BaseModel):
     text: str
     persona: Optional[str] = "assistant"
+
+def request_supabase_claims(request: Request) -> Optional[dict[str, Any]]:
+    scheme, _, token = request.headers.get("authorization", "").partition(" ")
+    if scheme.lower() != "bearer" or not token.strip():
+        return None
+    return verify_supabase_token(token.strip())
 
 class MathSimplifyRequest(BaseModel):
     expression: str
@@ -400,18 +443,30 @@ async def api_text(req: WebTextRequest, request: Request):
             import random
             return {"response": random.choice(HUMOROUS_QUIPS), "requestId": rid}
 
-        # Normal command processing
+        claims = request_supabase_claims(request)
+        model_config = request_model_config_from_headers(request.headers)
+        require_byok = os.environ.get("JAI_REQUIRE_BYOK", "false").lower() in {"1", "true", "yes", "on"}
+        if require_byok and not claims:
+            return JSONResponse({"code": "authentication_required", "detail": "Sign in and connect a provider key to use JAI."}, status_code=401)
+        if require_byok and not model_config:
+            return JSONResponse({"code": "provider_key_required", "detail": "Connect an OpenAI, OpenRouter, or Google Gemini key in AI Settings before chatting."}, status_code=409)
+        # Normal command processing; the provider override is isolated to this request.
         special = _handle_special_qa(text)
         if special is not None:
             result = special
+        elif model_config:
+            with model_request_context(model_config):
+                result = execute_command(text, session, suppress_tts=True)
         else:
             result = execute_command(text, session, suppress_tts=True)
 
         return {"response": result, "requestId": rid}
 
-    except Exception as e:
-        logging.error(f"Error in api_text: {e}", exc_info=True)
-        return {"response": f"DEBUG: {type(e).__name__}: {e}", "requestId": rid}
+    except ByokError as exc:
+        return JSONResponse({"code": exc.code, "detail": exc.message, "requestId": rid}, status_code=exc.status_code)
+    except Exception:
+        logging.error("Error in api_text", extra={"request_id": rid}, exc_info=True)
+        return JSONResponse({"code": "request_failed", "detail": "JAI couldn't complete that request. Please try again.", "requestId": rid}, status_code=500)
     finally:
         try:
             request_id_ctx_var.reset(token)
@@ -515,10 +570,11 @@ def _convert_to_wav16k_mono(src_path: str) -> str:
             pass
         raise RuntimeError("ffmpeg conversion failed") from e
 
-def _transcribe_wav(path: str, lang: str) -> str:
+def _transcribe_wav(path: str, lang: str, api_key_override: Optional[str] = None) -> str:
     # Prefer OpenAI Whisper if key and client available
-    api_key = os.environ.get("OPENAI_API_KEY")
+    api_key = api_key_override if api_key_override is not None else os.environ.get("OPENAI_API_KEY")
     if OpenAI and api_key:
+        client = None
         try:
             client = OpenAI(api_key=api_key)
             with open(path, "rb") as f:
@@ -527,6 +583,12 @@ def _transcribe_wav(path: str, lang: str) -> str:
                 return tr.text
         except Exception:
             pass
+        finally:
+            if client:
+                try:
+                    client.close()
+                except Exception:
+                    pass
     # Fallback to SpeechRecognition offline API (uses Google Web Speech - internet required)
     if sr is None:
         return ""
@@ -634,7 +696,59 @@ def _analyze_image_bytes(data: bytes, mime: str, prompt: str, analysis_type: str
         if not data_url:
             return "Could not read image data."
 
-        print(f"[DEBUG] Data URL created: {data_url[:100]}...")
+        request_model_config = get_model_request_config()
+        if request_model_config:
+            user_prompt = (prompt or "").strip()
+            if not user_prompt:
+                user_prompt = VISION_PROMPTS.get((analysis_type or "general").lower(), VISION_PROMPTS["general"])
+            user_prompt += "\n\nIMPORTANT: Respond only in English."
+            if request_model_config["provider"] == "gemini":
+                try:
+                    return gemini_generate_content(
+                        request_model_config,
+                        [{"role": "user", "parts": [
+                            {"text": user_prompt},
+                            {"inlineData": {"mimeType": mime, "data": base64.b64encode(data).decode("ascii")}},
+                        ]}],
+                        system_instruction="You are JAI Vision. Analyze the supplied image carefully and answer the user's request.",
+                        max_output_tokens=1500,
+                        temperature=0.3,
+                    )
+                except ByokError:
+                    return "Your Google Gemini key or model couldn't analyze this image. Check the model and account limits, then try again."
+                except Exception:
+                    return "Google Gemini couldn't analyze this image. Check the selected model and try again."
+            if OpenAI is None:
+                return "The selected provider connection is unavailable on this server."
+            client = None
+            try:
+                client = OpenAI(
+                    api_key=request_model_config["api_key"],
+                    base_url=request_model_config["base_url"],
+                    timeout=45.0,
+                )
+                response = client.chat.completions.create(
+                    model=request_model_config["model"],
+                    messages=[
+                        {"role": "system", "content": "You are JAI Vision. Analyze the supplied image carefully and answer the user's request."},
+                        {"role": "user", "content": [
+                            {"type": "text", "text": user_prompt},
+                            {"type": "image_url", "image_url": {"url": data_url, "detail": "high"}},
+                        ]},
+                    ],
+                    max_tokens=1500,
+                    temperature=0.3,
+                )
+                return (response.choices[0].message.content or "").strip() or "No description generated."
+            except Exception:
+                logging.warning("BYOK image analysis failed; shared-key fallback is disabled")
+                return "Your selected provider or model couldn't analyze this image. Check that the model supports image input, then try again."
+            finally:
+                if client:
+                    try:
+                        client.close()
+                    except Exception:
+                        pass
 
         # Try OpenAI first
         api_key = os.environ.get("OPENAI_API_KEY")
@@ -1020,6 +1134,13 @@ async def api_image(request: Request, file: UploadFile = File(...), prompt: str 
     rid = request.headers.get("x-request-id") or str(uuid.uuid4())
     token = request_id_ctx_var.set(rid)
     try:
+        claims = request_supabase_claims(request)
+        model_config = request_model_config_from_headers(request.headers)
+        require_byok = os.environ.get("JAI_REQUIRE_BYOK", "false").lower() in {"1", "true", "yes", "on"}
+        if require_byok and not claims:
+            return JSONResponse({"code": "authentication_required", "detail": "Sign in and connect a provider key before analyzing images."}, status_code=401)
+        if require_byok and not model_config:
+            return JSONResponse({"code": "provider_key_required", "detail": "Connect a provider key in AI Settings before analyzing images."}, status_code=409)
         web_id = request.cookies.get("jai_web_id") or "anon"
         username = f"web:{web_id}"
         if username not in ja_sessions:
@@ -1058,9 +1179,15 @@ async def api_image(request: Request, file: UploadFile = File(...), prompt: str 
             print(f"[ERROR] Image validation failed: {img_e}")
             return JSONResponse({"error": f"Image file appears corrupted or invalid: {str(img_e)}"}, status_code=400)
 
-        analysis = _analyze_image_bytes(data, mime, prompt, analysis_type)
+        if model_config:
+            with model_request_context(model_config):
+                analysis = _analyze_image_bytes(data, mime, prompt, analysis_type)
+        else:
+            analysis = _analyze_image_bytes(data, mime, prompt, analysis_type)
         analysis = _ensure_lang(analysis, "en")
         return {"response": analysis, "requestId": rid, "analysis_type": analysis_type}
+    except ByokError as exc:
+        return JSONResponse({"code": exc.code, "detail": exc.message, "requestId": rid}, status_code=exc.status_code)
     finally:
         try:
             request_id_ctx_var.reset(token)
@@ -1079,6 +1206,13 @@ async def api_image_multi(request: Request, files: List[UploadFile] = File(...),
     rid = request.headers.get("x-request-id") or str(uuid.uuid4())
     token = request_id_ctx_var.set(rid)
     try:
+        claims = request_supabase_claims(request)
+        model_config = request_model_config_from_headers(request.headers)
+        require_byok = os.environ.get("JAI_REQUIRE_BYOK", "false").lower() in {"1", "true", "yes", "on"}
+        if require_byok and not claims:
+            return JSONResponse({"code": "authentication_required", "detail": "Sign in and connect a provider key before analyzing images."}, status_code=401)
+        if require_byok and not model_config:
+            return JSONResponse({"code": "provider_key_required", "detail": "Connect a provider key in AI Settings before analyzing images."}, status_code=409)
         web_id = request.cookies.get("jai_web_id") or "anon"
         username = f"web:{web_id}"
         if username not in ja_sessions:
@@ -1097,7 +1231,11 @@ async def api_image_multi(request: Request, files: List[UploadFile] = File(...),
                 results.append({"index": i, "filename": file.filename, "error": "Unsupported file type"})
                 continue
 
-            analysis = _analyze_image_bytes(data, mime, prompt, analysis_type)
+            if model_config:
+                with model_request_context(model_config):
+                    analysis = _analyze_image_bytes(data, mime, prompt, analysis_type)
+            else:
+                analysis = _analyze_image_bytes(data, mime, prompt, analysis_type)
             results.append({
                 "index": i,
                 "filename": file.filename,
@@ -1105,6 +1243,8 @@ async def api_image_multi(request: Request, files: List[UploadFile] = File(...),
             })
 
         return {"results": results, "requestId": rid, "total_images": len(files)}
+    except ByokError as exc:
+        return JSONResponse({"code": exc.code, "detail": exc.message, "requestId": rid}, status_code=exc.status_code)
     finally:
         try:
             request_id_ctx_var.reset(token)
@@ -1125,6 +1265,13 @@ async def api_voice(request: Request, file: UploadFile = File(...), lang: str = 
     rid = request.headers.get("x-request-id") or str(uuid.uuid4())
     token = request_id_ctx_var.set(rid)
     try:
+        claims = request_supabase_claims(request)
+        model_config = request_model_config_from_headers(request.headers)
+        require_byok = os.environ.get("JAI_REQUIRE_BYOK", "false").lower() in {"1", "true", "yes", "on"}
+        if require_byok and not claims:
+            return JSONResponse({"code": "authentication_required", "detail": "Sign in and connect a provider key before using voice mode."}, status_code=401)
+        if require_byok and not model_config:
+            return JSONResponse({"code": "provider_key_required", "detail": "Connect a provider key in AI Settings before using voice mode."}, status_code=409)
         # Save uploaded audio (accept webm/ogg/wav/flac/etc.)
         up_ext = pathlib.Path(file.filename or "").suffix.lower() or ".webm"
         with tempfile.NamedTemporaryFile(delete=False, suffix=up_ext) as tmp:
@@ -1142,7 +1289,10 @@ async def api_voice(request: Request, file: UploadFile = File(...), lang: str = 
             wav_path = _convert_to_wav16k_mono(src_path)
 
         # Transcribe
-        text = _transcribe_wav(wav_path, lang)
+        whisper_key = None
+        if model_config:
+            whisper_key = model_config["api_key"] if model_config["provider"] == "openai" else ""
+        text = _transcribe_wav(wav_path, lang, api_key_override=whisper_key)
         web_id = request.cookies.get("jai_web_id") or "anon"
         username = f"web:{web_id}"
         if username not in ja_sessions:
@@ -1161,10 +1311,15 @@ async def api_voice(request: Request, file: UploadFile = File(...), lang: str = 
         special = _handle_special_qa(text)
         if special is not None:
             result = special
+        elif model_config:
+            with model_request_context(model_config):
+                result = execute_command(text, session, suppress_tts=True)
         else:
             result = execute_command(text, session, suppress_tts=True)
         result = _ensure_lang(result, desired_lang)
         return {"transcript": text, "response": result, "requestId": rid}
+    except ByokError as exc:
+        return JSONResponse({"code": exc.code, "detail": exc.message, "requestId": rid}, status_code=exc.status_code)
     finally:
         try:
             request_id_ctx_var.reset(token)
@@ -2184,6 +2339,149 @@ async def get_auth_config():
         "supabase_anon_key": SUPABASE_ANON_KEY,
         "enabled": bool(SUPABASE_URL and SUPABASE_ANON_KEY)
     }
+
+
+@app.get("/api/byok/settings")
+async def get_byok_settings(user: User = Depends(require_auth)):
+    try:
+        subscription_required = os.environ.get("JAI_REQUIRE_ACTIVE_SUBSCRIPTION", "false").lower() in {"1", "true", "yes", "on"}
+        try:
+            subscription = await BYOK_STORE.get_subscription(user.id)
+        except ByokError:
+            if subscription_required:
+                raise
+            subscription = None
+        return {
+            "providers": [
+                {
+                    "id": provider.id,
+                    "label": provider.label,
+                    "default_model": provider.default_model,
+                }
+                for provider in PROVIDERS.values()
+            ],
+            "subscription": {
+                "active": active_subscription(subscription),
+                "status": (subscription or {}).get("status", "inactive"),
+                "has_customer": bool((subscription or {}).get("stripe_customer_id")),
+            },
+            "subscription_required": subscription_required,
+            "billing_configured": billing_ready(),
+            "key_storage": "this_browser_only",
+        }
+    except ByokError as exc:
+        return JSONResponse({"code": exc.code, "detail": exc.message}, status_code=exc.status_code)
+
+
+@app.post("/api/byok/test")
+async def test_byok_key(request: Request, user: User = Depends(require_auth)):
+    try:
+        config = request_model_config_from_headers(request.headers)
+        if not config:
+            raise ByokError("provider_key_required", "Enter a provider key to test the connection.")
+        await validate_provider_key(config["provider"], config["api_key"])
+        return {"ok": True, "provider": config["provider"], "model": config["model"], "masked_key": "••••" + config["api_key"][-4:]}
+    except ByokError as exc:
+        return JSONResponse({"code": exc.code, "detail": exc.message}, status_code=exc.status_code)
+
+
+@app.post("/api/billing/checkout")
+async def create_billing_checkout(user: User = Depends(require_auth)):
+    config = stripe_configuration()
+    if not billing_ready():
+        return JSONResponse({"code": "billing_not_configured", "detail": "JAI subscription checkout is not configured yet."}, status_code=503)
+    try:
+        subscription = await BYOK_STORE.get_subscription(user.id)
+        if active_subscription(subscription):
+            return JSONResponse({"code": "already_subscribed", "detail": "Your JAI subscription is already active."}, status_code=409)
+        import stripe
+        stripe.api_key = config["secret_key"]
+        if not config["public_url"].startswith("https://"):
+            raise ByokError("billing_not_configured", "JAI's billing return URL must use HTTPS.", 503)
+        customer_id = (subscription or {}).get("stripe_customer_id")
+        args: dict[str, Any] = {
+            "mode": "subscription",
+            "line_items": [{"price": config["price_id"], "quantity": 1}],
+            "success_url": f"{config['public_url']}/?billing=success",
+            "cancel_url": f"{config['public_url']}/?billing=cancelled",
+            "client_reference_id": user.id,
+            "metadata": {"supabase_user_id": user.id},
+            "subscription_data": {"metadata": {"supabase_user_id": user.id}},
+        }
+        if customer_id:
+            args["customer"] = customer_id
+        elif user.email:
+            args["customer_email"] = user.email
+        session = stripe.checkout.Session.create(**args)
+        return {"checkout_url": session.url}
+    except ByokError as exc:
+        return JSONResponse({"code": exc.code, "detail": exc.message}, status_code=exc.status_code)
+    except Exception:
+        logging.warning("Stripe checkout session creation failed")
+        return JSONResponse({"code": "checkout_unavailable", "detail": "JAI couldn't start checkout. Please try again later."}, status_code=502)
+
+
+@app.post("/api/billing/portal")
+async def create_billing_portal(user: User = Depends(require_auth)):
+    config = stripe_configuration()
+    if not config["secret_key"]:
+        return JSONResponse({"code": "billing_not_configured", "detail": "JAI subscription management is not configured yet."}, status_code=503)
+    try:
+        subscription = await BYOK_STORE.get_subscription(user.id)
+        customer_id = (subscription or {}).get("stripe_customer_id")
+        if not customer_id:
+            return JSONResponse({"code": "billing_customer_missing", "detail": "No JAI billing account was found for this user."}, status_code=404)
+        import stripe
+        stripe.api_key = config["secret_key"]
+        session = stripe.billing_portal.Session.create(
+            customer=customer_id,
+            return_url=f"{config['public_url']}/",
+        )
+        return {"portal_url": session.url}
+    except Exception:
+        logging.warning("Stripe customer portal session creation failed")
+        return JSONResponse({"code": "billing_portal_unavailable", "detail": "JAI couldn't open subscription management. Please try again later."}, status_code=502)
+
+
+@app.post("/api/billing/webhook")
+async def stripe_billing_webhook(request: Request):
+    config = stripe_configuration()
+    if not config["webhook_secret"] or not config["secret_key"]:
+        return JSONResponse({"code": "billing_not_configured"}, status_code=503)
+    signature = request.headers.get("stripe-signature", "")
+    payload = await request.body()
+    try:
+        import stripe
+        stripe.api_key = config["secret_key"]
+        event = stripe.Webhook.construct_event(payload, signature, config["webhook_secret"])
+        event_type = event["type"]
+        if event_type in {"customer.subscription.created", "customer.subscription.updated", "customer.subscription.deleted"}:
+            subscription_obj = event["data"]["object"]
+            metadata = subscription_obj.get("metadata") or {}
+            user_id = metadata.get("supabase_user_id")
+            if user_id:
+                try:
+                    uuid.UUID(str(user_id))
+                except (TypeError, ValueError):
+                    return {"received": True}
+                customer_id = subscription_obj.get("customer")
+                if isinstance(customer_id, dict):
+                    customer_id = customer_id.get("id")
+                await BYOK_STORE.save_subscription({
+                    "user_id": user_id,
+                    "stripe_customer_id": customer_id,
+                    "stripe_subscription_id": subscription_obj.get("id"),
+                    "status": subscription_obj.get("status", "inactive"),
+                    "current_period_end": subscription_obj.get("current_period_end"),
+                    "stripe_event_created": event.get("created"),
+                    "stripe_event_id": event.get("id"),
+                })
+        return {"received": True}
+    except ByokError as exc:
+        return JSONResponse({"code": exc.code}, status_code=exc.status_code)
+    except Exception:
+        # Invalid signatures and malformed events are intentionally not reflected.
+        return JSONResponse({"code": "invalid_webhook"}, status_code=400)
 
 
 if __name__ == "__main__":

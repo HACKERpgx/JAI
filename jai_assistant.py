@@ -34,6 +34,18 @@ import uuid
 import contextvars
 import time
 from contextlib import asynccontextmanager
+try:
+    from openai import OpenAI as OpenAIClient
+except ImportError:
+    OpenAIClient = None
+try:
+    from byok_service import ByokError, gemini_chat, get_model_request_config
+except ImportError:
+    class ByokError(Exception):
+        pass
+    def get_model_request_config():
+        return None
+    gemini_chat = None
 
 try:
     import pyttsx3
@@ -1468,10 +1480,19 @@ def solve_mathematical_problem(command: str) -> str:
 # JAI Reply (Enhanced for Smarter Responses)
 # -----------------------------
 def jai_reply(prompt: str, session: UserSession) -> str:
-     # Check if Groq client is available
-     if client is None:
-         logging.error("Groq client is not initialized - GROQ_API_KEY may be missing", extra={'user': session.username})
-         return "I apologize, sir. My AI systems are not configured. Please set the GROQ_API_KEY environment variable."
+     # BYOK config is request-scoped; never mutate the module-global provider client.
+     request_model_config = get_model_request_config()
+     is_gemini = bool(request_model_config and request_model_config.get("provider") == "gemini")
+     active_client = None if is_gemini else client
+     active_model = "llama-3.1-8b-instant"
+     if request_model_config:
+         if not is_gemini and OpenAIClient is None:
+             return "The selected provider connection is unavailable on this server. Please contact JAI support."
+         active_model = request_model_config["model"]
+     # Check if a provider client is available
+     if active_client is None and not request_model_config:
+         logging.error("AI client is not initialized - provider key may be missing", extra={'user': session.username})
+         return "I apologize, sir. My AI systems are not configured. Please connect a provider key in AI Settings."
 
      # Check for time-related queries first
      time_queries = [
@@ -1536,16 +1557,29 @@ def jai_reply(prompt: str, session: UserSession) -> str:
          {"role": "system", "content": full_prompt},
          {"role": "user", "content": prompt}
      ]
+
+     if request_model_config and not is_gemini:
+         try:
+             active_client = OpenAIClient(
+                 api_key=request_model_config["api_key"],
+                 base_url=request_model_config["base_url"],
+                 timeout=45.0,
+             )
+         except Exception:
+             logging.error("Could not initialize the request-scoped BYOK client", extra={'user': session.username})
+             return "I couldn't connect to your selected provider. Check the saved key and model in AI Settings."
      
      try:
-         # Use Groq API - Lightning fast!
-         response = client.chat.completions.create(
-             model="llama-3.1-8b-instant",  # Groq's fastest model
-             messages=messages,
-             max_tokens=1000,
-             temperature=0.7
-         )
-         answer = response.choices[0].message.content.strip()
+         if is_gemini:
+             answer = gemini_chat(request_model_config, messages)
+         else:
+             response = active_client.chat.completions.create(
+                 model=active_model,
+                 messages=messages,
+                 max_tokens=1000,
+                 temperature=0.7
+             )
+             answer = response.choices[0].message.content.strip()
          
          # Post-process response to remove any duplicate time information
          if any(query in prompt.lower() for query in time_queries):
@@ -1568,6 +1602,10 @@ def jai_reply(prompt: str, session: UserSession) -> str:
              return answer
          return answer
      except Exception as e:
+         # Provider exceptions can contain request details; never log them for BYOK.
+         if request_model_config:
+             logging.error("BYOK provider request failed", extra={'user': session.username})
+             return "Your selected provider couldn't complete the request. Check the key, model, and provider balance, then try again."
          logging.error(f"AI error: {str(e)}", extra={'user': session.username})
          # Try fallback models on Groq
          fallback_models = [
@@ -1577,7 +1615,7 @@ def jai_reply(prompt: str, session: UserSession) -> str:
          
          for fallback_model in fallback_models:
              try:
-                 response = client.chat.completions.create(
+                 response = active_client.chat.completions.create(
                      model=fallback_model,
                      messages=messages,
                      max_tokens=1000,
@@ -1592,6 +1630,12 @@ def jai_reply(prompt: str, session: UserSession) -> str:
          # All models failed
          logging.error("All AI models failed", extra={'user': session.username})
          return "I apologize, sir. My AI systems are temporarily unavailable. Please try again in a moment."
+     finally:
+         if request_model_config and active_client is not None and active_client is not client:
+             try:
+                 active_client.close()
+             except Exception:
+                 pass
 
 # -----------------------------
 # TTS helper

@@ -18,6 +18,22 @@ services:
         sync: false
       - key: SUPABASE_JWT_SECRET
         sync: false
+      # Apply the subscription-state migration before enabling paid access enforcement.
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: STRIPE_SECRET_KEY
+        sync: false
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false
+      - key: STRIPE_PRICE_ID
+        sync: false
+      - key: JAI_PUBLIC_URL
+        value: https://j-ai.top
+      # Enable only after secrets, migration, Stripe recurring price, and webhook are configured.
+      - key: JAI_REQUIRE_ACTIVE_SUBSCRIPTION
+        value: "false"
+      - key: JAI_REQUIRE_BYOK
+        value: "false"
     healthCheckPath: /
     autoDeploy: true
     domains:

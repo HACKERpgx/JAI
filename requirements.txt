@@ -71,3 +71,4 @@ mangum==0.17.0
 # Supabase Auth
 supabase==2.13.0
 pyjwt==2.10.1
+stripe>=11.0.0,<15.0.0
